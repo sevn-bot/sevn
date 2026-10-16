@@ -1,0 +1,26 @@
+{"type": "session", "subtype": "load", "session_id": "ses_eb99d4e67ffeiQqoOL5fadImj5"}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "The user asks \""}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "what did I"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " ask before?\" referring"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " to the"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " previous turn. Looking at the"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " conversation history,"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " the previous user message"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " was"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": ": \"Call the sevn"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "_echo"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " tool exactly once with the text 'ping'.\"\n\nI should answer"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " that question directly and"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " concisely."}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "You asked me to"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": " **call the"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": " `se"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "vn_echo` tool exactly once"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": " with the text \""}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "ping\"**. I"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": " did that,"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": " and the tool echoed"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": " the text back"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "."}}
+{"type": "session_update", "update": {"sessionUpdate": "usage_update"}}
+{"type": "prompt_response", "stopReason": "end_turn", "usage": {"total_tokens": 10492, "input_tokens": 35, "output_tokens": 89, "cached_read_tokens": 10368}}

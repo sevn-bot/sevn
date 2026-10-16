@@ -1,0 +1,27 @@
+{"type": "session", "subtype": "new", "session_id": "ses_eb99ca692ffe43oA7fnHExuhhS"}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "The user first asked"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " for a detailed essay"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " about rivers, at"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " least 400 words"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": ", no tools."}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " I hadn't actually written"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " it yet — my"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " previous turn was just"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " a tool call to"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " write the file."}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " Then the user replied"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " asking for exactly the"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " word \"pong\""}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " with no tools.\n\n"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "The latest instruction should"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " take precedence:"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " reply with exactly the"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " word pong, no"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " tools.\n\nI should"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " just respond with \""}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "pong\" and nothing"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " else"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "."}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "pong"}}
+{"type": "session_update", "update": {"sessionUpdate": "usage_update"}}
+{"type": "prompt_response", "stopReason": "end_turn", "usage": {"total_tokens": 10384, "input_tokens": 183, "output_tokens": 89, "cached_read_tokens": 10112}}

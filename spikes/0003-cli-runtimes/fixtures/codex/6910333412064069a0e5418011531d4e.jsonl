@@ -1,0 +1,11 @@
+{"method": "thread/start", "params": {"threadId": "01a14646-b9ac-77b1-97e3-3907c87e1304"}}
+{"method": "thread/status/changed", "params": {}}
+{"method": "turn/started", "params": {}}
+{"method": "item/started", "params": {"item": {"type": "userMessage", "id": "01a14646-c705-7c11-b62e-edf31cacb2a1"}}}
+{"method": "item/completed", "params": {"item": {"type": "userMessage", "id": "01a14646-c705-7c11-b62e-edf31cacb2a1"}}}
+{"method": "item/started", "params": {"item": {"type": "agentMessage", "id": "msg_0ae62d2c6a0efb58016ad280c7fd208191a07ddc34da294f1e"}}}
+{"method": "item/agentMessage/delta", "params": {"delta": "pong"}}
+{"method": "item/completed", "params": {"item": {"type": "agentMessage", "id": "msg_0ae62d2c6a0efb58016ad280c7fd208191a07ddc34da294f1e"}}}
+{"method": "thread/tokenUsage/updated", "params": {}}
+{"method": "thread/status/changed", "params": {}}
+{"method": "turn/completed", "params": {"turn": {"id": "01a14646-c6d5-7103-a0eb-9285021245af", "status": "completed"}}}

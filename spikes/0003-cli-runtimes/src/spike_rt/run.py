@@ -6,22 +6,48 @@ import argparse
 import asyncio
 import sys
 import tempfile
+from collections.abc import Awaitable, Callable
 from pathlib import Path
+from typing import Protocol
 
 import anyio
 
-from spike_rt.claude_rt import ClaudeSession, _scrub
+from spike_rt.claude_rt import _scrub
 from spike_rt.events import RuntimeEvent
+from spike_rt.mcp_server import RecordedCall
+
+PermissionCallback = Callable[[RuntimeEvent], str | Awaitable[str]]
+EventCallback = Callable[[RuntimeEvent], Awaitable[None] | None]
+
+
+class RuntimeSession(Protocol):
+    """The session surface the live scenarios drive."""
+
+    session_ref: str | None
+    bearer: str
+    mcp_calls: list[RecordedCall]
+
+    async def turn(
+        self,
+        prompt: str,
+        *,
+        on_permission: PermissionCallback | None = None,
+        on_event: EventCallback | None = None,
+    ) -> list[RuntimeEvent]: ...
+
+    async def interrupt(self) -> None: ...
+
+    async def aclose(self) -> None: ...
 
 
 async def open_session(
     runtime: str,
     workspace: Path,
     session_ref: str | None = None,
-) -> ClaudeSession:
+) -> RuntimeSession:
     """Create ``README.md``, set the runtime cwd, and open a session.
 
-    ``session_ref`` resumes that CLI session. Codex and OpenCode arrive in W3.
+    ``session_ref`` resumes that CLI session.
     """
 
     await _prepare_workspace(workspace)
@@ -29,6 +55,14 @@ async def open_session(
         from spike_rt.claude_rt import open_claude_session
 
         return await open_claude_session(workspace, session_ref)
+    if runtime == "codex":
+        from spike_rt.codex_rt import open_codex_session
+
+        return await open_codex_session(workspace, session_ref)
+    if runtime in {"opencode", "cursor"}:
+        from spike_rt.acp_rt import open_acp_session
+
+        return await open_acp_session(runtime, workspace, session_ref)
     raise RuntimeError(f"runtime {runtime!r} is not available")
 
 

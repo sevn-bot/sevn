@@ -1,0 +1,32 @@
+{"type": "session", "subtype": "new", "session_id": "ses_eb9a1028effekQHkU4ufRL2n2r"}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "The user just gave"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " a new instruction:"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " \"Reply with exactly"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " the word pong."}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " Do not use tools"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": ".\"\n\nThe previous context"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " shows an essay request"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " that I apparently only"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " partially responded"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " to. Now the"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " user is asking"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " for something completely different"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " — reply with exactly"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " the word \"pong"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "\".\n\nI should follow"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " the current instruction"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": ". The instruction"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " is clear: reply"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " with exactly the word"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " pong, no tools"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": ".\n\nShould I include"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " any"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " formatting? \"Reply with exactly the word pong\" — so just \"pong\". No extra text, no punctuation changes..."}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " well, \"pong\" itself"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": ". Exactly the word"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " pong.\n\nI'll just"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " output"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " pong."}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "pong"}}
+{"type": "session_update", "update": {"sessionUpdate": "usage_update"}}
+{"type": "prompt_response", "stopReason": "end_turn", "usage": {"total_tokens": 10351, "input_tokens": 114, "output_tokens": 125, "cached_read_tokens": 10112}}

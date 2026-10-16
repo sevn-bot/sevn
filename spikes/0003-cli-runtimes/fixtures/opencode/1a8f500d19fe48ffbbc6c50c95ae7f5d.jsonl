@@ -1,0 +1,32 @@
+{"type": "session", "subtype": "load", "session_id": "ses_eb9a142efffetRpFyVVYF07NcH"}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "The user is asking"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " what they asked before"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": ". Looking"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " at the conversation"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " history, the previous"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " turn was: \""}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "Call the sevn"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "_echo tool"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " exactly once with"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " the text '"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "ping"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "'.\"\n\nThat's the only prior exchange in this session, so I should answer based on"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " the conversation history available to"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " me. I shouldn't"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " fabricate prior sessions since"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " I only have this"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " session's context."}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "Before this, you"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": " asked me to **"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "call the `se"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "vn_echo` tool"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": " exactly once with the"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": " text \"ping\""}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "**. That's the only"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": " thing you've asked so"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": " far in this conversation"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": " — was there"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": " something else you meant"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": " to ask?"}}
+{"type": "session_update", "update": {"sessionUpdate": "usage_update"}}
+{"type": "prompt_response", "stopReason": "end_turn", "usage": {"total_tokens": 10498, "input_tokens": 10, "output_tokens": 120, "cached_read_tokens": 10368}}

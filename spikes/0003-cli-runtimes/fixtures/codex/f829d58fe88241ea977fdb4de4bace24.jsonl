@@ -1,0 +1,66 @@
+{"method": "thread/start", "params": {"threadId": "01a1465f-a7ff-7311-bcfc-a8452d2e0edb"}}
+{"method": "thread/started", "params": {"threadId": "01a1465f-a7ff-7311-bcfc-a8452d2e0edb"}}
+{"method": "mcpServer/startupStatus/updated", "params": {}}
+{"method": "mcpServer/startupStatus/updated", "params": {}}
+{"method": "mcpServer/startupStatus/updated", "params": {}}
+{"method": "mcpServer/startupStatus/updated", "params": {}}
+{"method": "mcpServer/startupStatus/updated", "params": {}}
+{"method": "mcpServer/startupStatus/updated", "params": {}}
+{"method": "mcpServer/startupStatus/updated", "params": {}}
+{"method": "mcpServer/startupStatus/updated", "params": {}}
+{"method": "mcpServer/startupStatus/updated", "params": {}}
+{"method": "mcpServer/startupStatus/updated", "params": {}}
+{"method": "mcpServer/startupStatus/updated", "params": {}}
+{"method": "mcpServer/startupStatus/updated", "params": {}}
+{"method": "mcpServer/startupStatus/updated", "params": {}}
+{"method": "thread/status/changed", "params": {}}
+{"method": "turn/started", "params": {}}
+{"method": "mcpServer/startupStatus/updated", "params": {}}
+{"method": "mcpServer/startupStatus/updated", "params": {}}
+{"method": "mcpServer/startupStatus/updated", "params": {}}
+{"method": "item/started", "params": {"item": {"type": "userMessage", "id": "01a1465f-b524-71b2-96d4-5b42961c6fc7"}}}
+{"method": "item/completed", "params": {"item": {"type": "userMessage", "id": "01a1465f-b524-71b2-96d4-5b42961c6fc7"}}}
+{"method": "item/started", "params": {"item": {"type": "agentMessage", "id": "msg_098eb946047c29a1016ad2871912f48191b82b015c348fc334"}}}
+{"method": "item/agentMessage/delta", "params": {"delta": "I"}}
+{"method": "item/agentMessage/delta", "params": {"delta": "’ll"}}
+{"method": "item/agentMessage/delta", "params": {"delta": " call"}}
+{"method": "item/agentMessage/delta", "params": {"delta": " `"}}
+{"method": "item/agentMessage/delta", "params": {"delta": "se"}}
+{"method": "item/agentMessage/delta", "params": {"delta": "vn"}}
+{"method": "item/agentMessage/delta", "params": {"delta": "_echo"}}
+{"method": "item/agentMessage/delta", "params": {"delta": "`"}}
+{"method": "item/agentMessage/delta", "params": {"delta": " once"}}
+{"method": "item/agentMessage/delta", "params": {"delta": " with"}}
+{"method": "item/agentMessage/delta", "params": {"delta": " the"}}
+{"method": "item/agentMessage/delta", "params": {"delta": " exact"}}
+{"method": "item/agentMessage/delta", "params": {"delta": " requested"}}
+{"method": "item/agentMessage/delta", "params": {"delta": " text"}}
+{"method": "item/agentMessage/delta", "params": {"delta": "."}}
+{"method": "item/completed", "params": {"item": {"type": "agentMessage", "id": "msg_098eb946047c29a1016ad2871912f48191b82b015c348fc334"}}}
+{"method": "item/started", "params": {"item": {"type": "reasoning", "id": "rs_098eb946047c29a1016ad28719ce2c8191b84f70d0134ac73f"}}}
+{"method": "item/completed", "params": {"item": {"type": "reasoning", "id": "rs_098eb946047c29a1016ad28719ce2c8191b84f70d0134ac73f"}}}
+{"method": "thread/tokenUsage/updated", "params": {}}
+{"method": "item/started", "params": {"item": {"type": "reasoning", "id": "rs_098eb946047c29a1016ad2871c3b7c81919e564b97ed21f82f"}}}
+{"method": "item/completed", "params": {"item": {"type": "reasoning", "id": "rs_098eb946047c29a1016ad2871c3b7c81919e564b97ed21f82f"}}}
+{"method": "item/started", "params": {"item": {"type": "mcpToolCall", "id": "exec-32e9d19f-8f1f-47c4-91e5-ec702d2de52c", "tool": "sevn_echo", "status": "inProgress", "arguments": {"text": "ping"}}}}
+{"method": "thread/status/changed", "params": {}}
+{"method": "mcpServer/elicitation/request", "params": {"itemId": "mcpServer/elicitation/request", "tool": "sevn_echo", "arguments": {}}}
+{"method": "serverRequest/resolved", "params": {}}
+{"method": "thread/status/changed", "params": {}}
+{"method": "item/completed", "params": {"item": {"type": "mcpToolCall", "id": "exec-32e9d19f-8f1f-47c4-91e5-ec702d2de52c", "tool": "sevn_echo", "status": "completed", "arguments": {"text": "ping"}}}}
+{"method": "thread/tokenUsage/updated", "params": {}}
+{"method": "item/started", "params": {"item": {"type": "agentMessage", "id": "msg_098eb946047c29a1016ad2871e22f081919a1d56c0d45ddbe5"}}}
+{"method": "item/agentMessage/delta", "params": {"delta": "`"}}
+{"method": "item/agentMessage/delta", "params": {"delta": "se"}}
+{"method": "item/agentMessage/delta", "params": {"delta": "vn"}}
+{"method": "item/agentMessage/delta", "params": {"delta": "_echo"}}
+{"method": "item/agentMessage/delta", "params": {"delta": "`"}}
+{"method": "item/agentMessage/delta", "params": {"delta": " returned"}}
+{"method": "item/agentMessage/delta", "params": {"delta": " `\""}}
+{"method": "item/agentMessage/delta", "params": {"delta": "ping"}}
+{"method": "item/agentMessage/delta", "params": {"delta": "\""}}
+{"method": "item/agentMessage/delta", "params": {"delta": "`."}}
+{"method": "item/completed", "params": {"item": {"type": "agentMessage", "id": "msg_098eb946047c29a1016ad2871e22f081919a1d56c0d45ddbe5"}}}
+{"method": "thread/tokenUsage/updated", "params": {}}
+{"method": "thread/status/changed", "params": {}}
+{"method": "turn/completed", "params": {"turn": {"id": "01a1465f-a8ec-7c42-8049-514a4546d5b3", "status": "completed"}}}
