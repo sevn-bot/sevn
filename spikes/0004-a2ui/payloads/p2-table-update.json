@@ -1,0 +1,66 @@
+{
+  "messages": [
+    {
+      "version": "v0.9",
+      "createSurface": {
+        "surfaceId": "p2-table-update",
+        "catalogId": "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"
+      }
+    },
+    {
+      "version": "v0.9",
+      "updateComponents": {
+        "surfaceId": "p2-table-update",
+        "components": [
+          {
+            "id": "root",
+            "component": "Table",
+            "rows": {
+              "path": "/rows"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "version": "v0.9",
+      "updateDataModel": {
+        "surfaceId": "p2-table-update",
+        "path": "/rows",
+        "value": [
+          {
+            "item": "Ada",
+            "qty": 1
+          },
+          {
+            "item": "Grace",
+            "qty": 2
+          }
+        ]
+      }
+    }
+  ],
+  "update": [
+    {
+      "version": "v0.9",
+      "updateDataModel": {
+        "surfaceId": "p2-table-update",
+        "path": "/rows",
+        "value": [
+          {
+            "item": "Ada",
+            "qty": 9
+          },
+          {
+            "item": "Grace",
+            "qty": 2
+          },
+          {
+            "item": "Lin",
+            "qty": 3
+          }
+        ]
+      }
+    }
+  ]
+}

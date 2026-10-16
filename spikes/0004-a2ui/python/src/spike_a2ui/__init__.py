@@ -1,1 +1,1 @@
-"""Spike S3 A2UI payloads. Builders land in a later wave."""
+"""Spike S3 A2UI payloads. ``build_payloads.py`` writes ``payloads/``."""
