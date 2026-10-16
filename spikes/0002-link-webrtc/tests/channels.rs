@@ -1,4 +1,4 @@
-//! D2 channels, chunking, and ICE restart. Green after W2.
+//! D2 channels, chunking, and ICE restart.
 
 mod support;
 
@@ -9,7 +9,6 @@ use common::{Channel, Peer};
 
 use support::{LIBS, Peers};
 
-#[ignore = "green after W2"]
 #[test]
 fn peer_by_name_rejects_unknown() {
     for name in ["pion", "webrtc-rs", "STR0M", ""] {
@@ -22,7 +21,6 @@ fn peer_by_name_rejects_unknown() {
     }
 }
 
-#[ignore = "green after W2"]
 #[test]
 fn three_ordered_channels_open() {
     for name in LIBS {
@@ -36,7 +34,6 @@ fn three_ordered_channels_open() {
     }
 }
 
-#[ignore = "green after W2"]
 #[test]
 fn rpc_messages_arrive_in_order() {
     for name in LIBS {
@@ -44,7 +41,6 @@ fn rpc_messages_arrive_in_order() {
     }
 }
 
-#[ignore = "green after W2"]
 #[test]
 fn events_messages_arrive_in_order() {
     for name in LIBS {
@@ -52,7 +48,6 @@ fn events_messages_arrive_in_order() {
     }
 }
 
-#[ignore = "green after W2"]
 #[test]
 fn files_chunking_roundtrip() {
     assert_eq!(common::CHANNEL_FILES, 2);
@@ -73,7 +68,6 @@ fn files_chunking_roundtrip() {
     }
 }
 
-#[ignore = "green after W2"]
 #[test]
 fn files_short_chunk_roundtrip() {
     for name in LIBS {
@@ -88,7 +82,6 @@ fn files_short_chunk_roundtrip() {
     }
 }
 
-#[ignore = "green after W2"]
 #[test]
 fn ice_restart_recovers() {
     for name in LIBS {

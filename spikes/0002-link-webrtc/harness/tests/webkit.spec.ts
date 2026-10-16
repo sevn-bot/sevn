@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
+import { test } from "node:test";
 
 import { FILE_BYTES, fileSha256 } from "./support/blob.ts";
-import { red } from "./support/red.ts";
 import { LIBS, withPeer } from "./support/session.ts";
 
 const EXPECTED = [
@@ -10,7 +10,7 @@ const EXPECTED = [
   { id: 2, label: "files" },
 ];
 
-red("W2")("rust peer and webkit open three channels", async () => {
+test("rust peer and webkit open three channels", async () => {
   for (const lib of LIBS) {
     await withPeer("webkit", lib, "channels", async (page) => {
       await page.waitForFunction(
@@ -33,7 +33,7 @@ red("W2")("rust peer and webkit open three channels", async () => {
   }
 });
 
-red("W2")("webkit receives 10 MB file intact", async () => {
+test("webkit receives 10 MB file intact", async () => {
   const expected = fileSha256();
   for (const lib of LIBS) {
     await withPeer("webkit", lib, "file", async (page) => {
