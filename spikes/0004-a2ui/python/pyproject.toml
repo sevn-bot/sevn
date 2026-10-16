@@ -1,0 +1,20 @@
+# D1 pins. Specs, Swift revision, and renderer API paths: ../PINS.md
+# a2ui-core 0.3.0 speaks v0.9.1 and v1.0 (tag python/a2ui-core/v0.3.0).
+
+[project]
+name = "spike-a2ui"
+version = "0.1.0"
+description = "Spike S3: A2UI payloads for the React and SwiftUI renderers"
+requires-python = ">=3.13"
+dependencies = [
+    "a2ui-core==0.3.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.1,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
