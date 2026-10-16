@@ -42,6 +42,7 @@ CSP = (
 _FORBIDDEN_ORIGIN = "forbidden origin"
 _FORBIDDEN_HOST = "forbidden host"
 _DEV_ORIGIN = "http://localhost:5173"
+_DEV_HOST = "localhost:5173"
 
 type _Asgi = Callable[[Scope, Receive, Send], Awaitable[None]]
 
@@ -143,6 +144,12 @@ async def _lifespan(app: ASGIApp) -> AsyncGenerator[None]:
     try:
         state.hub = Hub(outbox, oplog)
         state.token = await asyncio.to_thread(_write_token, paths.run / "token")
+        await asyncio.to_thread(
+            _write_bind,
+            paths.run / "bind",
+            state.runtime.host,
+            state.runtime.port,
+        )
         register("loopback/token", state.token)
         if state.runtime.open_browser:
             browser = asyncio.create_task(_open_browser(state))
@@ -219,6 +226,9 @@ def refusal(headers: Headers, port: int, *, server: object = None) -> str | None
 
 def _allowed_hosts(port: int) -> set[str]:
     hosts = {f"127.0.0.1:{port}", f"localhost:{port}", f"[::1]:{port}"}
+    # Vite forwards the browser Host. D8 already allows this origin when SEVN_DEV=1.
+    if os.environ.get("SEVN_DEV") == "1":
+        hosts.add(_DEV_HOST)
     extra = os.environ.get("SEVN_ALLOWED_HOSTS", "")
     for item in extra.split(","):
         cleaned = item.strip()
@@ -290,6 +300,12 @@ async def _reject_websocket(send: Send, message: str) -> None:
         }
     )
     await send({"type": "websocket.http.response.body", "body": body})
+
+
+def _write_bind(path: Path, host: str, port: int) -> None:
+    """Publish the address this process bound so the probe does not dial config."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f"{host}\n{port}\n", encoding="ascii")
 
 
 def _write_token(path: Path) -> str:

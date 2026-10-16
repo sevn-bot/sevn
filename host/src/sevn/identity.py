@@ -4,15 +4,19 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import os
 from dataclasses import dataclass
 from typing import Protocol
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from sevn.secrets.errors import SecretNotFound
+from sevn.paths import Paths
+from sevn.secrets.errors import SecretBackendReadOnly, SecretNotFound
+from sevn.secrets.registry import register
 
 _NAME = "host/identity"
+_LOCAL_FILE = "host.pem"
 
 
 class SecretStore(Protocol):
@@ -33,11 +37,43 @@ def load_or_create(backend: SecretStore) -> HostIdentity:
         stored = backend.get(_NAME)
     except SecretNotFound:
         stored = ""
-    if not stored:
-        private = Ed25519PrivateKey.generate()
-        backend.set(_NAME, _pem(private))
-        return _from_private(private)
-    return _from_pem(stored)
+    if stored:
+        return _from_pem(stored)
+    private = Ed25519PrivateKey.generate()
+    pem = _pem(private)
+    try:
+        backend.set(_NAME, pem)
+    except SecretBackendReadOnly:
+        # `host/identity` is not a legal env var name, so the read-only backend
+        # cannot hold it. Keep the key on disk instead of aborting startup.
+        existing = _read_local_pem()
+        if existing:
+            return _from_pem(existing)
+        _write_local_pem(pem)
+    return _from_private(private)
+
+
+def _read_local_pem() -> str:
+    path = Paths.from_env().keys / _LOCAL_FILE
+    if not path.is_file():
+        return ""
+    pem = path.read_text(encoding="ascii").strip()
+    if pem:
+        register(_NAME, pem)
+    return pem
+
+
+def _write_local_pem(pem: str) -> None:
+    path = Paths.from_env().keys / _LOCAL_FILE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = pem if pem.endswith("\n") else pem + "\n"
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        os.write(descriptor, payload.encode("ascii"))
+    finally:
+        os.close(descriptor)
+    os.chmod(path, 0o600)
+    register(_NAME, pem.strip())
 
 
 def _pem(private: Ed25519PrivateKey) -> str:

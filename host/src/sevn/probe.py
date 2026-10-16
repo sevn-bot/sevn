@@ -87,7 +87,8 @@ async def _session[T](work: Callable[[_Socket], Awaitable[T]]) -> T:
     settings = Settings.load()
     paths = Paths.from_env()
     token = _read_token(paths.run / "token")
-    url = _ws_url(settings.http.host, settings.http.port)
+    host, port = _dial_target(paths, settings)
+    url = _ws_url(host, port)
     try:
         return await asyncio.wait_for(_connected(url, token, work), _TIMEOUT)
     except ProbeError:
@@ -167,6 +168,23 @@ def _read_token(path: Path) -> str:
     if token == "":
         raise ProbeError("token file is empty")
     return token
+
+
+def _dial_target(paths: Paths, settings: Settings) -> tuple[str, int]:
+    """Use the address ``sevn serve`` bound when it published one."""
+    path = paths.run / "bind"
+    if not path.is_file():
+        return settings.http.host, settings.http.port
+    lines = path.read_text(encoding="utf-8").splitlines()
+    if len(lines) != 2 or lines[0].strip() == "":
+        raise ProbeError("bind file is invalid")
+    try:
+        port = int(lines[1].strip())
+    except ValueError as exc:
+        raise ProbeError("bind file is invalid") from exc
+    if port < 1 or port > 65535:
+        raise ProbeError("bind file is invalid")
+    return lines[0].strip(), port
 
 
 def _ws_url(host: str, port: int) -> str:

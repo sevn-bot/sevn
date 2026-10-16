@@ -16,8 +16,8 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     proxy: {
-      "/ws": { target: host, ws: true },
-      "/auth": { target: host },
+      "/ws": { target: host, ws: true, changeOrigin: true },
+      "/auth": { target: host, changeOrigin: true },
     },
   },
   test: {
