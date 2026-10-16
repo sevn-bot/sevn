@@ -1,7 +1,5 @@
-import { expect, vi } from "vitest";
-import { red } from "../support/red.ts";
+import { expect, test, vi } from "vitest";
 
-const test = red("W6");
 const url = "ws://127.0.0.1:9876/ws";
 
 type Frame = Record<string, unknown>;

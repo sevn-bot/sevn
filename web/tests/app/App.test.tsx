@@ -1,7 +1,5 @@
-import { vi } from "vitest";
-import { red } from "../support/red.ts";
+import { test, vi } from "vitest";
 
-const test = red("W6");
 const socketUrl = "ws://localhost:3000/ws";
 const hostId = "host_example";
 

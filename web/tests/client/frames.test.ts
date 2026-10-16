@@ -1,9 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { expect } from "vitest";
-import { red } from "../support/red.ts";
-
-const test = red("W6");
+import { expect, test } from "vitest";
 
 type Frame = { t: string } & Record<string, unknown>;
 

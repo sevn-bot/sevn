@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { red } from "../tests/support/red.ts";
 import { statePath } from "./global-setup.ts";
 
 type SmokePage = {
@@ -31,7 +30,10 @@ async function runSmoke(page: SmokePage, expect: ExpectVisible): Promise<void> {
 }
 
 if (process.env.VITEST) {
-  red("W6")("click Ping shows event # and a number", async () => {
+  const { test } = (await import("vitest")) as {
+    test: (name: string, fn: () => Promise<void>) => void;
+  };
+  test("click Ping shows event # and a number", async () => {
     const playwrightPackage = "@playwright/test";
     const playwright = (await import(playwrightPackage)) as {
       chromium: {
@@ -56,20 +58,13 @@ if (process.env.VITEST) {
 } else {
   const playwrightPackage = ["@playwright", "test"].join("/");
   const playwright = nodeRequire(playwrightPackage) as {
-    test: {
-      (name: string, fn: (args: { page: SmokePage }) => Promise<void>): void;
-      skip: (condition: boolean, description: string) => void;
-    };
+    test: (
+      name: string,
+      fn: (args: { page: SmokePage }) => Promise<void>,
+    ) => void;
     expect: ExpectVisible;
   };
-  playwright.test(
-    "click Ping shows event # and a number [green after W6]",
-    async ({ page }) => {
-      playwright.test.skip(
-        process.env.SEVN_RUN_MARKED !== "1",
-        "green after W6",
-      );
-      await runSmoke(page, playwright.expect);
-    },
-  );
+  playwright.test("click Ping shows event # and a number", async ({ page }) => {
+    await runSmoke(page, playwright.expect);
+  });
 }

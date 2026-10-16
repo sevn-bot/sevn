@@ -1,4 +1,4 @@
-"""Contract export and drift check (D18, D21). Green after W6."""
+"""Contract export and drift check (D18, D21)."""
 
 from __future__ import annotations
 
@@ -7,10 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
 from support.repo import repo_root
-
-pytestmark = pytest.mark.xfail(strict=False, reason="green after W6")
 
 
 def test_contracts_export_writes_files(tmp_path: Path) -> None:
