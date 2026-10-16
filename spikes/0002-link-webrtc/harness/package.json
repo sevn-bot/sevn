@@ -1,0 +1,9 @@
+{
+  "name": "spike-0002-link-webrtc-harness",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}
