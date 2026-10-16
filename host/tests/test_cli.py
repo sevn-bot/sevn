@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import re
 import signal
 import socket
 import subprocess
@@ -21,6 +22,17 @@ import pytest
 from support.repo import repo_root
 
 _BIND_MESSAGE = "refusing to bind 0.0.0.0: pass --allow-remote-bind"
+_ANSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
+_SERVE_OPTIONS = ("--home", "--host", "--port", "--open", "--allow-remote-bind")
+
+
+def _visible(text: str) -> str:
+    """Help text with ANSI styles removed.
+
+    Rich's option highlighter styles each hyphen, so a colored render stores
+    ``--home`` as ``-`` + SGR + ``-home``. The visible glyphs are unchanged.
+    """
+    return _ANSI.sub("", text)
 
 
 def _stdout(result: object) -> str:
@@ -182,8 +194,9 @@ def test_serve_help_lists_options() -> None:
 
     result = CliRunner().invoke(app, ["serve", "--help"])
     assert result.exit_code == 0
-    for option in ("--home", "--host", "--port", "--open", "--allow-remote-bind"):
-        assert option in result.stdout
+    visible = _visible(result.stdout)
+    for option in _SERVE_OPTIONS:
+        assert option in visible, f"{option} missing from help:\n{visible}"
 
 
 def test_serve_refuses_remote_bind(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
