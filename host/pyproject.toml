@@ -7,12 +7,17 @@ dependencies = [
     "aiosqlite>=0.22.1",
     "alembic>=1.20.0",
     "cryptography>=50.0.2",
+    "fastapi>=0.143.3",
+    "httpx>=0.28.1",
     "keyring>=25.7.0",
     "loguru>=0.7.3",
     "pydantic>=2.12",
     "pydantic-settings>=2.16.0",
     "pyrage>=1.4.0",
     "sqlalchemy[asyncio]>=2.0",
+    "typer>=0.27.3",
+    "uvicorn[standard]>=0.54.0",
+    "websockets>=17.2",
 ]
 
 [dependency-groups]
@@ -23,6 +28,9 @@ dev = [
   "pytest-asyncio",
   "ruff",
 ]
+
+[project.scripts]
+sevn = "sevn.__main__:main"
 
 [build-system]
 requires = ["hatchling"]

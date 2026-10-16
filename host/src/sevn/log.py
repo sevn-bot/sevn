@@ -99,6 +99,7 @@ def _install_intercept(level: str) -> None:
         named.handlers = [handler]
         named.setLevel(numeric)
         named.propagate = False
+        named.disabled = False
 
 
 def setup(level: str, json_file: Path) -> None:

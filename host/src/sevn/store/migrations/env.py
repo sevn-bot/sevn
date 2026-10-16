@@ -11,7 +11,9 @@ from sqlalchemy import engine_from_config, event, pool
 
 config = context.config
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # sevn.log.setup already owns logging. The default fileConfig disables every
+    # logger that already exists, which hides uvicorn's bind errors after upgrade.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 

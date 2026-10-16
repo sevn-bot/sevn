@@ -78,6 +78,9 @@ class Outbox:
         async with self._sessions() as session:
             return await _min_seq(session)
 
+    async def aclose(self) -> None:
+        await self._engine.dispose()
+
 
 async def _min_seq(session: AsyncSession) -> int | None:
     value = await session.scalar(select(func.min(Event.seq)))

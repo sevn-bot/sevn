@@ -43,3 +43,6 @@ class OpLog:
         cutoff = utcnow() - _RETENTION
         async with self._sessions() as session, session.begin():
             await session.execute(delete(OpLogEntry).where(OpLogEntry.created_at < cutoff))
+
+    async def aclose(self) -> None:
+        await self._engine.dispose()

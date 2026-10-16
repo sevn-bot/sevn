@@ -28,7 +28,8 @@ class SecretsSettings(BaseModel):
 
 
 class HttpSettings(BaseModel):
-    pass
+    host: str = "127.0.0.1"
+    port: int = 8787
 
 
 class Settings(BaseSettings):
