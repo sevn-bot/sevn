@@ -1,4 +1,4 @@
-"""Handshake, dispatch errors, and session scope (D5-D7, D14). Green after W4."""
+"""Handshake, dispatch errors, and session scope (D5-D7, D14)."""
 
 from __future__ import annotations
 
@@ -15,8 +15,6 @@ from support.memory import (
     send_frame,
     send_req,
 )
-
-pytestmark = pytest.mark.xfail(strict=False, reason="green after W4")
 
 
 async def test_hello_welcome_with_token(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

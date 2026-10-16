@@ -1,4 +1,4 @@
-"""Mutating op_id behaviour (D11, D13). Green after W4."""
+"""Mutating op_id behaviour (D11, D13)."""
 
 from __future__ import annotations
 
@@ -7,8 +7,6 @@ from pathlib import Path
 
 import pytest
 from support.memory import count_events, handshake, memory_host, recv_frame, send_req
-
-pytestmark = pytest.mark.xfail(strict=False, reason="green after W4")
 
 
 async def _ping(

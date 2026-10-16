@@ -1,4 +1,4 @@
-"""Durable replay and ticks that are not replayed (D10, D12). Green after W4."""
+"""Durable replay and ticks that are not replayed (D10, D12)."""
 
 from __future__ import annotations
 
@@ -9,8 +9,6 @@ from pathlib import Path
 import pytest
 from support.clock import ManualClock
 from support.memory import handshake, memory_host, recv_frame, send_req
-
-pytestmark = pytest.mark.xfail(strict=False, reason="green after W4")
 
 
 async def _ping(client: object, op_id: str) -> None:

@@ -1,4 +1,4 @@
-"""Queue overflow and tick coalescing (D12). Green after W4."""
+"""Queue overflow and tick coalescing (D12)."""
 
 from __future__ import annotations
 
@@ -8,8 +8,6 @@ from pathlib import Path
 import pytest
 from support.clock import ManualClock
 from support.memory import handshake, memory_host, recv_frame
-
-pytestmark = pytest.mark.xfail(strict=False, reason="green after W4")
 
 
 async def test_slow_consumer_closes_4008(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
