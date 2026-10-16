@@ -51,6 +51,9 @@ _DENY_RETRY_AGAIN = (
     "You replied with text and did not call a tool. Call the tool now, before "
     "any other text. Do not ask the user a question."
 )
+# Pinned catalog model. The CLI default is rejected by the provider at prompt time.
+# ACP session/new has no model field, so the process-local config carries the pin.
+_OPENCODE_MODEL = "opencode-go/deepseek-v4.1-flash#high"
 
 PermissionCallback = Callable[[RuntimeEvent], str | Awaitable[str]]
 EventCallback = Callable[[RuntimeEvent], Awaitable[None] | None]
@@ -379,6 +382,7 @@ def _child_env(runtime: str, workspace: Path) -> dict[str, str]:
 def _write_opencode_config(config_dir: Path) -> None:
     config_dir.mkdir(parents=True, exist_ok=True)
     config = {
+        "model": _OPENCODE_MODEL,
         "permissions": [{"action": "*", "resource": "*", "effect": "ask"}],
         "experimental": {"continue_loop_on_deny": True},
     }

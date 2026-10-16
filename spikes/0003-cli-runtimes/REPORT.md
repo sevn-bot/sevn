@@ -80,7 +80,9 @@ When a turn denied a call and never approved one, the adapter sends up to
 two follow-up prompts telling the model to invoke the tool again. A prose
 reply does not raise a new permission request, so the second prompt says so.
 The approve path selects `allow_once`. The process-local config directory sets every
-permission to `ask`. The user's config is not modified.
+permission to `ask` and pins `model` to `opencode-go/deepseek-v4.1-flash#high`,
+a catalog model this login can run. ACP `session/new` has no model field.
+The user's config is not modified.
 `OPENCODE_DISABLE_FILEWATCHER` and `OPENCODE_FAST_BOOT` keep this process from
 indexing other projects. `session/load` resumes after the process exits.
 `session/cancel` is the interrupt.
