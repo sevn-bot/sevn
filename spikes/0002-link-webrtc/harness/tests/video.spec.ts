@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
+import { test } from "node:test";
 
-import { red } from "./support/red.ts";
 import { LIBS, withPeer } from "./support/session.ts";
 
-red("W3")("chrome renders first frame", async () => {
+test("chrome renders first frame", async () => {
   for (const lib of LIBS) {
     await withPeer("chromium", lib, "video", async (page) => {
       const size = await page.evaluate(() => {

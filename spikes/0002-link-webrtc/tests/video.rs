@@ -1,10 +1,9 @@
-//! D3 H.264 test-pattern track. Green after W3.
+//! D3 H.264 test-pattern track.
 
 mod support;
 
 use support::LIBS;
 
-#[ignore = "green after W3"]
 #[test]
 fn h264_track_negotiated() {
     for name in LIBS {

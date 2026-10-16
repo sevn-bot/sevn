@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { readFile, rm } from "node:fs/promises";
 import path from "node:path";
+import { test } from "node:test";
 
-import { red } from "./support/red.ts";
 import { harnessDir, LIBS, spikeDir } from "./support/session.ts";
 
 const FIELDS = [
@@ -16,7 +16,7 @@ const FIELDS = [
   "cpu_pct",
 ] as const;
 
-red("W3")("s-lan results have twenty runs and the D5 fields", async () => {
+test("s-lan results have twenty runs and the D5 fields", async () => {
   const resultsDir = path.join(spikeDir, "results");
   for (const lib of LIBS) {
     await rm(path.join(resultsDir, `s-lan-${lib}.json`), { force: true });
