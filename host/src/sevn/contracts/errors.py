@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict
 type ErrorCode = Literal[
     "protocol_error",
     "unauthorized",
+    "forbidden",
     "method_not_found",
     "invalid_params",
     "op_id_required",
