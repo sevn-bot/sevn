@@ -1,0 +1,12 @@
+{
+  "scenario": "s-lan",
+  "lib": "webrtcrs",
+  "runs": 20,
+  "connect_p50_ms": 412.4633,
+  "connect_p95_ms": 451.5309,
+  "mbps_10mb": 77.7412,
+  "ice_restart_ms": 0.9522,
+  "first_frame_ms": 1.0000,
+  "rss_mb": 125.7031,
+  "cpu_pct": 26.8091
+}

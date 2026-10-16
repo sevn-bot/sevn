@@ -18,7 +18,32 @@ const specs = [
   { id: 2, label: "files" },
 ];
 
+const started = performance.now();
+const logEl = document.querySelector("#log");
+function log(line) {
+  if (logEl) {
+    logEl.textContent += `${line}\n`;
+  }
+}
+
 const pc = new RTCPeerConnection({ iceServers: [] });
+pc.ontrack = (event) => {
+  const video = document.querySelector("video");
+  if (!video) {
+    return;
+  }
+  video.srcObject = event.streams[0] ?? new MediaStream([event.track]);
+  const play = video.play();
+  if (play) {
+    play.catch(() => undefined);
+  }
+  if (!("requestVideoFrameCallback" in video)) {
+    return;
+  }
+  video.requestVideoFrameCallback((_now, metadata) => {
+    log(`first frame ${Math.round(performance.now() - started)} ms ${metadata.width}x${metadata.height}`);
+  });
+};
 const dataChannels = specs.map((spec) => {
   const channel = pc.createDataChannel(spec.label, {
     ordered: true,
@@ -71,6 +96,7 @@ for (const channel of dataChannels) {
       return;
     }
     spike.channels = specs.map((spec) => ({ id: spec.id, label: spec.label }));
+    log(`channels open ${Math.round(performance.now() - started)} ms`);
     if (scenario === "file") {
       dataChannels[0].send(new TextEncoder().encode("ready"));
     }

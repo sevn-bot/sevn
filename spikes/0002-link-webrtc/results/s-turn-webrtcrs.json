@@ -1,0 +1,7 @@
+{
+  "scenario": "s-turn",
+  "lib": "webrtcrs",
+  "skipped": true,
+  "reason": "no live gate",
+  "detail": "CF_TURN_KEY_ID and CF_TURN_API_TOKEN are unset"
+}

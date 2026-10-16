@@ -1131,6 +1131,7 @@ version = "0.0.0"
 dependencies = [
  "async-trait",
  "bytes",
+ "rtc",
  "serde_json",
  "signal",
  "tokio",
@@ -1897,6 +1898,7 @@ name = "spike-0002-link-webrtc"
 version = "0.0.0"
 dependencies = [
  "common",
+ "libc",
  "sha2",
  "signal",
 ]

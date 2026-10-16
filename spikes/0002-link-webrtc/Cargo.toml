@@ -17,8 +17,13 @@ publish = false
 name = "spike-peer"
 path = "src/bin/spike-peer.rs"
 
+[[bin]]
+name = "spike-measure"
+path = "src/bin/spike-measure.rs"
+
 [dependencies]
 common = { path = "crates/common" }
+libc = "0.2"
 signal = { path = "crates/signal" }
 
 [dev-dependencies]

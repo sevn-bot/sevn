@@ -23,4 +23,6 @@ spike-test:
 endif
 
 spike-measure:
-	@echo "spike-measure: no scenarios until W3"
+	cd harness && node measure.ts --scenario s-lan
+	cd harness && node measure.ts --scenario s-turn
+	cd harness && node measure.ts --scenario s-ios

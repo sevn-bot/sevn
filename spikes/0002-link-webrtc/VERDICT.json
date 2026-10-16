@@ -1,0 +1,41 @@
+{
+  "verdict": "blocked",
+  "choice": null,
+  "ios_build": false,
+  "gates": {
+    "chrome-headless": {
+      "outcome": "passed",
+      "reason": "make -C spikes/0002-link-webrtc test RUN_MARKED=1: Chrome opened three channels, received the 10 MB file, and rendered a 1280x720 first frame for webrtcrs and str0m",
+      "evidence": [
+        "spikes/0002-link-webrtc/results/s-lan-webrtcrs.json",
+        "spikes/0002-link-webrtc/results/s-lan-str0m.json"
+      ]
+    },
+    "webkit-desktop": {
+      "outcome": "passed",
+      "reason": "the same run: desktop WebKit opened three channels and received the 10 MB file for both libraries; a separate WebKit check rendered a 1280x720 frame for both",
+      "evidence": [
+        "spikes/0002-link-webrtc/results/s-lan-webrtcrs.json",
+        "spikes/0002-link-webrtc/results/s-lan-str0m.json"
+      ]
+    },
+    "cf-turn": {
+      "outcome": "skipped",
+      "reason": "CF_TURN_KEY_ID and CF_TURN_API_TOKEN are unset",
+      "evidence": [
+        "spikes/0002-link-webrtc/results/s-turn-webrtcrs.json",
+        "spikes/0002-link-webrtc/results/s-turn-str0m.json"
+      ]
+    },
+    "ios-safari": {
+      "outcome": "skipped",
+      "reason": "no operator iPhone confirmed",
+      "evidence": [
+        "spikes/0002-link-webrtc/results/s-ios-webrtcrs.json",
+        "spikes/0002-link-webrtc/results/s-ios-str0m.json"
+      ]
+    }
+  },
+  "report": "REPORT.md",
+  "sha": null
+}

@@ -108,6 +108,9 @@ fn main() {
 }
 
 fn drive(peer: &std::sync::Arc<dyn Peer>, signal_url: &str, scenario: &str) -> Result<(), String> {
+    if scenario == "video" {
+        peer.enable_test_video().map_err(|err| err.to_string())?;
+    }
     peer.connect(signal_url).map_err(|err| err.to_string())?;
     peer.open_channels().map_err(|err| err.to_string())?;
     if scenario == "file" {

@@ -1,0 +1,12 @@
+{
+  "scenario": "s-lan",
+  "lib": "str0m",
+  "runs": 20,
+  "connect_p50_ms": 30.3136,
+  "connect_p95_ms": 32.1993,
+  "mbps_10mb": 35.4040,
+  "ice_restart_ms": 23.5337,
+  "first_frame_ms": 1.0000,
+  "rss_mb": 135.3125,
+  "cpu_pct": 130.9029
+}

@@ -2,12 +2,14 @@
 
 use std::fmt;
 use std::net::SocketAddr;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use str0m::change::{SdpAnswer, SdpOffer, SdpPendingOffer};
 use str0m::channel::{ChannelConfig, ChannelId, Reliability};
+use str0m::format::Codec;
+use str0m::media::{Direction, MediaKind, MediaTime, Mid};
 use str0m::net::{Protocol, Receive};
 use str0m::{Candidate, Event, Input, Output, Rtc};
 use tokio::net::UdpSocket;
@@ -15,6 +17,8 @@ use tokio::sync::{mpsc, watch};
 
 #[path = "../../common/src/chunk.rs"]
 mod chunk;
+#[path = "../../common/src/video.rs"]
+mod video;
 
 use chunk::{CHANNEL_FILES, CHANNEL_SPECS, PauseGate};
 
@@ -55,6 +59,7 @@ struct StatsInner {
     connect_ms: AtomicU64,
     ice_restart_ms: AtomicU64,
     backpressure_pauses: AtomicU64,
+    first_frame_ms: AtomicU64,
 }
 
 type Reply<T> = std::sync::mpsc::Sender<Result<T, Error>>;
@@ -111,6 +116,13 @@ struct World {
     pending: Option<SdpPendingOffer>,
     candidate_sdp: String,
     buf: Vec<u8>,
+    video: bool,
+    video_mid: Option<Mid>,
+    video_units: Vec<Vec<u8>>,
+    video_index: usize,
+    video_next: Instant,
+    video_rtp: u64,
+    video_ready: Option<Instant>,
 }
 
 pub struct Peer {
@@ -135,14 +147,17 @@ impl Peer {
             connect_ms: AtomicU64::new(0),
             ice_restart_ms: AtomicU64::new(0),
             backpressure_pauses: AtomicU64::new(0),
+            first_frame_ms: AtomicU64::new(0),
         });
         let local_sdp = Arc::new(Mutex::new(String::new()));
+        let want_video = Arc::new(AtomicBool::new(false));
         rt.spawn(worker(
             cmd_rx,
             incoming_tx,
             cancel_rx,
             Arc::clone(&stats),
             Arc::clone(&local_sdp),
+            want_video,
         ));
         Self {
             rt: Mutex::new(Some(rt)),
@@ -194,13 +209,14 @@ impl Peer {
             connect_ms: self.stats.connect_ms.load(Ordering::Relaxed),
             ice_restart_ms: self.stats.ice_restart_ms.load(Ordering::Relaxed),
             backpressure_pauses: self.stats.backpressure_pauses.load(Ordering::Relaxed),
-            first_frame_ms: 0,
+            first_frame_ms: self.stats.first_frame_ms.load(Ordering::Relaxed),
             rss_mb: 0.0,
             cpu_pct: 0.0,
         }
     }
 
     pub fn enable_test_video(&self) -> Result<(), Error> {
+        video::h264_access_units().map_err(Error::Failed)?;
         self.call(|reply| Cmd::EnableVideo(reply))
     }
 
@@ -240,12 +256,13 @@ async fn worker(
     mut cancel_rx: watch::Receiver<bool>,
     stats: Arc<StatsInner>,
     local_sdp: Arc<Mutex<String>>,
+    want_video: Arc<AtomicBool>,
 ) {
-    let connect = wait_for_connect(&mut cmd_rx, &mut cancel_rx).await;
+    let connect = wait_for_connect(&mut cmd_rx, &mut cancel_rx, &want_video).await;
     let Some((url, connect_reply)) = connect else {
         return;
     };
-    let mut world = match setup(&url, &local_sdp).await {
+    let mut world = match setup(&url, &local_sdp, want_video.load(Ordering::SeqCst)).await {
         Ok(world) => world,
         Err(err) => {
             let _ = connect_reply.send(Err(err));
@@ -282,6 +299,16 @@ async fn worker(
                 Pump::Wait if job.started.elapsed() > SEND_TIMEOUT => Some(Err(Error::Timeout)),
                 Pump::Wait => None,
             };
+        }
+        if let Err(err) = drain(&mut world, &incoming_tx).await {
+            spike_log(&format!("drain: {err}"));
+            fail_waits(&mut connect_wait, &mut restart_wait, &mut send_job, err);
+            break;
+        }
+        if send_job.is_none()
+            && let Err(err) = pump_video(&mut world, &stats)
+        {
+            spike_log(&format!("video: {err}"));
         }
         if let Err(err) = drain(&mut world, &incoming_tx).await {
             spike_log(&format!("drain: {err}"));
@@ -337,6 +364,7 @@ async fn worker(
 async fn wait_for_connect(
     cmd_rx: &mut mpsc::Receiver<Cmd>,
     cancel_rx: &mut watch::Receiver<bool>,
+    want_video: &AtomicBool,
 ) -> Option<(String, Reply<()>)> {
     loop {
         tokio::select! {
@@ -358,9 +386,8 @@ async fn wait_for_connect(
                         let _ = reply.send(Err(Error::Failed("not connected".into())));
                     }
                     Some(Cmd::EnableVideo(reply)) => {
-                        let _ = reply.send(Err(Error::Failed(
-                            "h264 test pattern is added in a later wave".into(),
-                        )));
+                        want_video.store(true, Ordering::SeqCst);
+                        let _ = reply.send(Ok(()));
                     }
                     None => return None,
                 }
@@ -369,7 +396,7 @@ async fn wait_for_connect(
     }
 }
 
-async fn setup(url: &str, local_sdp: &Arc<Mutex<String>>) -> Result<World, Error> {
+async fn setup(url: &str, local_sdp: &Arc<Mutex<String>>, video: bool) -> Result<World, Error> {
     let conn = signal::connect(url)
         .await
         .map_err(|err| Error::Failed(err.to_string()))?;
@@ -378,9 +405,15 @@ async fn setup(url: &str, local_sdp: &Arc<Mutex<String>>) -> Result<World, Error
     std_sock.set_nonblocking(true).map_err(failed)?;
     let sock = UdpSocket::from_std(std_sock).map_err(failed)?;
     let local_addr = sock.local_addr().map_err(failed)?;
-    let mut rtc = Rtc::builder()
+    // Both roles advertise constrained-baseline H.264. The video peer is not
+    // always the signalling offerer, and an answer cannot add an m-line.
+    let mut builder = Rtc::builder()
         .set_sctp_max_buffered_amount(SCTP_BUFFER)
-        .build(Instant::now());
+        .clear_codecs();
+    builder
+        .codec_config()
+        .add_h264(108.into(), Some(109.into()), true, 0x42e0_1f);
+    let mut rtc = builder.build(Instant::now());
     let host = Candidate::host(local_addr, "udp").map_err(failed)?;
     let candidate_sdp = rtc
         .add_local_candidate(host)
@@ -398,6 +431,17 @@ async fn setup(url: &str, local_sdp: &Arc<Mutex<String>>) -> Result<World, Error
         pending: None,
         candidate_sdp,
         buf: vec![0; 4096],
+        video,
+        video_mid: None,
+        video_units: if video {
+            video::h264_access_units().map_err(Error::Failed)?.to_vec()
+        } else {
+            Vec::new()
+        },
+        video_index: 0,
+        video_next: Instant::now(),
+        video_rtp: 0,
+        video_ready: None,
     };
 
     if world.role == "offerer" {
@@ -410,6 +454,20 @@ async fn setup(url: &str, local_sdp: &Arc<Mutex<String>>) -> Result<World, Error
                 id: channel_id,
                 open: false,
             });
+        }
+        // str0m emits MediaAdded for a remote offer, not for media this
+        // side added. The mid from add_media is the one writer() uses
+        // after the answer is applied. The m-line is always in the offer;
+        // frames are written only when this peer enabled the test pattern.
+        let mid = change.add_media(
+            MediaKind::Video,
+            Direction::SendOnly,
+            Some("spike".to_owned()),
+            Some("pattern".to_owned()),
+            None,
+        );
+        if world.video {
+            world.video_mid = Some(mid);
         }
         let (offer, pending) = change
             .apply()
@@ -528,9 +586,7 @@ fn on_cmd(
             });
         }
         Cmd::EnableVideo(reply) => {
-            let _ = reply.send(Err(Error::Failed(
-                "h264 test pattern is added in a later wave".into(),
-            )));
+            let _ = reply.send(Err(Error::Failed("enable video before connect".into())));
         }
     }
 }
@@ -625,7 +681,16 @@ async fn drain(
                     .await
                     .map_err(failed)?;
             }
-            Output::Event(event) => on_event(&mut world.channels, incoming_tx, event),
+            Output::Event(event) => {
+                if let Event::MediaAdded(added) = &event
+                    && world.video
+                    && added.kind == MediaKind::Video
+                    && added.direction.is_sending()
+                {
+                    world.video_mid = Some(added.mid);
+                }
+                on_event(&mut world.channels, incoming_tx, event);
+            }
         }
     }
 }
@@ -769,6 +834,51 @@ fn fail_waits(
     if let Some(job) = send_job.take() {
         let _ = job.reply.send(Err(err));
     }
+}
+
+fn pump_video(world: &mut World, stats: &StatsInner) -> Result<(), Error> {
+    if !world.video || world.video_units.is_empty() || !world.rtc.is_connected() {
+        return Ok(());
+    }
+    let Some(mid) = world.video_mid else {
+        return Ok(());
+    };
+    let now = Instant::now();
+    if now < world.video_next {
+        return Ok(());
+    }
+    let ready = *world.video_ready.get_or_insert(now);
+    let pt = {
+        let writer = world
+            .rtc
+            .writer(mid)
+            .ok_or_else(|| Error::Failed("video writer missing".into()))?;
+        writer
+            .payload_params()
+            .find(|params| {
+                let spec = params.spec();
+                spec.codec == Codec::H264
+                    && spec.format.profile_level_id == Some(0x42e0_1f)
+                    && spec.format.packetization_mode == Some(1)
+            })
+            .map(|params| params.pt())
+            .ok_or_else(|| Error::Failed("no H264 42e01f payload type".into()))?
+    };
+    let frame = world.video_units[world.video_index].clone();
+    world
+        .rtc
+        .writer(mid)
+        .ok_or_else(|| Error::Failed("video writer missing".into()))?
+        .write(pt, now, MediaTime::from_90khz(world.video_rtp), frame)
+        .map_err(failed)?;
+    let ms = elapsed_ms(ready).max(1);
+    let _ = stats
+        .first_frame_ms
+        .compare_exchange(0, ms, Ordering::Relaxed, Ordering::Relaxed);
+    world.video_index = (world.video_index + 1) % world.video_units.len();
+    world.video_rtp = world.video_rtp.wrapping_add(3_000);
+    world.video_next = now + Duration::from_millis(33);
+    Ok(())
 }
 
 fn elapsed_ms(start: Instant) -> u64 {

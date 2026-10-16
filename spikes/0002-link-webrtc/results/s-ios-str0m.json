@@ -1,0 +1,7 @@
+{
+  "scenario": "s-ios",
+  "lib": "str0m",
+  "skipped": true,
+  "reason": "no live gate",
+  "detail": "no operator iPhone confirmed"
+}

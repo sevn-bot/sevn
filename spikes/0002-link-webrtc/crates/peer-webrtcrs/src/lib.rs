@@ -7,18 +7,33 @@ use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use bytes::BytesMut;
+use rtc::media::Sample;
+use rtc::media_stream::MediaStreamTrack;
+use rtc::peer_connection::configuration::media_engine::{MIME_TYPE_H264, MediaEngine};
+use rtc::rtp_transceiver::rtp_sender::{
+    RTCRtpCodec, RTCRtpCodecParameters, RTCRtpCodingParameters, RTCRtpEncodingParameters,
+    RtpCodecKind,
+};
 use tokio::sync::{Notify, mpsc, watch};
 use webrtc::data_channel::{DataChannel, DataChannelEvent, RTCDataChannelInit};
+use webrtc::media_stream::track_local::TrackLocal;
+use webrtc::media_stream::track_local::static_sample::TrackLocalStaticSample;
 use webrtc::peer_connection::{
     PeerConnection, PeerConnectionBuilder, PeerConnectionEventHandler, RTCConfigurationBuilder,
     RTCIceCandidateInit, RTCPeerConnectionIceEvent, RTCPeerConnectionState, RTCSessionDescription,
 };
+use webrtc::rtp_transceiver::RtpSender;
 use webrtc::runtime::TokioRuntime;
 
 #[path = "../../common/src/chunk.rs"]
 mod chunk;
+#[path = "../../common/src/video.rs"]
+mod video;
 
 use chunk::{CHANNEL_FILES, CHANNEL_SPECS, PAUSE_ABOVE_BUFFERED, PauseGate, RESUME_BELOW_BUFFERED};
+
+const VIDEO_SSRC: u32 = 0x0002_51D0;
+const FRAME: Duration = Duration::from_millis(33);
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(20);
 const RESTART_TIMEOUT: Duration = Duration::from_secs(4);
@@ -55,6 +70,7 @@ struct StatsInner {
     connect_ms: AtomicU64,
     ice_restart_ms: AtomicU64,
     backpressure_pauses: AtomicU64,
+    first_frame_ms: AtomicU64,
 }
 
 enum Cmd {
@@ -99,14 +115,17 @@ impl Peer {
             connect_ms: AtomicU64::new(0),
             ice_restart_ms: AtomicU64::new(0),
             backpressure_pauses: AtomicU64::new(0),
+            first_frame_ms: AtomicU64::new(0),
         });
         let local_sdp = Arc::new(Mutex::new(String::new()));
+        let want_video = Arc::new(AtomicBool::new(false));
         rt.spawn(worker(
             cmd_rx,
             incoming_tx,
             cancel_rx,
             Arc::clone(&stats),
             Arc::clone(&local_sdp),
+            want_video,
         ));
         Self {
             rt: Mutex::new(Some(rt)),
@@ -158,13 +177,14 @@ impl Peer {
             connect_ms: self.stats.connect_ms.load(Ordering::Relaxed),
             ice_restart_ms: self.stats.ice_restart_ms.load(Ordering::Relaxed),
             backpressure_pauses: self.stats.backpressure_pauses.load(Ordering::Relaxed),
-            first_frame_ms: 0,
+            first_frame_ms: self.stats.first_frame_ms.load(Ordering::Relaxed),
             rss_mb: 0.0,
             cpu_pct: 0.0,
         }
     }
 
     pub fn enable_test_video(&self) -> Result<(), Error> {
+        video::h264_access_units().map_err(Error::Failed)?;
         self.call(|reply| Cmd::EnableVideo(reply))
     }
 
@@ -249,6 +269,7 @@ async fn worker(
     mut cancel_rx: watch::Receiver<bool>,
     stats: Arc<StatsInner>,
     local_sdp: Arc<Mutex<String>>,
+    want_video: Arc<AtomicBool>,
 ) {
     let mut session: Option<Session> = None;
     loop {
@@ -265,7 +286,14 @@ async fn worker(
                 }
                 match cmd {
                     Cmd::Connect(url, reply) => {
-                        let result = connect_session(&url, &incoming_tx, &local_sdp).await;
+                        let result = connect_session(
+                            &url,
+                            &incoming_tx,
+                            &local_sdp,
+                            &stats,
+                            want_video.load(Ordering::SeqCst),
+                        )
+                        .await;
                         match result {
                             Ok(ready) => {
                                 stats.connect_ms.store(ready.connect_ms, Ordering::Relaxed);
@@ -307,9 +335,8 @@ async fn worker(
                         }
                     }
                     Cmd::EnableVideo(reply) => {
-                        let _ = reply.send(Err(Error::Failed(
-                            "h264 test pattern is added in a later wave".into(),
-                        )));
+                        want_video.store(true, Ordering::SeqCst);
+                        let _ = reply.send(Ok(()));
                     }
                 }
             }
@@ -326,6 +353,8 @@ async fn connect_session(
     url: &str,
     incoming_tx: &std::sync::mpsc::Sender<(u16, Vec<u8>)>,
     local_sdp: &Arc<Mutex<String>>,
+    stats: &Arc<StatsInner>,
+    want_video: bool,
 ) -> Result<Connected, Error> {
     let started = Instant::now();
     let conn = signal::connect(url)
@@ -336,8 +365,13 @@ async fn connect_session(
     let connected_gen = Arc::new(AtomicU64::new(0));
     let answer_gen = Arc::new(AtomicU64::new(0));
 
+    let mut media_engine = MediaEngine::default();
+    media_engine
+        .register_codec(h264_codec(), RtpCodecKind::Video)
+        .map_err(|err| Error::Failed(err.to_string()))?;
     let pc = PeerConnectionBuilder::new()
         .with_configuration(RTCConfigurationBuilder::new().build())
+        .with_media_engine(media_engine)
         .with_handler(Arc::new(Handler {
             state_tx,
             connected_gen: Arc::clone(&connected_gen),
@@ -350,6 +384,11 @@ async fn connect_session(
         .await
         .map_err(|err| Error::Failed(err.to_string()))?;
     let pc: Arc<dyn PeerConnection> = Arc::new(pc);
+    // Every peer offers the H.264 m-line. The harness starts both connects
+    // together, so the peer that called enable_test_video is not always the
+    // signalling offerer; an answer cannot add an m-line the offer omitted.
+    let added = add_video_track(&pc).await?;
+    let video_sender = if want_video { Some(added) } else { None };
 
     let mut slots = Vec::with_capacity(CHANNEL_SPECS.len());
     for (id, label) in CHANNEL_SPECS {
@@ -419,6 +458,20 @@ async fn connect_session(
 
     let mut state_rx = state_rx;
     wait_state(&mut state_rx, CONNECT_TIMEOUT).await?;
+    // PC Connected can precede SCTP OnOpen. A send in that gap is dropped by
+    // the stack, so connect does not return until every negotiated channel is open.
+    for slot in &slots {
+        wait_open(&slot.open, &slot.opened).await?;
+    }
+    if let Some((track, sender)) = video_sender {
+        let payload_type = negotiated_payload_type(&sender).await?;
+        let stats = Arc::clone(stats);
+        tokio::spawn(async move {
+            if let Err(err) = send_pattern(track, payload_type, stats).await {
+                spike_log(&format!("video: {err}"));
+            }
+        });
+    }
     Ok(Connected {
         session: Session {
             pc,
@@ -693,6 +746,94 @@ async fn ice_restart(session: &Session, local_sdp: &Arc<Mutex<String>>) -> Resul
         }
         let _ =
             tokio::time::timeout(left.min(Duration::from_millis(100)), state_rx.changed()).await;
+    }
+}
+
+fn h264_codec() -> RTCRtpCodecParameters {
+    RTCRtpCodecParameters {
+        rtp_codec: RTCRtpCodec {
+            mime_type: MIME_TYPE_H264.to_owned(),
+            clock_rate: 90_000,
+            channels: 0,
+            sdp_fmtp_line: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f"
+                .to_owned(),
+            rtcp_feedback: vec![],
+        },
+        payload_type: 102,
+    }
+}
+
+async fn add_video_track(
+    pc: &Arc<dyn PeerConnection>,
+) -> Result<(Arc<TrackLocalStaticSample>, Arc<dyn RtpSender>), Error> {
+    let codec = h264_codec();
+    let track = Arc::new(
+        TrackLocalStaticSample::new(
+            Instant::now(),
+            MediaStreamTrack::new(
+                "spike-video".to_owned(),
+                "pattern".to_owned(),
+                "test-pattern".to_owned(),
+                RtpCodecKind::Video,
+                vec![RTCRtpEncodingParameters {
+                    rtp_coding_parameters: RTCRtpCodingParameters {
+                        ssrc: Some(VIDEO_SSRC),
+                        ..Default::default()
+                    },
+                    codec: codec.rtp_codec,
+                    ..Default::default()
+                }],
+            ),
+        )
+        .map_err(|err| Error::Failed(err.to_string()))?,
+    );
+    let sender = pc
+        .add_track(Arc::clone(&track) as Arc<dyn TrackLocal>)
+        .await
+        .map_err(|err| Error::Failed(err.to_string()))?;
+    Ok((track, sender))
+}
+
+async fn negotiated_payload_type(sender: &Arc<dyn RtpSender>) -> Result<u8, Error> {
+    sender
+        .get_parameters()
+        .await
+        .map_err(|err| Error::Failed(err.to_string()))?
+        .rtp_parameters
+        .codecs
+        .first()
+        .map(|codec| codec.payload_type)
+        .ok_or_else(|| Error::Failed("no negotiated video codec".into()))
+}
+
+async fn send_pattern(
+    track: Arc<TrackLocalStaticSample>,
+    payload_type: u8,
+    stats: Arc<StatsInner>,
+) -> Result<(), Error> {
+    let units = video::h264_access_units().map_err(Error::Failed)?;
+    let started = Instant::now();
+    let mut index = 0_usize;
+    loop {
+        let sample = Sample {
+            data: bytes::Bytes::copy_from_slice(&units[index]),
+            duration: FRAME,
+            ..Sample::new(Instant::now())
+        };
+        track
+            .sample_writer(VIDEO_SSRC, payload_type)
+            .write_sample(&sample)
+            .await
+            .map_err(|err| Error::Failed(err.to_string()))?;
+        let ms = elapsed_ms(started);
+        let _ = stats.first_frame_ms.compare_exchange(
+            0,
+            ms.max(1),
+            Ordering::Relaxed,
+            Ordering::Relaxed,
+        );
+        index = (index + 1) % units.len();
+        tokio::time::sleep(FRAME).await;
     }
 }
 

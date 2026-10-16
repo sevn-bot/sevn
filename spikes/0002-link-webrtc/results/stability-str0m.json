@@ -1,0 +1,7 @@
+{
+  "scenario": "stability",
+  "lib": "str0m",
+  "connects": 100,
+  "ok": 100,
+  "failed": 0
+}
