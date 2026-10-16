@@ -1,7 +1,7 @@
 # W0 toolchain. Later waves append targets; they do not rename these.
 # pytest exits 5 when it collects nothing. The empty skeleton treats that as success.
 
-.PHONY: setup format lint typecheck test test-host test-web test-link test-edge test-apple ci-fast ci
+.PHONY: setup format lint typecheck test test-host test-web test-link test-edge test-apple db-heads ci-fast ci
 
 PYTEST_ARGS ?=
 RUN_MARKED ?=
@@ -64,6 +64,17 @@ test-apple:
 	@if [ ! -d apps/apple ]; then echo "skip: apple not present"; exit 0; fi; \
 	xcodebuild test -project apps/apple/Sevn.xcodeproj -scheme Sevn-macOS -destination 'platform=macOS'
 
-ci-fast: lint typecheck
+db-heads:
+	@heads=$$(uv run alembic -c host/alembic.ini heads); \
+	status=$$?; \
+	printf '%s\n' "$$heads"; \
+	if [ $$status -ne 0 ]; then exit $$status; fi; \
+	count=$$(printf '%s\n' "$$heads" | grep -cve '^[[:space:]]*$$'); \
+	if [ "$$count" -ne 1 ]; then \
+		printf 'expected exactly one alembic head, found %s\n' "$$count" >&2; \
+		exit 1; \
+	fi
+
+ci-fast: lint typecheck db-heads
 
 ci: ci-fast test

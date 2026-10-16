@@ -4,12 +4,15 @@ version = "0.0.0"
 description = "Local-first host for persistent AI bots"
 requires-python = ">=3.13"
 dependencies = [
+    "aiosqlite>=0.22.1",
+    "alembic>=1.20.0",
     "cryptography>=50.0.2",
     "keyring>=25.7.0",
     "loguru>=0.7.3",
     "pydantic>=2.12",
     "pydantic-settings>=2.16.0",
     "pyrage>=1.4.0",
+    "sqlalchemy[asyncio]>=2.0",
 ]
 
 [dependency-groups]
