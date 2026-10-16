@@ -1,4 +1,4 @@
-"""Durable outbox (D10). Green after W3."""
+"""Durable outbox (D10)."""
 
 from __future__ import annotations
 
@@ -9,8 +9,6 @@ from datetime import timedelta
 from pathlib import Path
 
 import pytest
-
-pytestmark = pytest.mark.xfail(strict=False, reason="green after W3")
 
 
 def _url(tmp_path: Path) -> str:

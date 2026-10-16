@@ -1,4 +1,4 @@
-"""Alembic head and the initial revision (K-MIG, D22). Green after W3."""
+"""Alembic head and the initial revision (K-MIG, D22)."""
 
 from __future__ import annotations
 
@@ -7,10 +7,7 @@ import sqlite3
 import subprocess
 from pathlib import Path
 
-import pytest
 from support.repo import repo_root
-
-pytestmark = pytest.mark.xfail(strict=False, reason="green after W3")
 
 
 def test_migrations_single_head() -> None:

@@ -1,12 +1,8 @@
-"""Error wire shape and schema export (D14, D18). Green after W3."""
+"""Error wire shape and schema export (D14, D18)."""
 
 from __future__ import annotations
 
 import json
-
-import pytest
-
-pytestmark = pytest.mark.xfail(strict=False, reason="green after W3")
 
 
 def test_error_shape() -> None:

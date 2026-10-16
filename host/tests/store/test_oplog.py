@@ -1,12 +1,8 @@
-"""Op log retention (D11). Green after W3."""
+"""Op log retention (D11)."""
 
 from __future__ import annotations
 
 from pathlib import Path
-
-import pytest
-
-pytestmark = pytest.mark.xfail(strict=False, reason="green after W3")
 
 
 async def _oplog(tmp_path: Path) -> object:

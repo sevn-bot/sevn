@@ -1,4 +1,4 @@
-"""Frame codec and committed vectors (D5, D21). Green after W3."""
+"""Frame codec and committed vectors (D5, D21)."""
 
 from __future__ import annotations
 
@@ -7,8 +7,6 @@ from typing import Any
 
 import pytest
 from support.repo import repo_root
-
-pytestmark = pytest.mark.xfail(strict=False, reason="green after W3")
 
 _CASES: list[tuple[str, dict[str, Any]]] = [
     (
