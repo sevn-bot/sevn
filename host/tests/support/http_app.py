@@ -6,16 +6,45 @@ before `sevn.http` exists.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
+from urllib.parse import urljoin
 
+import httpx
 import pytest
+from starlette.testclient import TestClient, WebSocketTestSession
 
 INDEX_HTML = "<!doctype html><title>sevn</title>\n"
 CSP = (
     "default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'"
 )
+
+
+class _LoopbackClient(TestClient):
+    """WebSocket dials the same host ``base_url`` used for the session cookie.
+
+    Starlette 1.8 rejects ``timeout=`` on ``TestClient``. The 5s bound is set on
+    the httpx client. ``websocket_connect`` otherwise always uses ``ws://testserver``,
+    and httpx will not send the ``sevn_session`` cookie stored for ``127.0.0.1``.
+    """
+
+    def websocket_connect(
+        self,
+        url: str,
+        subprotocols: Sequence[str] | None = None,
+        **kwargs: Any,
+    ) -> WebSocketTestSession:
+        if not url.startswith(("ws://", "wss://")):
+            url = urljoin(_websocket_base(str(self.base_url)), url)
+        return super().websocket_connect(url, subprotocols, **kwargs)
+
+
+def _websocket_base(base_url: str) -> str:
+    scheme, rest = base_url.split("://", 1)
+    ws_scheme = "wss" if scheme == "https" else "ws"
+    return f"{ws_scheme}://{rest}"
 
 
 @contextmanager
@@ -57,9 +86,8 @@ def running_app(
     from sevn.http import create_app
 
     app = create_app(Settings(home=tmp_path))
-    from starlette.testclient import TestClient
-
-    client = TestClient(app, base_url=base_url, follow_redirects=False, timeout=5)
+    client = _LoopbackClient(app, base_url=base_url, follow_redirects=False)
+    client.timeout = httpx.Timeout(5.0)
     client.__enter__()
     try:
         token = (tmp_path / "run" / "token").read_text(encoding="utf-8").strip()

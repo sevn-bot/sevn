@@ -1,4 +1,4 @@
-"""WebSocket handshake and the Origin/Host guard (D7, D8). Green after W5."""
+"""WebSocket handshake and the Origin/Host guard (D7, D8)."""
 
 from __future__ import annotations
 
@@ -6,8 +6,6 @@ from pathlib import Path
 
 import pytest
 from support.http_app import running_app
-
-pytestmark = pytest.mark.xfail(strict=False, reason="green after W5")
 
 _HELLO = {
     "t": "hello",

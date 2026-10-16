@@ -1,4 +1,4 @@
-"""sevn serve, probe, and doctor (D9, D13). Green after W5."""
+"""sevn serve, probe, and doctor (D9, D13)."""
 
 from __future__ import annotations
 
@@ -12,8 +12,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
-pytestmark = pytest.mark.xfail(strict=False, reason="green after W5")
 
 _BIND_MESSAGE = "refusing to bind 0.0.0.0: pass --allow-remote-bind"
 

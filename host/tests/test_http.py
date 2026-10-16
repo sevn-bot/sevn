@@ -1,13 +1,10 @@
-"""Health and the static SPA (D13, D19). Green after W5."""
+"""Health and the static SPA (D13, D19)."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 from support.http_app import CSP, INDEX_HTML
-
-pytestmark = pytest.mark.xfail(strict=False, reason="green after W5")
 
 
 def test_health(host_app: tuple[object, str, object]) -> None:
