@@ -1,0 +1,23 @@
+models:
+- opencode-go/deepseek-v4.1-flash
+push: disabled
+shell: disabled
+signedCommits: false
+prApproveEnabled: false
+autoMergeEnabled: false
+trust:
+  agentSandbox: dispatch
+  selfReview: "off"
+providers:
+- label: opencode-go
+  harness: opencode
+  envIndex: 9
+  authKind: api_key
+  models:
+  - id: deepseek-v4.1-flash
+    modelIndex: 1
+providersSeeded: true
+agents:
+  reviewer:
+    modelChain:
+    - opencode-go/deepseek-v4.1-flash
