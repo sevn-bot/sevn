@@ -241,7 +241,8 @@ async def test_restart_marks_waiting_claude_turn_interrupted(
         turns = fetch_all(tmp_path, "SELECT status FROM turns")
         assert turns[0]["status"] == "interrupted"
         messages = fetch_all(tmp_path, "SELECT parts FROM messages")
-        assert "resend" in repr(messages).lower()
+        stored = " ".join(str(row["parts"]) for row in messages)
+        assert "resend" in stored.lower()
 
 
 async def test_interrupt_calls_client_interrupt(
