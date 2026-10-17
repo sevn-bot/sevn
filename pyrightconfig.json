@@ -1,0 +1,8 @@
+{
+  "include": ["host/src"],
+  "strict": ["host/src"],
+  "pythonVersion": "3.13",
+  "venvPath": ".",
+  "venv": ".venv",
+  "extraPaths": ["host/src"]
+}

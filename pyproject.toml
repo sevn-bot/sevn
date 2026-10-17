@@ -1,0 +1,12 @@
+[dependency-groups]
+dev = ["pre-commit"]
+
+[tool.uv.workspace]
+members = ["host"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["host/tests"]
+markers = [
+  "live: requires credentials or a live service",
+]
