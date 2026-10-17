@@ -2,6 +2,7 @@
 
 use std::fmt;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -69,6 +70,10 @@ impl std::error::Error for PeerError {}
 
 pub trait Peer: Send + Sync {
     fn connect(&self, signal_url: &str) -> Result<(), PeerError>;
+    /// Harness only. The connect deadline stays paused until `joined` is set,
+    /// which is when the browser opens the signal socket. Measurement does not
+    /// call this, so its deadline still starts at `connect`.
+    fn defer_connect_deadline(&self, _joined: Arc<AtomicBool>) {}
     fn open_channels(&self) -> Result<Vec<Channel>, PeerError>;
     /// One message on `rpc` or `events`. On `files`, `bytes` is the whole blob:
     /// the peer chunks it (D2) and applies the pause/resume watermarks.
@@ -142,6 +147,10 @@ impl Peer for Adapted<peer_webrtcrs::Peer> {
         self.inner.connect(signal_url).map_err(from_peer)
     }
 
+    fn defer_connect_deadline(&self, joined: Arc<AtomicBool>) {
+        self.inner.defer_connect_deadline(joined);
+    }
+
     fn open_channels(&self) -> Result<Vec<Channel>, PeerError> {
         self.inner
             .open_channels()
@@ -180,6 +189,10 @@ impl Peer for Adapted<peer_webrtcrs::Peer> {
 impl Peer for Adapted<peer_str0m::Peer> {
     fn connect(&self, signal_url: &str) -> Result<(), PeerError> {
         self.inner.connect(signal_url).map_err(from_peer)
+    }
+
+    fn defer_connect_deadline(&self, joined: Arc<AtomicBool>) {
+        self.inner.defer_connect_deadline(joined);
     }
 
     fn open_channels(&self) -> Result<Vec<Channel>, PeerError> {

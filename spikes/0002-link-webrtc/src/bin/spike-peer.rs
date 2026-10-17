@@ -5,6 +5,8 @@
 
 use std::io::{Read, Write};
 use std::net::TcpListener;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -41,6 +43,18 @@ fn main() {
     let signal_url = room.url.clone();
     let scenario_thread = scenario.clone();
     let peer_thread = std::sync::Arc::clone(&peer);
+    // The Rust peer joins now, so it is the offerer. The connect deadline
+    // starts only after Safari opens the signal socket.
+    let browser_joined = Arc::new(AtomicBool::new(false));
+    peer.defer_connect_deadline(Arc::clone(&browser_joined));
+    let peer_count = room.peer_count();
+    thread::spawn(move || {
+        while peer_count.load(Ordering::SeqCst) < 2 {
+            thread::sleep(Duration::from_millis(20));
+        }
+        browser_joined.store(true, Ordering::SeqCst);
+        eprintln!("spike-peer: browser connected");
+    });
     thread::spawn(move || {
         if let Err(err) = drive(&peer_thread, &signal_url, &scenario_thread) {
             eprintln!("spike-peer: {err}");

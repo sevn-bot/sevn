@@ -103,7 +103,10 @@ Those are the offerer `drive()` connect failures. `connect` starts when the proc
 starts and gives up after 45 seconds, and the log has no per-line timestamps, so the
 lines are not a Wi-Fi `channels open` time. The cellular half was not run: with Wi-Fi
 off the phone cannot reach this Mac on a private address, and no tunnel was started.
-The simulator does not count. `results/s-ios-*.json` stays `skipped: true`.
+The simulator does not count. The connect deadline in that run started when the
+process started, so it expired before the phone opened the pages. The harness now
+starts that deadline when the browser joins the signal room. `results/s-ios-*.json`
+stays `skipped: true`.
 
 ### Other checks from this run
 

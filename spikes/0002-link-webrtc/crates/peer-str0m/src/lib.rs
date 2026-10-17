@@ -88,6 +88,8 @@ struct Chan {
 struct ConnectWait {
     reply: Reply<()>,
     started: Instant,
+    browser_joined: Option<Arc<AtomicBool>>,
+    deadline_armed: bool,
 }
 
 struct RestartWait {
@@ -137,6 +139,7 @@ pub struct Peer {
     cancel_tx: watch::Sender<bool>,
     stats: Arc<StatsInner>,
     local_sdp: Arc<Mutex<String>>,
+    browser_joined: Arc<Mutex<Option<Arc<AtomicBool>>>>,
 }
 
 impl Peer {
@@ -156,6 +159,7 @@ impl Peer {
         });
         let local_sdp = Arc::new(Mutex::new(String::new()));
         let want_video = Arc::new(AtomicBool::new(false));
+        let browser_joined = Arc::new(Mutex::new(None));
         rt.spawn(worker(
             cmd_rx,
             incoming_tx,
@@ -163,6 +167,7 @@ impl Peer {
             Arc::clone(&stats),
             Arc::clone(&local_sdp),
             want_video,
+            Arc::clone(&browser_joined),
         ));
         Self {
             rt: Mutex::new(Some(rt)),
@@ -171,7 +176,13 @@ impl Peer {
             cancel_tx,
             stats,
             local_sdp,
+            browser_joined,
         }
+    }
+
+    /// The connect deadline starts once `joined` is true, not at `connect`.
+    pub fn defer_connect_deadline(&self, joined: Arc<AtomicBool>) {
+        *self.browser_joined.lock().expect("browser joined") = Some(joined);
     }
 
     pub fn connect(&self, signal_url: &str) -> Result<(), Error> {
@@ -262,6 +273,7 @@ async fn worker(
     stats: Arc<StatsInner>,
     local_sdp: Arc<Mutex<String>>,
     want_video: Arc<AtomicBool>,
+    browser_joined: Arc<Mutex<Option<Arc<AtomicBool>>>>,
 ) {
     let connect = wait_for_connect(&mut cmd_rx, &mut cancel_rx, &want_video).await;
     let Some((url, connect_reply)) = connect else {
@@ -274,9 +286,12 @@ async fn worker(
             return;
         }
     };
+    let browser_joined = browser_joined.lock().expect("browser joined").clone();
     let mut connect_wait = Some(ConnectWait {
         reply: connect_reply,
         started: Instant::now(),
+        browser_joined,
+        deadline_armed: false,
     });
     let mut restart_wait: Option<RestartWait> = None;
     let mut send_job: Option<SendJob> = None;
@@ -878,6 +893,19 @@ fn pump_send(rtc: &mut Rtc, channels: &[Chan], job: &mut SendJob) -> Pump {
 }
 
 fn settle_connect(wait: &mut Option<ConnectWait>, world: &World, stats: &StatsInner) {
+    if let Some(pending) = wait.as_mut() {
+        let waiting = pending
+            .browser_joined
+            .as_ref()
+            .is_some_and(|flag| !flag.load(Ordering::SeqCst));
+        if waiting {
+            return;
+        }
+        if pending.browser_joined.is_some() && !pending.deadline_armed {
+            pending.started = Instant::now();
+            pending.deadline_armed = true;
+        }
+    }
     let Some(pending) = wait.as_ref() else {
         return;
     };

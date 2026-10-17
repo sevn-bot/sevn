@@ -29,6 +29,12 @@ impl Room {
     pub fn peers_connected(&self) -> usize {
         self.peers.load(Ordering::SeqCst)
     }
+
+    /// Shared count so the harness can start its connect deadline when the
+    /// browser's socket joins, after the Rust peer is already the offerer.
+    pub fn peer_count(&self) -> Arc<AtomicUsize> {
+        Arc::clone(&self.peers)
+    }
 }
 
 impl Drop for Room {

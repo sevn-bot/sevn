@@ -101,6 +101,7 @@ pub struct Peer {
     cancel_tx: watch::Sender<bool>,
     stats: Arc<StatsInner>,
     local_sdp: Arc<Mutex<String>>,
+    browser_joined: Arc<Mutex<Option<Arc<AtomicBool>>>>,
 }
 
 impl Peer {
@@ -120,6 +121,7 @@ impl Peer {
         });
         let local_sdp = Arc::new(Mutex::new(String::new()));
         let want_video = Arc::new(AtomicBool::new(false));
+        let browser_joined = Arc::new(Mutex::new(None));
         rt.spawn(worker(
             cmd_rx,
             incoming_tx,
@@ -127,6 +129,7 @@ impl Peer {
             Arc::clone(&stats),
             Arc::clone(&local_sdp),
             want_video,
+            Arc::clone(&browser_joined),
         ));
         Self {
             rt: Mutex::new(Some(rt)),
@@ -135,7 +138,13 @@ impl Peer {
             cancel_tx,
             stats,
             local_sdp,
+            browser_joined,
         }
+    }
+
+    /// The connect deadline starts once `joined` is true, not at `connect`.
+    pub fn defer_connect_deadline(&self, joined: Arc<AtomicBool>) {
+        *self.browser_joined.lock().expect("browser joined") = Some(joined);
     }
 
     pub fn connect(&self, signal_url: &str) -> Result<(), Error> {
@@ -296,6 +305,7 @@ async fn worker(
     stats: Arc<StatsInner>,
     local_sdp: Arc<Mutex<String>>,
     want_video: Arc<AtomicBool>,
+    browser_joined: Arc<Mutex<Option<Arc<AtomicBool>>>>,
 ) {
     let mut session: Option<Session> = None;
     loop {
@@ -312,12 +322,14 @@ async fn worker(
                 }
                 match cmd {
                     Cmd::Connect(url, reply) => {
+                        let joined = browser_joined.lock().expect("browser joined").clone();
                         let result = connect_session(
                             &url,
                             &incoming_tx,
                             &local_sdp,
                             &stats,
                             want_video.load(Ordering::SeqCst),
+                            joined,
                         )
                         .await;
                         match result {
@@ -381,6 +393,7 @@ async fn connect_session(
     local_sdp: &Arc<Mutex<String>>,
     stats: &Arc<StatsInner>,
     want_video: bool,
+    browser_joined: Option<Arc<AtomicBool>>,
 ) -> Result<Connected, Error> {
     let started = Instant::now();
     let conn = signal::connect(url)
@@ -511,7 +524,13 @@ async fn connect_session(
     }
 
     let mut state_rx = state_rx;
-    wait_connected(&mut state_rx, connect_limit(), gather.as_deref()).await?;
+    let armed = wait_connected(
+        &mut state_rx,
+        connect_limit(),
+        gather.as_deref(),
+        browser_joined.as_ref(),
+    )
+    .await?;
     // PC Connected can precede SCTP OnOpen. A send in that gap is dropped by
     // the stack, so connect does not return until every negotiated channel is open.
     for slot in &slots {
@@ -537,7 +556,11 @@ async fn connect_session(
             relay: relay_on,
             gather,
         },
-        connect_ms: elapsed_ms(started),
+        connect_ms: elapsed_ms(if browser_joined.is_some() {
+            armed
+        } else {
+            started
+        }),
     })
 }
 
@@ -707,9 +730,24 @@ async fn wait_connected(
     state_rx: &mut watch::Receiver<RTCPeerConnectionState>,
     timeout: Duration,
     gather: Option<&GatherWatch>,
-) -> Result<(), Error> {
-    let deadline = Instant::now() + timeout;
+    browser_joined: Option<&Arc<AtomicBool>>,
+) -> Result<Instant, Error> {
+    let mut armed = if browser_joined.is_some() {
+        None
+    } else {
+        Some(Instant::now())
+    };
     loop {
+        if armed.is_none() {
+            let ready = browser_joined.is_some_and(|flag| flag.load(Ordering::SeqCst));
+            if !ready {
+                let _ = tokio::time::timeout(Duration::from_millis(100), state_rx.changed()).await;
+                continue;
+            }
+            armed = Some(Instant::now());
+        }
+        let started = armed.expect("deadline armed");
+        let deadline = started + timeout;
         if let Some(gather) = gather {
             if gather.saw_other.load(Ordering::SeqCst) {
                 return Err(Error::Failed("non-relay candidate gathered".into()));
@@ -725,7 +763,7 @@ async fn wait_connected(
             {
                 return Err(Error::Failed("no relay candidate".into()));
             }
-            return Ok(());
+            return Ok(started);
         }
         if state == RTCPeerConnectionState::Failed || state == RTCPeerConnectionState::Closed {
             return Err(Error::Failed(format!("connection {state}")));
