@@ -881,6 +881,53 @@
         }
       ]
     },
+    "ModelInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "provider": {
+          "title": "Provider",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "provider",
+        "name"
+      ],
+      "title": "ModelInfo",
+      "type": "object"
+    },
+    "ModelsListParams": {
+      "additionalProperties": false,
+      "properties": {},
+      "title": "ModelsListParams",
+      "type": "object"
+    },
+    "ModelsListResult": {
+      "additionalProperties": false,
+      "properties": {
+        "models": {
+          "items": {
+            "$ref": "#/$defs/ModelInfo"
+          },
+          "title": "Models",
+          "type": "array"
+        }
+      },
+      "required": [
+        "models"
+      ],
+      "title": "ModelsListResult",
+      "type": "object"
+    },
     "Req": {
       "properties": {
         "id": {
@@ -1218,6 +1265,11 @@
       "mutating": true,
       "params": "BotsUpdateParams",
       "result": "BotRecord"
+    },
+    "models.list": {
+      "mutating": false,
+      "params": "ModelsListParams",
+      "result": "ModelsListResult"
     },
     "sync.since": {
       "mutating": false,

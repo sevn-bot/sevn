@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from sevn.api.errors import raise_protocol
-from sevn.contracts.errors import JsonObject
+from sevn.contracts.errors import JsonObject, JsonValue, ProtocolError
 from sevn.contracts.kinds import AccessName, ApprovalPolicy, RuntimeName
 from sevn.contracts.methods import (
     BotsCreateParams,
@@ -17,10 +17,12 @@ from sevn.contracts.methods import (
 from sevn.domain.bots import BotRecord, BotService
 from sevn.domain.errors import DomainError
 from sevn.protocol.registry import Ctx, method
+from sevn.runtime.models import model_allowed
 
 
 @method("bots.create", params=BotsCreateParams, result=BotRecord, mutating=True, scope="owner")
 async def bots_create(ctx: Ctx, params: BotsCreateParams) -> BotRecord:
+    _reject_unknown_model(params.model)
     try:
         bot = await BotService().create(
             params.name,
@@ -56,6 +58,7 @@ async def bots_get(_ctx: Ctx, params: BotsGetParams) -> BotRecord:
 
 @method("bots.update", params=BotsUpdateParams, result=BotRecord, mutating=True, scope="owner")
 async def bots_update(ctx: Ctx, params: BotsUpdateParams) -> BotRecord:
+    _reject_unknown_model(params.model)
     try:
         bot, changed = await BotService().update(
             params.bot_id,
@@ -96,6 +99,16 @@ async def bots_delete(ctx: Ctx, params: BotsDeleteParams) -> BotsDeleteResult:
         raise_protocol(exc)
     await ctx.hub.emit("bot.deleted", bot_id, {"bot_id": bot_id})
     return BotsDeleteResult(id=bot_id)
+
+
+def _reject_unknown_model(model: str | None) -> None:
+    if model is None or model_allowed(model):
+        return
+    loc: list[JsonValue] = ["model"]
+    error: dict[str, JsonValue] = {"loc": loc, "msg": "unknown model"}
+    errors: list[JsonValue] = [error]
+    data: JsonObject = {"errors": errors}
+    raise ProtocolError("invalid_params", "invalid params", data)
 
 
 def _text(value: str | None) -> str:

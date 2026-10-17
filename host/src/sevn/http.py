@@ -22,6 +22,7 @@ from starlette.websockets import WebSocket
 
 import sevn.api.agents as agent_api
 import sevn.api.bots as bot_api
+import sevn.api.models as model_api
 import sevn.system as system
 from sevn import __version__
 from sevn.config import Settings
@@ -47,6 +48,7 @@ _REGISTERED = (
     bot_api.bots_delete,
     agent_api.agents_list,
     agent_api.agents_get,
+    model_api.models_list,
 )
 
 CSP = (

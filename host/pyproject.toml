@@ -12,12 +12,14 @@ dependencies = [
     "keyring>=25.7.0",
     "loguru>=0.7.3",
     "pydantic>=2.12",
+    "pydantic-ai-slim[anthropic,openai,google]==2.57.0",
     "pydantic-settings>=2.16.0",
     "pyrage>=1.4.0",
     "sqlalchemy[asyncio]>=2.0",
     "typer>=0.27.3",
     "uvicorn[standard]>=0.54.0",
-    "websockets>=17.2",
+    # google-genai (the pydantic-ai google extra) requires websockets<17.
+    "websockets>=13,<17",
 ]
 
 [dependency-groups]

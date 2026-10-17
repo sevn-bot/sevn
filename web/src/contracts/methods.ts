@@ -36,6 +36,11 @@ export const methods = {
     params: "BotsUpdateParams",
     result: "BotRecord",
   },
+  "models.list": {
+    mutating: false,
+    params: "ModelsListParams",
+    result: "ModelsListResult",
+  },
   "sync.since": {
     mutating: false,
     params: "SyncSinceParams",

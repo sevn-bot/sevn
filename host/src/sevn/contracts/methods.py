@@ -139,6 +139,24 @@ class AgentsGetParams(BaseModel):
     agent_id: str
 
 
+class ModelInfo(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    provider: str
+    name: str
+
+
+class ModelsListParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class ModelsListResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    models: list[ModelInfo]
+
+
 @dataclass(frozen=True, slots=True)
 class MethodSpec:
     name: str
@@ -170,5 +188,6 @@ METHODS: dict[str, MethodSpec] = {
         _spec("bots.delete", BotsDeleteParams, BotsDeleteResult, mutating=True),
         _spec("agents.list", AgentsListParams, AgentsListResult, mutating=False),
         _spec("agents.get", AgentsGetParams, AgentRecord, mutating=False),
+        _spec("models.list", ModelsListParams, ModelsListResult, mutating=False),
     )
 }

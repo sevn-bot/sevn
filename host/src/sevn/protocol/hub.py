@@ -55,6 +55,10 @@ class Hub:
         await self._fanout(_event_frame(event))
         return event
 
+    async def relay(self, event: Event) -> None:
+        """Fan out an event that was already committed with the turn."""
+        await self._fanout(_event_frame(event))
+
     def tick(self, kind: str, key: str, data: Mapping[str, object]) -> None:
         self._ticks.add(kind, key, _as_json_object(data))
 

@@ -32,6 +32,12 @@ type Bot = {
   updated_at: string;
 };
 
+type ModelInfo = {
+  id: string;
+  provider: string;
+  name: string;
+};
+
 type Agent = {
   id: string;
   bot_id: string;
@@ -87,6 +93,7 @@ export type MethodParams = {
   "bots.delete": { bot_id: string; purge?: boolean; op_id?: string };
   "agents.list": { bot_id: string };
   "agents.get": { agent_id: string };
+  "models.list": Record<string, never>;
 };
 
 export type MethodResult = {
@@ -106,6 +113,7 @@ export type MethodResult = {
   "bots.delete": { id: string };
   "agents.list": { agents: Agent[] };
   "agents.get": Agent;
+  "models.list": { models: ModelInfo[] };
 };
 
 export type Status = "connecting" | "connected" | "reconnecting";
