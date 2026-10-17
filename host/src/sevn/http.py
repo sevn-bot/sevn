@@ -229,8 +229,16 @@ class _Spa(StaticFiles):
 
     async def get_response(self, path: str, scope: Scope) -> Response:
         response = await super().get_response(path, scope)
+        if response.status_code == 404 and _client_route(path):
+            response = await super().get_response("index.html", scope)
         response.headers["Content-Security-Policy"] = CSP
         return response
+
+
+def _client_route(path: str) -> bool:
+    """App paths such as ``bots/<id>`` fall back to the SPA. Asset files do not."""
+    name = path.rsplit("/", 1)[-1]
+    return "." not in name
 
 
 def refusal(headers: Headers, port: int, *, server: object = None) -> str | None:

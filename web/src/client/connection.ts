@@ -172,7 +172,12 @@ export type Connection = {
     params: MethodParams[M],
   ) => Promise<MethodResult[M]>;
   onEvent: (handler: (event: ProtocolEvent) => void) => void;
+  offEvent: (handler: (event: ProtocolEvent) => void) => void;
   onTick: (
+    kind: string,
+    handler: (data: Record<string, unknown>) => void,
+  ) => void;
+  offTick: (
     kind: string,
     handler: (data: Record<string, unknown>) => void,
   ) => void;
@@ -191,7 +196,47 @@ type Pending = {
   reject: (error: unknown) => void;
 };
 
+type TickHandler = (data: Record<string, unknown>) => void;
+type EventHandler = (event: ProtocolEvent) => void;
+
+const tickListeners: Array<{ kind: string; handler: TickHandler }> = [];
+const eventListeners: EventHandler[] = [];
+
 let active: Connection | null = null;
+
+export function onTick(kind: string, handler: TickHandler): () => void {
+  const entry = { kind, handler };
+  tickListeners.push(entry);
+  active?.onTick(kind, handler);
+  return () => {
+    const index = tickListeners.indexOf(entry);
+    if (index >= 0) {
+      tickListeners.splice(index, 1);
+    }
+    active?.offTick(kind, handler);
+  };
+}
+
+export function onEvent(handler: EventHandler): () => void {
+  eventListeners.push(handler);
+  active?.onEvent(handler);
+  return () => {
+    const index = eventListeners.indexOf(handler);
+    if (index >= 0) {
+      eventListeners.splice(index, 1);
+    }
+    active?.offEvent(handler);
+  };
+}
+
+function attachListeners(connection: Connection): void {
+  for (const entry of tickListeners) {
+    connection.onTick(entry.kind, entry.handler);
+  }
+  for (const handler of eventListeners) {
+    connection.onEvent(handler);
+  }
+}
 
 export function call<M extends MethodName>(
   method: M,
@@ -239,10 +284,28 @@ export function connect(options: ConnectOptions): Promise<Connection> {
     onEvent(handler) {
       eventHandlers.push(handler);
     },
+    offEvent(handler) {
+      const index = eventHandlers.indexOf(handler);
+      if (index >= 0) {
+        eventHandlers.splice(index, 1);
+      }
+    },
     onTick(kind, handler) {
       const list = tickHandlers.get(kind) ?? [];
       list.push(handler);
       tickHandlers.set(kind, list);
+    },
+    offTick(kind, handler) {
+      const list = tickHandlers.get(kind);
+      if (list === undefined) {
+        return;
+      }
+      const next = list.filter((item) => item !== handler);
+      if (next.length === 0) {
+        tickHandlers.delete(kind);
+        return;
+      }
+      tickHandlers.set(kind, next);
     },
     onStatus(handler) {
       statusHandlers.push(handler);
@@ -271,6 +334,7 @@ export function connect(options: ConnectOptions): Promise<Connection> {
   };
 
   active = connection;
+  attachListeners(connection);
   openSocket();
   return ready;
 

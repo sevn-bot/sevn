@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { type Connection, connect } from "../client/index.ts";
+import { BotList } from "./bots/BotList.tsx";
+import { Chat } from "./chat/Chat.tsx";
+import { botIdFromPath } from "./routes.ts";
 
 type Status = "connecting" | "connected" | "reconnecting";
 
@@ -28,7 +31,19 @@ export default function App() {
   const [status, setStatus] = useState<Status>("connecting");
   const [hostId, setHostId] = useState("");
   const [events, setEvents] = useState<ShownEvent[]>([]);
+  const [path, setPath] = useState(() => window.location.pathname);
   const connectionRef = useRef<Connection | null>(null);
+  const botId = botIdFromPath(path);
+
+  useEffect(() => {
+    const sync = () => {
+      setPath(window.location.pathname);
+    };
+    window.addEventListener("popstate", sync);
+    return () => {
+      window.removeEventListener("popstate", sync);
+    };
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -104,6 +119,7 @@ export default function App() {
         >
           Ping
         </button>
+        {botId === null ? <BotList /> : <Chat botId={botId} />}
         <ul className="space-y-1 font-mono text-sm">
           {events.map((event) => (
             <li key={event.seq}>{`event #${event.seq} — ${event.kind}`}</li>

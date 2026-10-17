@@ -297,4 +297,9 @@ def _default_model() -> str:
         except SecretNotFound:
             continue
         return name
+    # The e2e host has no provider key. Echo is the only model when both dev flags are on.
+    from sevn.runtime.models import ECHO_ID, echo_enabled
+
+    if echo_enabled():
+        return ECHO_ID
     return ""

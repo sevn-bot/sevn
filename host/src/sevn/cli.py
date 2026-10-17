@@ -20,12 +20,16 @@ from sevn.errors import ConfigError
 from sevn.http import AppState, create_app, web_dist_path
 from sevn.paths import Paths
 from sevn.probe import ProbeError, call_method, events_since, parse_params
+from sevn.secrets.backends import AgeFileBackend, EnvBackend, KeychainBackend, open_backend
+from sevn.secrets.errors import SecretBackendReadOnly, SecretNotFound
 
 app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 probe_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 contracts_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
+secret_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 app.add_typer(probe_app, name="probe")
 app.add_typer(contracts_app, name="contracts")
+app.add_typer(secret_app, name="secret")
 
 _LOOPBACK = frozenset({"127.0.0.1", "localhost", "::1", "[::1]"})
 
@@ -130,6 +134,45 @@ def doctor(
         return
     for key, value in payload.items():
         typer.echo(f"{key}: {value}")
+
+
+@secret_app.command("set")
+def secret_set(name: str) -> None:
+    """Store one secret. The value is read without echo and is never printed."""
+    import getpass
+
+    value = getpass.getpass("Secret: ")
+    if value == "":
+        typer.echo("secret value is empty", err=True)
+        raise typer.Exit(code=1)
+    try:
+        _open_secrets().set(name, value)
+    except SecretBackendReadOnly as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(f"stored {name}")
+
+
+@secret_app.command("list")
+def secret_list() -> None:
+    """Print secret names. Values stay in the backend."""
+    for name in _open_secrets().names():
+        typer.echo(name)
+
+
+@secret_app.command("rm")
+def secret_rm(name: str) -> None:
+    """Delete one secret by name."""
+    try:
+        _open_secrets().delete(name)
+    except (SecretNotFound, SecretBackendReadOnly) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(f"removed {name}")
+
+
+def _open_secrets() -> KeychainBackend | AgeFileBackend | EnvBackend:
+    return open_backend(_settings(), Paths.from_env())
 
 
 def _apply_home(home: Path | None) -> None:
