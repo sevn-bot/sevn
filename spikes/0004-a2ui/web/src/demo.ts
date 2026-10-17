@@ -13,8 +13,24 @@ function fileMessages(file: PayloadFile): Record<string, unknown>[] {
   return [...file.messages, ...(file.update ?? [])];
 }
 
+const payloadFiles = [form, table, secret, approval, assist] as PayloadFile[];
+
+function surfaceId(file: PayloadFile): string {
+  for (const message of file.messages) {
+    const create = message.createSurface;
+    if (typeof create === "object" && create !== null && !Array.isArray(create)) {
+      const id = (create as { surfaceId?: unknown }).surfaceId;
+      if (typeof id === "string") {
+        return id;
+      }
+    }
+  }
+  return "";
+}
+
 export function demoMessages(): Record<string, unknown>[] {
-  return [form, table, secret, approval, assist].flatMap((file) =>
-    fileMessages(file as PayloadFile),
-  );
+  const selected =
+    typeof location === "undefined" ? null : new URLSearchParams(location.search).get("payload");
+  const files = selected ? payloadFiles.filter((file) => surfaceId(file) === selected) : payloadFiles;
+  return files.flatMap((file) => fileMessages(file));
 }
