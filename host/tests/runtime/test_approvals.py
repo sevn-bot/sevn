@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 
@@ -223,3 +224,71 @@ async def test_answer_twice_rejected(tmp_path: Path, monkeypatch: pytest.MonkeyP
             {"pending_id": item["id"], "answer": "approve", "op_id": mint_id("op_")},
         )
         assert error_body(again)["code"] == "pending_resolved"
+
+
+async def test_message_during_approval_stays_queued_until_answer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A send while an approval is open stays on that agent and runs after the answer."""
+    from sevn.runtime.models import use_model
+    from sevn.runtime.worker import bind
+
+    follow_up = "queued-while-waiting"
+    reset_model_requests()
+    use_model(
+        function_model(
+            [
+                [{"kind": "tool", "name": "shell", "args": {"command": "echo hi"}}],
+                [{"kind": "text", "text": "approved"}],
+                [{"kind": "text", "text": "later"}],
+            ]
+        )
+    )
+    load_modules("sevn.api.bots", "sevn.api.messages", "sevn.api.pending")
+    async with connected(tmp_path, monkeypatch) as (host, client):
+        bind(host.hub)
+        bot = await _bot(client)
+        first_frame, _earlier = await request(
+            client,
+            "messages.send",
+            {"bot_id": bot["id"], "text": "run it", "op_id": mint_id("op_")},
+        )
+        first = ok(first_frame)
+        item = await _wait_pending(tmp_path, client)
+        calls_while_waiting = len(model_request_payloads())
+        second_frame, _earlier = await request(
+            client,
+            "messages.send",
+            {"bot_id": bot["id"], "text": follow_up, "op_id": mint_id("op_")},
+        )
+        second = ok(second_frame)
+        assert second["agent_id"] == first["agent_id"]
+        agents = fetch_all(tmp_path, "SELECT id FROM agents")
+        assert len(agents) == 1
+        deadline = asyncio.get_running_loop().time() + 0.5
+        while asyncio.get_running_loop().time() < deadline:
+            queued = fetch_all(
+                tmp_path,
+                "SELECT status FROM jobs WHERE id = ?",
+                (second["job_id"],),
+            )
+            assert queued[0]["status"] == "queued"
+            assert len(model_request_payloads()) == calls_while_waiting
+            await asyncio.sleep(0.02)
+        frame, _earlier = await request(
+            client,
+            "pending.answer",
+            {"pending_id": item["id"], "answer": "approve", "op_id": mint_id("op_")},
+        )
+        ok(frame)
+        await poll_rows(
+            tmp_path,
+            "SELECT id, status FROM jobs ORDER BY created_at",
+            (),
+            lambda rows: len(rows) == 2 and all(row["status"] == "done" for row in rows),
+        )
+        payloads = model_request_payloads()
+        assert len(payloads) > calls_while_waiting
+        blob = json.dumps(payloads[-1]["messages"])
+        assert "run it" in blob
+        assert follow_up in blob

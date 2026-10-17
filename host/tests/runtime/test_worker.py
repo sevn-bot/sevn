@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from datetime import datetime
 from pathlib import Path
 
@@ -245,3 +246,83 @@ async def test_turns_cancel_stops_turn(tmp_path: Path, monkeypatch: pytest.Monke
             )
     finally:
         pause.set()
+
+
+_PROVIDER_CANARY = "provider-echo-CANARY-9f3a"
+_FAILED_TEXT = "This turn failed."
+
+
+def _raising_model(message: str) -> object:
+    from collections.abc import AsyncIterator
+
+    from pydantic_ai.models.function import FunctionModel
+
+    async def respond(_messages: list[object], _info: object) -> object:
+        raise RuntimeError(message)
+
+    async def stream(_messages: list[object], _info: object) -> AsyncIterator[str]:
+        if _messages is not None or _info is not None:
+            raise RuntimeError(message)
+        yield ""
+
+    return FunctionModel(respond, stream_function=stream, model_name="raising")
+
+
+def _stored_rows(home: Path) -> str:
+    chunks: list[str] = []
+    for sql in (
+        "SELECT * FROM messages",
+        "SELECT * FROM events",
+        "SELECT * FROM jobs",
+        "SELECT * FROM turns",
+    ):
+        chunks.append(json.dumps([dict(row) for row in fetch_all(home, sql)], default=str))
+    return "\n".join(chunks)
+
+
+async def test_provider_error_after_start_fails_turn_without_storing_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A turn that raises after it starts fails closed and hides the provider text."""
+    from sevn.runtime.models import use_model
+    from sevn.runtime.worker import bind
+
+    use_model(_raising_model(_PROVIDER_CANARY))
+    load_modules("sevn.api.bots", "sevn.api.messages")
+    try:
+        async with connected(tmp_path, monkeypatch) as (host, client):
+            bind(host.hub)
+            bot = await _create_bot(client)
+            await _send(client, bot["id"], "fail this turn")
+            await poll_rows(
+                tmp_path,
+                "SELECT status FROM turns",
+                (),
+                lambda rows: bool(rows) and rows[0]["status"] == "failed",
+            )
+            turns = fetch_all(tmp_path, "SELECT status, model_messages FROM turns")
+            assert len(turns) == 1
+            assert turns[0]["status"] == "failed"
+            raw_messages = turns[0]["model_messages"]
+            parsed: object = None if raw_messages is None else json.loads(str(raw_messages))
+            assert parsed is None
+            agents = fetch_all(tmp_path, "SELECT status FROM agents")
+            assert agents[0]["status"] == "idle"
+            jobs = fetch_all(tmp_path, "SELECT status FROM jobs")
+            assert jobs[0]["status"] == "failed"
+            listed, _earlier = await request(client, "messages.list", {"bot_id": bot["id"]})
+            body = ok(listed)
+            messages = body["messages"]
+            assert isinstance(messages, list)
+            assistant = [
+                part["text"]
+                for message in messages
+                if isinstance(message, dict) and message.get("role") == "assistant"
+                for part in message["parts"]
+                if isinstance(part, dict) and isinstance(part.get("text"), str)
+            ]
+            assert assistant == [_FAILED_TEXT]
+            assert _PROVIDER_CANARY not in _stored_rows(tmp_path)
+            assert _PROVIDER_CANARY not in json.dumps(body)
+    finally:
+        use_model(None)
