@@ -96,9 +96,8 @@ That row is one failed attempt, not 20 timeouts. Source:
 
 ### S-iOS (skipped)
 
-No operator iPhone was available. The harness was not served to a phone, and no connect
-time was taken from a page log. `results/s-ios-*.json` is `skipped: true`, reason
-`no live gate`.
+The physical iPhone was not driven. The simulator does not count. No connect time was
+taken from a page log. `results/s-ios-*.json` is `skipped: true`, reason `no live gate`.
 
 ### Other checks from this run
 
