@@ -1,4 +1,4 @@
-"""Per-agent lock, host cap, crash recovery, snapshot, and cancel (green after W4)."""
+"""Per-agent lock, host cap, crash recovery, snapshot, and cancel."""
 
 from __future__ import annotations
 
@@ -19,8 +19,6 @@ from support.chat import (
     poll_rows,
     request,
 )
-
-pytestmark = pytest.mark.xfail(reason="green after W4", strict=False)
 
 
 async def _create_bot(client: object) -> dict[str, object]:

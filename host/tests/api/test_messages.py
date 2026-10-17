@@ -1,4 +1,4 @@
-"""messages.send routing and cursor paging (green after W4)."""
+"""messages.send routing and cursor paging."""
 
 from __future__ import annotations
 
@@ -17,8 +17,6 @@ from support.chat import (
     poll_rows,
     request,
 )
-
-pytestmark = pytest.mark.xfail(reason="green after W4", strict=False)
 
 
 async def _create_bot(client: object, name: str = "Nimbus") -> dict[str, object]:

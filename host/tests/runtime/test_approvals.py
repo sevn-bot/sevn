@@ -1,4 +1,4 @@
-"""Deferred-tool approvals for the Pydantic AI runtime (green after W4)."""
+"""Deferred-tool approvals for the Pydantic AI runtime."""
 
 from __future__ import annotations
 
@@ -19,8 +19,6 @@ from support.chat import (
     poll_rows,
     request,
 )
-
-pytestmark = pytest.mark.xfail(reason="green after W4", strict=False)
 
 
 def _script() -> object:
