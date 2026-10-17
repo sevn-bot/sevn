@@ -96,8 +96,10 @@ That row is one failed attempt, not 20 timeouts. Source:
 
 ### S-iOS (skipped)
 
-The physical iPhone was not driven. The simulator does not count. No connect time was
-taken from a page log. `results/s-ios-*.json` is `skipped: true`, reason `no live gate`.
+Safari on the physical iPhone opened the webrtc-rs page over the private LAN and showed
+a blank page. The harness answered before Safari finished sending the request, then
+closed. No `channels open` time was recorded. The simulator does not count.
+`results/s-ios-*.json` stays `skipped: true`.
 
 ### Other checks from this run
 

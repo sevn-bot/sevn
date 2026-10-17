@@ -91,9 +91,9 @@ fn main() {
     for stream in listener.incoming() {
         let Ok(mut stream) = stream else { continue };
         let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
-        let mut buf = [0_u8; 2048];
-        let n = stream.read(&mut buf).unwrap_or(0);
-        let request = String::from_utf8_lossy(&buf[..n]);
+        // iPhone Safari keeps sending headers after the first packet. Answering
+        // before those bytes arrive, then closing, is a blank page.
+        let request = read_headers(&mut stream);
         let path = request
             .split_whitespace()
             .nth(1)
@@ -118,6 +118,22 @@ fn main() {
         let _ = stream.write_all(header.as_bytes());
         let _ = stream.write_all(body.as_bytes());
     }
+}
+
+fn read_headers(stream: &mut std::net::TcpStream) -> String {
+    let mut buf = Vec::new();
+    let mut tmp = [0_u8; 2048];
+    loop {
+        if buf.windows(4).any(|window| window == b"\r\n\r\n") || buf.len() > 65_536 {
+            break;
+        }
+        match stream.read(&mut tmp) {
+            Ok(0) => break,
+            Ok(n) => buf.extend_from_slice(&tmp[..n]),
+            Err(_) => break,
+        }
+    }
+    String::from_utf8_lossy(&buf).into_owned()
 }
 
 fn drive(peer: &std::sync::Arc<dyn Peer>, signal_url: &str, scenario: &str) -> Result<(), String> {

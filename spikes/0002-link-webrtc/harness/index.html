@@ -2,11 +2,36 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>sevn spike s1</title>
+    <style>
+      body {
+        margin: 0;
+        background: #fff;
+        color: #111;
+        font: 16px/1.4 ui-monospace, monospace;
+      }
+      #status,
+      #log {
+        margin: 0;
+        padding: 12px;
+      }
+      #log {
+        padding-top: 0;
+        white-space: pre-wrap;
+      }
+      video {
+        display: block;
+        width: 100%;
+        max-height: 40vh;
+        background: #111;
+      }
+    </style>
   </head>
   <body>
-    <video id="preview" width="1280" height="720" playsinline autoplay muted></video>
-    <pre id="log"></pre>
+    <p id="status">sevn spike</p>
+    <pre id="log">page ready</pre>
+    <video id="preview" playsinline autoplay muted></video>
     <script type="module" src="/peer.ts"></script>
   </body>
 </html>

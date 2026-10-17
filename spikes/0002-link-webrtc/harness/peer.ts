@@ -25,12 +25,21 @@ function log(line) {
     logEl.textContent += `${line}\n`;
   }
 }
+function safe(err) {
+  const text = String(err && err.message ? err.message : err);
+  if (/\b\d{1,3}(\.\d{1,3}){3}\b/.test(text) || /turns?:/i.test(text) || /credential/i.test(text)) {
+    return "failed";
+  }
+  return text.slice(0, 160);
+}
 
+log("page loaded");
 const relay = params.get("relay") === "1";
 const iceServers = relay ? await relayServers() : [];
 const pc = new RTCPeerConnection(
   relay ? { iceServers, iceTransportPolicy: "relay" } : { iceServers: [] },
 );
+pc.onconnectionstatechange = () => log(`connection ${pc.connectionState}`);
 
 async function relayServers() {
   const response = await fetch("/ice.json");
@@ -134,8 +143,25 @@ async function flush() {
 }
 
 const ws = new WebSocket(signalUrl);
+ws.onopen = () => log("signal open");
+ws.onerror = () => log("signal failed");
+ws.onclose = () => log("signal closed");
 ws.onmessage = async (event) => {
-  const message = JSON.parse(event.data);
+  let message;
+  try {
+    message = JSON.parse(event.data);
+  } catch (err) {
+    log(`signal ${safe(err)}`);
+    return;
+  }
+  try {
+    await onSignal(message);
+  } catch (err) {
+    log(`signal ${safe(err)}`);
+  }
+};
+
+async function onSignal(message) {
   if (message.kind === "role" && message.role === "offerer") {
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);

@@ -29,7 +29,7 @@
     },
     "ios-safari": {
       "outcome": "skipped",
-      "reason": "physical iPhone was not driven; the simulator does not count",
+      "reason": "Safari on the physical iPhone showed a blank page; channels open was not recorded. The simulator does not count",
       "evidence": [
         "spikes/0002-link-webrtc/results/s-ios-webrtcrs.json",
         "spikes/0002-link-webrtc/results/s-ios-str0m.json"
