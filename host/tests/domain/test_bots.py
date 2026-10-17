@@ -166,7 +166,7 @@ async def test_list_bots_ordered_by_updated_desc(
 
 def test_migrations_single_head() -> None:
     completed = subprocess.run(
-        ["make", "db-heads"],  # noqa: S607
+        ["make", "--no-print-directory", "db-heads"],  # noqa: S607
         cwd=repo_root(),
         check=False,
         capture_output=True,
