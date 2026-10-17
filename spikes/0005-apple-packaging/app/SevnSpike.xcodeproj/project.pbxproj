@@ -6,8 +6,17 @@
 	objectVersion = 56;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		A10000000000000000000011 /* SevnSpikeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000021 /* SevnSpikeApp.swift */; };
+		A10000000000000000000012 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000022 /* ContentView.swift */; };
+		A10000000000000000000013 /* HostService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000023 /* HostService.swift */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		A10000000000000000000001 /* SevnSpike.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SevnSpike.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000000000000000000021 /* SevnSpikeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SevnSpikeApp.swift; sourceTree = "<group>"; };
+		A10000000000000000000022 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A10000000000000000000023 /* HostService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -41,6 +50,9 @@
 		A1000000000000000000000E /* SevnSpike */ = {
 			isa = PBXGroup;
 			children = (
+				A10000000000000000000021 /* SevnSpikeApp.swift */,
+				A10000000000000000000022 /* ContentView.swift */,
+				A10000000000000000000023 /* HostService.swift */,
 			);
 			path = SevnSpike;
 			sourceTree = "<group>";
@@ -103,6 +115,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A10000000000000000000011 /* SevnSpikeApp.swift in Sources */,
+				A10000000000000000000012 /* ContentView.swift in Sources */,
+				A10000000000000000000013 /* HostService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -136,6 +151,7 @@
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
 			};

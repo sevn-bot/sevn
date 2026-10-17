@@ -1,0 +1,9 @@
+[package]
+name = "sevn-spike-helper"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "sevn-helper"
+path = "src/main.rs"
