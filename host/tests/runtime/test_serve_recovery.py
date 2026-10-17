@@ -18,7 +18,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 
 import pytest
@@ -30,6 +30,7 @@ from support.chat import (
     load_modules,
     mint_id,
     ok,
+    poll_rows,
     request,
 )
 from support.repo import repo_root
@@ -246,3 +247,126 @@ def test_serve_fails_crashed_turn_and_echoes_without_resend(
             "SELECT method FROM op_log WHERE method = 'messages.send'",
         )
         assert sent == []
+
+
+_RESUMED = "resumed-after-restart"
+
+
+def _part_text(raw: object) -> str:
+    parsed: object = json.loads(raw) if isinstance(raw, str) else raw
+    if not isinstance(parsed, list):
+        return ""
+    chunks: list[str] = []
+    for part in parsed:
+        if not isinstance(part, dict):
+            continue
+        text = part.get("text")
+        if isinstance(text, str):
+            chunks.append(text)
+    return "".join(chunks)
+
+
+@contextlib.asynccontextmanager
+async def _serve_lifespan() -> AsyncIterator[None]:
+    """Enter ``sevn serve`` startup. The HTTP server itself is not bound."""
+    from fastapi import FastAPI
+    from sevn.config import Settings
+    from sevn.http import create_app
+
+    app = create_app(Settings.load())
+    assert isinstance(app, FastAPI)
+    async with app.router.lifespan_context(app):
+        yield
+
+
+async def _plant_open_approval(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[str, str]:
+    from fakes.models import function_model
+    from sevn.runtime.models import use_model
+    from sevn.runtime.worker import bind
+
+    load_modules("sevn.api.bots", "sevn.api.messages", "sevn.api.pending")
+    use_model(
+        function_model(
+            [
+                [{"kind": "tool", "name": "shell", "args": {"command": "echo hi"}}],
+                [{"kind": "text", "text": _RESUMED}],
+            ]
+        )
+    )
+    async with connected(tmp_path, monkeypatch) as (host, client):
+        bind(host.hub)
+        frame, _earlier = await request(
+            client,
+            "bots.create",
+            {"name": "Nimbus", "op_id": mint_id("op_")},
+        )
+        bot = ok(frame)
+        await request(
+            client,
+            "messages.send",
+            {"bot_id": bot["id"], "text": "run it", "op_id": mint_id("op_")},
+        )
+        await poll_rows(
+            tmp_path,
+            "SELECT id FROM pending_requests WHERE status = 'waiting'",
+            (),
+            lambda rows: bool(rows),
+        )
+        turns = fetch_all(tmp_path, "SELECT id, status FROM turns")
+        pending = fetch_all(tmp_path, "SELECT id FROM pending_requests")
+        assert turns[0]["status"] == "waiting"
+        worker = bind(host.hub)
+        await worker.aclose()
+        await host.outbox.aclose()
+        await host.hub.oplog.aclose()
+    return str(turns[0]["id"]), str(pending[0]["id"])
+
+
+async def test_serve_resumes_answered_turn_and_keeps_open_approval_waiting(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Startup resumes a waiting turn only after its approval is saved.
+
+    ``test_waiting_turn_survives_restart`` calls ``recover`` while the approval
+    is still open. This test enters the serve lifespan. An open approval stays
+    ``waiting``. After that approval is saved, startup finishes the turn
+    ``done``. Deleting the resume loop in ``_lifespan`` leaves that turn
+    ``waiting``.
+    """
+    from sevn.domain.pending import PendingService
+    from sevn.runtime.models import use_model
+
+    try:
+        turn_id, pending_id = await _plant_open_approval(tmp_path, monkeypatch)
+        async with _serve_lifespan():
+            deadline = asyncio.get_running_loop().time() + 0.5
+            while asyncio.get_running_loop().time() < deadline:
+                turns = fetch_all(tmp_path, "SELECT status FROM turns WHERE id = ?", (turn_id,))
+                assert turns[0]["status"] == "waiting"
+                pending = fetch_all(
+                    tmp_path,
+                    "SELECT status FROM pending_requests WHERE id = ?",
+                    (pending_id,),
+                )
+                assert pending[0]["status"] == "waiting"
+                jobs = fetch_all(tmp_path, "SELECT status FROM jobs")
+                assert jobs[0]["status"] == "started"
+                await asyncio.sleep(0.05)
+        await PendingService().resolve(pending_id, "approve")
+        async with _serve_lifespan():
+            await poll_rows(
+                tmp_path,
+                "SELECT status FROM turns WHERE id = ?",
+                (turn_id,),
+                lambda rows: bool(rows) and rows[0]["status"] == "done",
+                timeout_s=5,
+            )
+        saved = fetch_all(
+            tmp_path,
+            "SELECT parts FROM messages WHERE role = 'assistant'",
+        )
+        assert any(_part_text(row["parts"]) == _RESUMED for row in saved)
+        done = fetch_all(tmp_path, "SELECT status FROM jobs")
+        assert done[0]["status"] == "done"
+    finally:
+        use_model(None)

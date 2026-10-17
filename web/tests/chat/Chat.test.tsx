@@ -12,6 +12,10 @@ function textMessage(id: string, text: string): Record<string, unknown> {
   };
 }
 
+function logTexts(log: HTMLElement): string[] {
+  return [...log.querySelectorAll("p")].map((node) => node.textContent ?? "");
+}
+
 test("streams ticks into the current assistant bubble", async () => {
   const harness = await startHarness({
     "messages.list": {
@@ -134,6 +138,99 @@ test("loads older messages on scroll", async () => {
       (params) => params.cursor,
     );
     expect(cursors).toContain("page-2");
+  } finally {
+    testing.cleanup();
+    harness.stop();
+  }
+});
+
+test("shows newest-first pages oldest-first and prepends older pages", async () => {
+  const harness = await startHarness({
+    "agents.list": { agents: [] },
+    "pending.list": { pending: [] },
+    "bots.get": { name: "Nimbus", model: "echo" },
+    "messages.list": (params) => {
+      if (params.cursor === "page-2") {
+        return {
+          messages: [
+            textMessage("msg_b", "second-oldest"),
+            textMessage("msg_a", "oldest-note"),
+          ],
+          next_cursor: null,
+        };
+      }
+      return {
+        messages: [
+          textMessage("msg_d", "newest-note"),
+          textMessage("msg_c", "middle-note"),
+        ],
+        next_cursor: "page-2",
+      };
+    },
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Chat = await loadChat();
+    testing.render(createElement(Chat, { botId }));
+    await testing.screen.findByText("newest-note");
+    const log = await testing.screen.findByRole("log");
+    expect(logTexts(log)).toEqual(["middle-note", "newest-note"]);
+    log.scrollTop = 0;
+    testing.fireEvent.scroll(log);
+    await testing.screen.findByText("oldest-note");
+    expect(logTexts(log)).toEqual([
+      "oldest-note",
+      "second-oldest",
+      "middle-note",
+      "newest-note",
+    ]);
+  } finally {
+    testing.cleanup();
+    harness.stop();
+  }
+});
+
+test("keeps the latest line in view until the user scrolls up", async () => {
+  const harness = await startHarness({
+    "agents.list": { agents: [] },
+    "pending.list": { pending: [] },
+    "bots.get": { name: "Nimbus", model: "echo" },
+    "messages.list": {
+      messages: [textMessage("msg_d", "newest-note")],
+      next_cursor: null,
+    },
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Chat = await loadChat();
+    testing.render(createElement(Chat, { botId }));
+    await testing.screen.findByText("newest-note");
+    const log = await testing.screen.findByRole("log");
+    Object.defineProperty(log, "scrollHeight", {
+      configurable: true,
+      get: () => 400,
+    });
+    Object.defineProperty(log, "clientHeight", {
+      configurable: true,
+      get: () => 80,
+    });
+    harness.tick("turn.delta", {
+      turn_id: "turn_1",
+      agent_id: "agent_1",
+      text: "tail",
+    });
+    await testing.waitFor(() => {
+      expect(log.scrollTop).toBe(400);
+    });
+    log.scrollTop = 10;
+    testing.fireEvent.scroll(log);
+    harness.tick("turn.delta", {
+      turn_id: "turn_1",
+      agent_id: "agent_1",
+      text: " more",
+    });
+    await testing.screen.findByText("tail more", { exact: false });
+    expect(log.scrollTop).toBe(10);
   } finally {
     testing.cleanup();
     harness.stop();

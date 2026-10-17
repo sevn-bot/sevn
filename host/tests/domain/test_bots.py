@@ -60,7 +60,7 @@ async def test_create_bot_creates_workspace(
         bot_id = assert_prefixed_id(body["id"], "bot_")
         assert body["name"] == "alpha"
         assert body["runtime"] == "pydantic_ai"
-        assert body["model"] == "anthropic"
+        assert body["model"] == "anthropic:claude-sonnet-4-5"
         assert body["access"] == "workspace"
         assert body["approval_policy"] == "ask"
         _assert_workspace(body, bot_id)
