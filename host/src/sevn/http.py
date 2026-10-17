@@ -168,11 +168,17 @@ async def _lifespan(app: ASGIApp) -> AsyncGenerator[None]:
     state.oplog = oplog
     browser: asyncio.Task[None] | None = None
     worker: Worker | None = None
+    resumes: list[asyncio.Task[None]] = []
     try:
         state.hub = Hub(outbox, oplog)
-        requeued = await recover()
+        recovered = await recover()
         worker = bind(state.hub)
-        for agent_id in requeued:
+        for item in recovered.resume:
+            logger.info("resuming answered turn {turn_id}", turn_id=item.turn_id)
+            resumes.append(
+                asyncio.create_task(worker.resume(item.agent_id, item.turn_id, item.decisions))
+            )
+        for agent_id in recovered.kick:
             worker.kick(agent_id)
         state.token = await asyncio.to_thread(_write_token, paths.run / "token")
         await asyncio.to_thread(
@@ -186,6 +192,12 @@ async def _lifespan(app: ASGIApp) -> AsyncGenerator[None]:
             browser = asyncio.create_task(_open_browser(state))
         yield
     finally:
+        for task in resumes:
+            if not task.done():
+                task.cancel()
+        for task in resumes:
+            with suppress(asyncio.CancelledError, Exception):
+                await task
         if browser is not None:
             browser.cancel()
             with suppress(asyncio.CancelledError):

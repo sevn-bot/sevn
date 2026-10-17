@@ -99,7 +99,17 @@ def resolve_model(name: str) -> Model:
     if name == "":
         raise ModelError("bot has no model")
     factory = cast("Callable[[str], Provider[Any]]", _provider_for)
-    return infer_model(name, provider_factory=factory)
+    return infer_model(_resolvable_name(name), provider_factory=factory)
+
+
+def _resolvable_name(name: str) -> str:
+    """Picker ids are ``provider:model``. A bare provider uses its first catalog id."""
+    if ":" in name:
+        return name
+    for item in _CATALOG:
+        if item.provider == name:
+            return item.id
+    return name
 
 
 async def list_models() -> list[CatalogModel]:

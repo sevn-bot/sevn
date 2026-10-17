@@ -40,11 +40,13 @@ function ChatView({ botId }: { botId: string }) {
   const seenEvents = useRef(0);
   const olderCursor = useRef<string | null | undefined>(undefined);
   const loadingOlder = useRef(false);
+  const logRef = useRef<HTMLDivElement>(null);
+  const followTail = useRef(true);
   const [older, setOlder] = useState<ListedMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const page = messagesQuery.data?.messages ?? [];
-  const messages = [...page, ...older];
+  const messages = [...older, ...chronological(page)];
   const agents = agentsQuery.data?.agents ?? [];
   const pending = pendingQuery.data?.pending ?? [];
   const botName = botQuery.data?.name ?? "";
@@ -60,6 +62,20 @@ function ChatView({ botId }: { botId: string }) {
       olderCursor.current = messagesQuery.data.next_cursor;
     }
   }, [messagesQuery.data]);
+
+  useEffect(() => {
+    const node = logRef.current;
+    const count = (messagesQuery.data?.messages.length ?? 0) + ticks.length;
+    if (
+      node === null ||
+      !followTail.current ||
+      count === 0 ||
+      node.scrollHeight <= node.clientHeight
+    ) {
+      return;
+    }
+    node.scrollTop = node.scrollHeight;
+  }, [messagesQuery.data, ticks]);
 
   useEffect(() => {
     if (events.length === seenEvents.current) {
@@ -84,7 +100,7 @@ function ChatView({ botId }: { botId: string }) {
     try {
       const next = await call("messages.list", { bot_id: botId, cursor });
       olderCursor.current = next.next_cursor;
-      setOlder((current) => [...current, ...next.messages]);
+      setOlder((current) => [...chronological(next.messages), ...current]);
     } catch {
       // The log stays on the page that loaded. Another scroll can retry.
     } finally {
@@ -93,7 +109,10 @@ function ChatView({ botId }: { botId: string }) {
   }
 
   function onScroll(event: UIEvent<HTMLDivElement>): void {
-    if (event.currentTarget.scrollTop !== 0) {
+    const node = event.currentTarget;
+    const fromTail = node.scrollHeight - node.scrollTop - node.clientHeight;
+    followTail.current = node.scrollTop !== 0 && fromTail <= 1;
+    if (node.scrollTop !== 0) {
       return;
     }
     void loadOlder();
@@ -141,6 +160,7 @@ function ChatView({ botId }: { botId: string }) {
         ))}
       </div>
       <div
+        ref={logRef}
         role="log"
         className="max-h-80 space-y-2 overflow-y-auto rounded border border-zinc-800 px-3 py-2"
         onScroll={onScroll}
@@ -191,6 +211,10 @@ function ChatView({ botId }: { botId: string }) {
       </details>
     </section>
   );
+}
+
+function chronological(rows: ListedMessage[]): ListedMessage[] {
+  return [...rows].reverse();
 }
 
 function messageText(parts: Record<string, string>[]): string {

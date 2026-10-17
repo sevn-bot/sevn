@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 
 from sqlalchemy import select
@@ -10,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sevn.domain.ids import new_id
 from sevn.domain.session import open_session
 from sevn.log import logger
+from sevn.runtime.base import ToolDecision
 from sevn.store.db import utcnow
 from sevn.store.models import Agent as AgentRow
 from sevn.store.models import Event, Message
@@ -20,31 +22,53 @@ from sevn.store.models import Turn as TurnRow
 _RESEND = "This Claude turn was interrupted. Resend your message."
 
 
-async def recover() -> list[str]:
+@dataclass(frozen=True, slots=True)
+class AnsweredTurn:
+    """A waiting turn whose approvals were saved before the process stopped."""
+
+    agent_id: str
+    turn_id: str
+    decisions: tuple[ToolDecision, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class Recovery:
+    """Work the startup path must pick up after ``recover``."""
+
+    kick: tuple[str, ...]
+    resume: tuple[AnsweredTurn, ...]
+
+
+async def recover() -> Recovery:
     """Requeue ``started`` jobs whose turn has no committed result.
 
-    A ``waiting`` Pydantic AI turn stays waiting, and so does its job. A
-    committed ``model_messages`` value is a result, including an empty list.
-    A Claude turn that was blocked on ``can_use_tool`` only holds that wait in
-    memory, so a restart marks the turn ``interrupted`` and asks the user to
-    resend.
+    A ``waiting`` turn that still has an open approval stays waiting, and so
+    does its job. A ``waiting`` turn whose approvals are already saved is
+    returned in ``resume``; the caller continues it. Leaving that job
+    ``started`` would wedge the agent. A committed ``model_messages`` value
+    is a result, including an empty list. A Claude turn that was blocked on
+    ``can_use_tool`` only holds that wait in memory, so a restart marks the
+    turn ``interrupted`` and asks the user to resend.
 
     The crashed attempt's running turn is marked ``failed`` so the retry is
-    not a second running turn for the same job. The returned agent ids own a
-    queued job; the caller starts a pump for each of them.
+    not a second running turn for the same job. ``kick`` lists agents that
+    own a queued job; the caller starts a pump for each of them.
     """
+    answered: list[AnsweredTurn] = []
     async with open_session() as session:
         jobs = list(await session.scalars(select(JobRow).where(JobRow.status == "started")))
         if len(jobs) > 0:
             turns = list(await session.scalars(select(TurnRow)))
-            pendings = list(
-                await session.scalars(select(PendingRow).where(PendingRow.status == "waiting"))
-            )
-            waiting_ids = {row.turn_id for row in pendings}
+            pendings = list(await session.scalars(select(PendingRow)))
+            waiting_ids = {row.turn_id for row in pendings if row.status == "waiting"}
             now = utcnow()
             for job in jobs:
                 related = [turn for turn in turns if job.id in turn.job_ids]
                 if await _interrupt_claude(session, job, related, pendings, waiting_ids):
+                    continue
+                ready = _answered_turns(related, pendings)
+                if len(ready) > 0:
+                    answered.extend(ready)
                     continue
                 if any(turn.status == "waiting" for turn in related):
                     continue
@@ -56,7 +80,7 @@ async def recover() -> list[str]:
                 await _idle_crashed_agent(session, turns, job.agent_id, now)
                 logger.info("requeued crashed job {job_id}", job_id=job.id)
             await session.commit()
-    return await _queued_agent_ids()
+    return Recovery(kick=tuple(await _queued_agent_ids()), resume=tuple(answered))
 
 
 def _close_crashed_turns(session: AsyncSession, related: list[TurnRow], now: datetime) -> None:
@@ -99,6 +123,35 @@ def _turn_finished(turn_id: str, agent_id: str, now: datetime) -> Event:
 def _agent_updated(agent_id: str, now: datetime) -> Event:
     payload: dict[str, object] = {"agent_id": agent_id, "status": "idle"}
     return Event(type="agent.updated", entity=agent_id, payload=payload, created_at=now)
+
+
+def _answered_turns(related: list[TurnRow], pendings: list[PendingRow]) -> list[AnsweredTurn]:
+    """Waiting turns with every approval already saved, and none still open."""
+    if any(turn.status == "waiting" and _open_pending(turn.id, pendings) for turn in related):
+        return []
+    ready: list[AnsweredTurn] = []
+    for turn in related:
+        if turn.status != "waiting":
+            continue
+        decisions = _saved_decisions(turn.id, pendings)
+        if len(decisions) == 0:
+            continue
+        ready.append(AnsweredTurn(agent_id=turn.agent_id, turn_id=turn.id, decisions=decisions))
+    return ready
+
+
+def _open_pending(turn_id: str, pendings: list[PendingRow]) -> bool:
+    return any(row.turn_id == turn_id and row.status == "waiting" for row in pendings)
+
+
+def _saved_decisions(turn_id: str, pendings: list[PendingRow]) -> tuple[ToolDecision, ...]:
+    chosen: list[ToolDecision] = []
+    for row in pendings:
+        if row.turn_id != turn_id or row.tool_call_id is None or row.status != "resolved":
+            continue
+        approved = row.answer is not None and row.answer.get("decision") == "approve"
+        chosen.append(ToolDecision(tool_call_id=row.tool_call_id, approved=approved))
+    return tuple(chosen)
 
 
 async def _queued_agent_ids() -> list[str]:
