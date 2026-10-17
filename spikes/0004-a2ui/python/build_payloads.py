@@ -63,9 +63,7 @@ def create_surface(surface_id: str) -> dict[str, Any]:
     )
 
 
-def update_components(
-    surface_id: str, components: list[dict[str, Any]]
-) -> dict[str, Any]:
+def update_components(surface_id: str, components: list[dict[str, Any]]) -> dict[str, Any]:
     return dump(
         UpdateComponentsMessage(
             update_components=UpdateComponents(
@@ -130,18 +128,14 @@ def sevn_catalog() -> dict[str, Any]:
                 "additionalProperties": False,
                 "description": "Approve or deny a pending action.",
                 "required": ["title"],
-                "properties": {
-                    "title": _string_prop("What the operator is approving.")
-                },
+                "properties": {"title": _string_prop("What the operator is approving.")},
             },
             "sevn.AssistCard": {
                 "type": "object",
                 "additionalProperties": False,
                 "description": "Offers the Open Computer panel action.",
                 "required": ["prompt"],
-                "properties": {
-                    "prompt": _string_prop("Short prompt shown on the card.")
-                },
+                "properties": {"prompt": _string_prop("Short prompt shown on the card.")},
             },
             "Table": {
                 "type": "object",
