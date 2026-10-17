@@ -1,4 +1,4 @@
-"""``sevn secret set|list|rm`` (green after W6)."""
+"""``sevn secret set|list|rm``."""
 
 from __future__ import annotations
 
@@ -7,8 +7,6 @@ from pathlib import Path
 import pytest
 from support.canary import canary
 from support.chat import arm_home
-
-pytestmark = pytest.mark.xfail(reason="green after W6", strict=False)
 
 
 def _runner() -> object:

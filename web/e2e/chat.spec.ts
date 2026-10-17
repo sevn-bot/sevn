@@ -45,11 +45,9 @@ async function runChat(page: ChatPage, expect: ExpectVisible): Promise<void> {
 
 if (process.env.VITEST) {
   const { test } = (await import("vitest")) as {
-    test: {
-      skip: (name: string, fn: () => Promise<void>) => void;
-    };
+    test: (name: string, fn: () => Promise<void>) => void;
   };
-  test.skip("create a bot, send hi, see echo: hi [green after W6]", async () => {
+  test("create a bot, send hi, see echo: hi", async () => {
     const playwrightPackage = "@playwright/test";
     const playwright = (await import(playwrightPackage)) as {
       chromium: {
@@ -74,16 +72,13 @@ if (process.env.VITEST) {
 } else {
   const playwrightPackage = ["@playwright", "test"].join("/");
   const playwright = nodeRequire(playwrightPackage) as {
-    test: ((
+    test: (
       name: string,
       fn: (args: { page: ChatPage }) => Promise<void>,
-    ) => void) & {
-      skip: (condition: boolean, description: string) => void;
-    };
+    ) => void;
     expect: ExpectVisible;
   };
   playwright.test("create a bot, send hi, see echo: hi", async ({ page }) => {
-    playwright.test.skip(process.env.SEVN_RUN_MARKED !== "1", "green after W6");
     await runChat(page, playwright.expect);
   });
 }

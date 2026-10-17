@@ -1,9 +1,6 @@
 import { createElement } from "react";
-import { expect } from "vitest";
-import { red } from "../support/red.ts";
+import { expect, test } from "vitest";
 import { loadBotList, requestParams, startHarness } from "./host.ts";
-
-const test = red("W6");
 
 test("lists bots", async () => {
   const harness = await startHarness({
