@@ -15,6 +15,7 @@ from typing import cast
 
 from fastapi import FastAPI
 from starlette.datastructures import Headers
+from starlette.exceptions import HTTPException
 from starlette.responses import PlainTextResponse, RedirectResponse, Response
 from starlette.staticfiles import StaticFiles
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -228,7 +229,13 @@ class _Spa(StaticFiles):
         super().__init__(directory=directory, html=True)
 
     async def get_response(self, path: str, scope: Scope) -> Response:
-        response = await super().get_response(path, scope)
+        try:
+            response = await super().get_response(path, scope)
+        except HTTPException as exc:
+            # A missing file raises. It is not a response whose status is 404.
+            if exc.status_code != 404 or not _client_route(path):
+                raise
+            response = await super().get_response("index.html", scope)
         if response.status_code == 404 and _client_route(path):
             response = await super().get_response("index.html", scope)
         response.headers["Content-Security-Policy"] = CSP
