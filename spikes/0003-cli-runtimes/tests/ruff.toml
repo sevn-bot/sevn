@@ -1,0 +1,9 @@
+# Spike tests use pytest asserts. Login checks pass a fixed argv into subprocess.
+line-length = 100
+
+[lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC", "S", "BLE", "RUF"]
+
+[lint.per-file-ignores]
+"*.py" = ["S101"]
+"test_live_scenarios.py" = ["S101", "S603"]

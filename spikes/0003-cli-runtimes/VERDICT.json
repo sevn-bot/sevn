@@ -1,0 +1,40 @@
+{
+  "claude": {
+    "verdict": "pass",
+    "scenarios": {
+      "tool_call": "passed",
+      "permission": "passed",
+      "resume": "passed",
+      "interrupt": "passed"
+    }
+  },
+  "codex": {
+    "verdict": "pass",
+    "scenarios": {
+      "tool_call": "passed",
+      "permission": "passed",
+      "resume": "passed",
+      "interrupt": "passed"
+    }
+  },
+  "opencode": {
+    "verdict": "pass",
+    "scenarios": {
+      "tool_call": "passed",
+      "permission": "passed",
+      "resume": "passed",
+      "interrupt": "passed"
+    }
+  },
+  "cursor": {
+    "verdict": "no-go",
+    "scenarios": {
+      "tool_call": "failed",
+      "permission": "failed",
+      "resume": "failed",
+      "interrupt": "failed"
+    }
+  },
+  "runtime_protocol": "async def open(self, agent: AgentRecord) -> SessionRef: ...\ndef run_turn(self, turn: TurnContext) -> AsyncIterator[RuntimeEvent]: ...\nasync def answer(self, pending_id: str, answer: PendingAnswer) -> None: ...\nasync def interrupt(self, agent_id: str) -> None: ...\nasync def close(self, agent_id: str) -> None: ...",
+  "sha": "807299a6da4c1b64c102d36cfc16a095fe6923a3"
+}

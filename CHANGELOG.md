@@ -7,4 +7,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Spike S2: subscription CLI runtimes with sevn MCP tools.
 - Foundation: `sevn serve` with WebSocket protocol (handshake, idempotent calls, durable events with replay), SPA shell, Docker image.

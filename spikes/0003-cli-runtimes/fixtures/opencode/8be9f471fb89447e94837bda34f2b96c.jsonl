@@ -1,0 +1,50 @@
+{"type": "session", "subtype": "new", "session_id": "ses_eb9a142efffetRpFyVVYF07NcH"}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "The user asks to"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " call the sevn"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "_echo tool exactly once"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " with"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " the text \"ping\". There's a tool `tools.sevn.sevn"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "_echo` available"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " via the `execute"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "` tool in Code"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " Mode. Let me"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " search for it first"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": ", then call it"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": ".\n\nActually, the"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " instructions say: \""}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "Inside `execute`,"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " use `search(..."}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": ")` to find"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " a tool, then"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " call it by"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " `path` in"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " the result.\"\n\nLet"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " me search for se"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "vn_echo."}}
+{"type": "session_update", "update": {"sessionUpdate": "tool_call", "tool": "execute", "args": {}}}
+{"type": "session_update", "update": {"sessionUpdate": "tool_call_update", "tool": "sevn_echo", "status": "in_progress"}}
+{"type": "session_update", "update": {"sessionUpdate": "tool_call_update", "tool": "sevn_echo", "status": "in_progress"}}
+{"type": "permission_request", "tool": "sevn_echo", "args": {"code": "const res = await tools.sevn.sevn_echo({ text: \"ping\" });\nreturn JSON.stringify(res);"}, "request_id": "call_05633c3577cd4d159de240ab"}
+{"type": "session_update", "update": {"sessionUpdate": "tool_call_update", "tool": "sevn_echo", "status": "in_progress"}}
+{"type": "session_update", "update": {"sessionUpdate": "tool_call_update", "tool": "sevn_echo", "status": "completed"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "The tool was called"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " and returned"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " the echo. The user asked to call it exactly once with"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " the text \"ping"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "\" — done."}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "Done."}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": " I called the `"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "sevn_echo`"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": " tool exactly once with"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": " the text **\"ping"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "\"**, and it"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": " returned:\n\n```json\n{\n  \"echo\": \"ping\",\n  \"session"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "\": \"78f"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "51f1bdd"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "ad495ab9"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "d3f0"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "ca6a03"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "a29e\"\n"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "}\n```"}}
+{"type": "session_update", "update": {"sessionUpdate": "usage_update"}}
+{"type": "prompt_response", "stopReason": "end_turn", "usage": {"total_tokens": 10371, "input_tokens": 38, "output_tokens": 93, "cached_read_tokens": 10240}}
