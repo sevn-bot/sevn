@@ -1,4 +1,4 @@
-"""Pydantic AI runtime, TurnRunner, and the model catalog (green after W3)."""
+"""Pydantic AI runtime, TurnRunner, and the model catalog."""
 
 from __future__ import annotations
 
@@ -23,8 +23,6 @@ from support.chat import (
     ok,
     request,
 )
-
-pytestmark = pytest.mark.xfail(reason="green after W3", strict=False)
 
 
 async def _spawn(bot_id: str) -> Any:
