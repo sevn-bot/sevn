@@ -29,7 +29,7 @@
     },
     "ios-safari": {
       "outcome": "skipped",
-      "reason": "Safari on the physical iPhone showed a blank page; channels open was not recorded. The simulator does not count",
+      "reason": "Physical iPhone Safari on private Wi-Fi rendered both pages. The harness log has no channels open line. It has 'webrtcrs spike-peer: no relay candidate' and 'str0m spike-peer: timed out'. Wi-Fi half not recorded. Cellular half not run. The simulator does not count",
       "evidence": [
         "spikes/0002-link-webrtc/results/s-ios-webrtcrs.json",
         "spikes/0002-link-webrtc/results/s-ios-str0m.json"

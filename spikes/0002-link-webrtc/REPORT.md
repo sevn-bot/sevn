@@ -96,10 +96,14 @@ That row is one failed attempt, not 20 timeouts. Source:
 
 ### S-iOS (skipped)
 
-Safari on the physical iPhone opened the webrtc-rs page over the private LAN and showed
-a blank page. The harness answered before Safari finished sending the request, then
-closed. No `channels open` time was recorded. The simulator does not count.
-`results/s-ios-*.json` stays `skipped: true`.
+Safari on the physical iPhone, on the same private Wi-Fi, rendered both fixed harness
+pages. The harness log for those listeners does not contain `channels open`. The only
+peer lines are `webrtcrs spike-peer: no relay candidate` and `str0m spike-peer: timed out`.
+Those are the offerer `drive()` connect failures. `connect` starts when the process
+starts and gives up after 45 seconds, and the log has no per-line timestamps, so the
+lines are not a Wi-Fi `channels open` time. The cellular half was not run: with Wi-Fi
+off the phone cannot reach this Mac on a private address, and no tunnel was started.
+The simulator does not count. `results/s-ios-*.json` stays `skipped: true`.
 
 ### Other checks from this run
 
@@ -124,7 +128,7 @@ stored millisecond. The callback reported width 1280 and height 720 for both lib
 | LAN 10 MB ≥ 5 MB/s | pass (77.7 MiB/s) | pass (35.4 MiB/s) |
 | ICE restart < 5 s | pass (1.0 ms) | pass (23.5 ms) |
 | Chrome data + video | pass | pass |
-| Safari data + video | desktop WebKit pass; iOS Safari not run | desktop WebKit pass; iOS Safari not run |
+| Safari data + video | desktop WebKit pass; iOS pages rendered, channels open not recorded | desktop WebKit pass; iOS pages rendered, channels open not recorded |
 | 100 connects, no crash | pass | pass |
 
 webrtc-rs misses the S-TURN connect bar. str0m clears the bars that were run, including
@@ -187,9 +191,10 @@ WebKit data plus 1280×720 H.264, and 100 connects with no failure. S-TURN, same
 relay only: webrtc-rs UDP connect p50 5066 ms (over 3.0 s) at 6.57 MiB/s, ICE restart 3.08 s;
 TLS:443 gathered no relay candidate. str0m, via this spike's `rtc-turn` adapter, UDP connect
 p50 150 ms at 12.22 MiB/s and TLS:443 connect p50 215 ms at 3.40 MiB/s. str0m 0.24.1 still
-has no TURN client of its own. iOS Safari was not run. A tie, if both later pass, selects
-str0m. If the adapter is not acceptable as str0m, the choice is webrtc-rs or plan C (pion
-sidecar).
+has no TURN client of its own. iOS Safari rendered the pages on private Wi-Fi; the
+harness log has no `channels open` line, and the cellular half was not run. A tie, if
+both later pass, selects str0m. If the adapter is not acceptable as str0m, the choice is
+webrtc-rs or plan C (pion sidecar).
 
 **0068 (UniFFI / Apple).** `ios_build` is false. Cross-builds for `aarch64-apple-ios` and
 `aarch64-apple-ios-sim` stop in `ring` 0.17.14 (webrtc-rs) and `aws-lc-sys` 0.46.0 (str0m)

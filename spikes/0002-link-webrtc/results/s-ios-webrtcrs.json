@@ -3,5 +3,5 @@
   "lib": "webrtcrs",
   "skipped": true,
   "reason": "no live gate",
-  "detail": "no operator iPhone confirmed"
+  "detail": "pages rendered on private Wi-Fi; harness log has no channels open line (spike-peer: no relay candidate). Cellular half not run"
 }
