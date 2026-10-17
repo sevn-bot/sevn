@@ -41,3 +41,7 @@ AGENTS.md
 
 # Claude Code local state
 .claude/worktrees/
+.mergecraft/audit.jsonl
+.mergecraft/reviews/
+.mergecraft/analyzer-cache/
+.mergecraft/analyzers.lock

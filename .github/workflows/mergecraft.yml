@@ -1,0 +1,75 @@
+# mergeCraft PR review (BYOK). https://github.com/alexhawat/mergeCraft
+#
+# Reviewer: OpenCode Go subscription, model opencode-go/deepseek-v4.1-flash.
+# That is the primary rung in alexhawat/mergeCraft's own review workflow.
+# The action pin below is that workflow's verified image commit. The tagged
+# v0.1.0a1 action does not include this model.
+#
+# Trigger is pull_request, not pull_request_target. This job is not a required
+# ruleset, and pull_request keeps repository secrets out of fork runs. The
+# credential is passed only for workflow_dispatch and same-repo pull requests.
+# push and shell stay disabled: a review must not run pull-request scripts or
+# push commits.
+name: mergeCraft
+
+on:
+  pull_request:
+    types: [opened, ready_for_review, synchronize]
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: Prompt for the agent
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mergecraft-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mergecraft:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      checks: write
+    env:
+      # Fork pull_request runs receive an empty secret. The same-repo clause
+      # stays even if the trigger later changes.
+      HAS_OPENCODE_GO: ${{ secrets.LLM_PROVIDER_9_API_KEY != '' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Do not persist the checkout token into .git/config: mergeCraft adds
+          # its own Authorization header, and git sends both on one request.
+          persist-credentials: false
+
+      - name: Run mergeCraft
+        if: env.HAS_OPENCODE_GO == 'true'
+        uses: alexhawat/mergeCraft@677c192c0229a96777b0092febd7d1c3264319d3 # verified image manifest
+        with:
+          prompt: >
+            ${{ github.event_name == 'pull_request'
+                && 'Review this pull request.'
+                || github.event.inputs.prompt }}
+          model: opencode-go/deepseek-v4.1-flash
+          model_pin: enabled
+          push: disabled
+          shell: disabled
+          status_checks: enabled
+          timeout: 25m
+        env:
+          # Keep equal to the uses: commit above. The container cannot read it.
+          MERGECRAFT_ACTION_SHA: 677c192c0229a96777b0092febd7d1c3264319d3
+          LLM_PROVIDER_9: opencode-go
+          OPENCODE_GO_API_KEY: ${{ secrets.LLM_PROVIDER_9_API_KEY }}
+
+      - name: Skip review without an OpenCode Go credential
+        if: env.HAS_OPENCODE_GO != 'true'
+        run: echo "::notice title=mergeCraft::No same-repo OpenCode Go credential for this run, so review was skipped."
