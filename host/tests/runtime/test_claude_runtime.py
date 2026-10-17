@@ -1,4 +1,4 @@
-"""Claude runtime over FakeClaudeClient, plus one live turn (green after W5)."""
+"""Claude runtime over FakeClaudeClient, plus one live turn."""
 
 from __future__ import annotations
 
@@ -17,8 +17,6 @@ from support.chat import (
     poll_rows,
     request,
 )
-
-pytestmark = pytest.mark.xfail(reason="green after W5", strict=False)
 
 _HI = [
     {"type": "system", "subtype": "init", "session_id": "sess_1"},
