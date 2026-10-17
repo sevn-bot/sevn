@@ -158,6 +158,7 @@ class TurnRunner:
             bot=bot,
             job_id=job.id,
             text=job.text,
+            turn_id=turn_id,
             message_history=history,
             approvals=decisions,
         )

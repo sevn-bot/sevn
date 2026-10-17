@@ -39,9 +39,10 @@ class TurnContext:
     """Inputs for one ``run_turn`` call."""
 
     agent: AgentRecord
-    bot: BotRecord
-    job_id: str
     text: str
+    bot: BotRecord | None = None
+    job_id: str = ""
+    turn_id: str | None = None
     message_history: list[object] | None = None
     approvals: tuple[ToolDecision, ...] | None = None
 

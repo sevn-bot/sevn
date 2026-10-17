@@ -8,11 +8,13 @@ from contextlib import suppress
 from sqlalchemy import select
 
 from sevn.config import Settings
+from sevn.domain.agents import AgentService
 from sevn.domain.errors import DomainError
 from sevn.domain.session import open_session
 from sevn.log import logger
 from sevn.protocol.hub import Hub
 from sevn.runtime.base import Runtime, ToolDecision
+from sevn.runtime.runtimes.claude import ClaudeRuntime, installed_client
 from sevn.runtime.runtimes.pydantic_ai import PydanticAIRuntime
 from sevn.runtime.turn import TurnRunner
 from sevn.store.models import Job as JobRow
@@ -52,7 +54,9 @@ class Worker:
 
     def __init__(self, hub: Hub, runtime: Runtime | None = None) -> None:
         self.hub = hub
-        self._runtime = runtime if runtime is not None else PydanticAIRuntime()
+        self._override = runtime
+        self._pydantic = PydanticAIRuntime()
+        self._claude = ClaudeRuntime(client=installed_client(), hub=hub)
         self._slots = asyncio.Semaphore(_max_running_turns())
         self._locks: dict[str, asyncio.Lock] = {}
         self._tasks: dict[str, asyncio.Task[None]] = {}
@@ -92,10 +96,11 @@ class Worker:
         turn_id: str,
         decisions: tuple[ToolDecision, ...],
     ) -> None:
+        runtime = await self._choose(agent_id)
         async with self._lock(agent_id):
             await self._slots.acquire()
             try:
-                runner = TurnRunner(self.hub, self._runtime, watch=self._board)
+                runner = TurnRunner(self.hub, runtime, watch=self._board)
                 await runner.resume(turn_id, decisions)
             finally:
                 self._slots.release()
@@ -105,7 +110,8 @@ class Worker:
         agent_id = self._board.agent_id(turn_id)
         if agent_id is None:
             agent_id = await _agent_for_turn(turn_id)
-        await self._runtime.interrupt(agent_id)
+        runtime = await self._choose(agent_id)
+        await runtime.interrupt(agent_id)
 
     async def snapshot(self, turn_id: str) -> tuple[str, str]:
         status = await _turn_status(turn_id)
@@ -134,11 +140,22 @@ class Worker:
                     self._slots.release()
 
     async def _run(self, job_id: str) -> None:
-        runner = TurnRunner(self.hub, self._runtime, watch=self._board)
+        runtime = await self._choose(await _agent_id_for_job(job_id))
+        runner = TurnRunner(self.hub, runtime, watch=self._board)
         try:
             await runner.run(job_id)
         except Exception:  # noqa: BLE001 — one failed turn must not stop the agent pump
             logger.exception("turn failed")
+
+    async def _choose(self, agent_id: str | None) -> Runtime:
+        if self._override is not None:
+            return self._override
+        if agent_id is None:
+            return self._pydantic
+        agent = await AgentService().get(agent_id)
+        if agent.runtime == "claude":
+            return self._claude
+        return self._pydantic
 
 
 _current: Worker | None = None
@@ -188,6 +205,14 @@ async def _turn_status(turn_id: str) -> str:
         if row is None:
             raise DomainError("not_found", "turn not found")
         return row.status
+
+
+async def _agent_id_for_job(job_id: str) -> str | None:
+    async with open_session() as session:
+        row = await session.get(JobRow, job_id)
+        if row is None:
+            return None
+        return row.agent_id
 
 
 async def _agent_for_turn(turn_id: str) -> str:

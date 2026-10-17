@@ -13,6 +13,7 @@ from sevn.domain.errors import DomainError
 from sevn.domain.pending import PendingService
 from sevn.protocol.registry import Ctx, method
 from sevn.runtime.base import ToolDecision
+from sevn.runtime.runtimes.claude import release_permission
 from sevn.runtime.worker import current
 
 
@@ -43,6 +44,8 @@ async def pending_answer(ctx: Ctx, params: PendingAnswerParams) -> PendingAnswer
             "status": "resolved",
         },
     )
+    if await release_permission(record.id, params.answer):
+        return PendingAnswerResult(id=record.id, status=record.status)
     if await PendingService().has_waiting(record.turn_id):
         return PendingAnswerResult(id=record.id, status=record.status)
     worker = current()

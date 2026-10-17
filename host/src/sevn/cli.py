@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import shutil
+import subprocess
 import sys
 from collections.abc import Coroutine
 from pathlib import Path
@@ -110,15 +112,18 @@ def contracts_export(
 def doctor(
     as_json: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
-    """Print host paths, the secret backend, and the version."""
+    """Print host paths, the secret backend, the version, and Claude login."""
     settings = _settings()
     paths = Paths.from_env()
+    claude_present, claude_login = _run(_claude_login())
     payload = {
         "home": str(paths.home.resolve()),
         "db": str(paths.db),
         "secrets_backend": _secrets_backend(settings),
         "web_dist": str(web_dist_path()),
         "version": __version__,
+        "claude_present": claude_present,
+        "claude_login": claude_login,
     }
     if as_json:
         typer.echo(json.dumps(payload))
@@ -138,6 +143,34 @@ def _settings() -> Settings:
     except ConfigError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1) from exc
+
+
+async def _claude_login() -> tuple[bool, int | None]:
+    """Whether ``claude`` is on PATH, and the ``claude auth status`` exit code.
+
+    The status text is discarded. A missing binary or a timed-out process
+    reports no exit code.
+    """
+    binary = shutil.which("claude")
+    if binary is None or not Path(binary).is_absolute():
+        return False, None
+    try:
+        process = await asyncio.create_subprocess_exec(
+            binary,
+            "auth",
+            "status",
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except OSError:
+        return True, None
+    try:
+        code = await asyncio.wait_for(process.wait(), timeout=15)
+    except TimeoutError:
+        process.kill()
+        await process.wait()
+        return True, None
+    return True, code
 
 
 def _secrets_backend(settings: Settings) -> str:

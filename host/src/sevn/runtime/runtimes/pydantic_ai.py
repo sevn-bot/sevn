@@ -56,15 +56,18 @@ class PydanticAIRuntime:
         return SessionRef(agent_id=agent.id)
 
     async def run_turn(self, turn: TurnContext) -> AsyncIterator[RuntimeEvent]:
+        bot = turn.bot
+        if bot is None:
+            raise TurnError("turn has no bot")
         model = self._model
         if model is None:
-            model = await asyncio.to_thread(resolve_model, turn.bot.model)
+            model = await asyncio.to_thread(resolve_model, bot.model)
         agent: Agent[None, str | DeferredToolRequests] = Agent(
             model=model,
-            instructions=build_instructions(turn.bot),
+            instructions=build_instructions(bot),
             output_type=[str, DeferredToolRequests],
-            capabilities=[_thinking(turn.bot.effort)],
-            tools=_tools(turn.bot.approval_policy),
+            capabilities=[_thinking(bot.effort)],
+            tools=_tools(bot.approval_policy),
             deps_type=None,
         )
         history = _history(turn.message_history)
