@@ -1,10 +1,8 @@
-"""Built-app layout and launch-agent checks. Green after W2."""
+"""Built-app layout and launch-agent checks. W2 markers removed in W2.R."""
 
 from __future__ import annotations
 
 from pathlib import Path
-
-import pytest
 
 from support import (
     APP_DISPLAY_NAME,
@@ -30,7 +28,6 @@ from support import (
 )
 
 
-@pytest.mark.xfail(reason="green after W2: bundle layout", strict=False)
 def test_bundle_layout() -> None:
     app = require_app()
     python = app / PYTHON_RELATIVE
@@ -43,7 +40,6 @@ def test_bundle_layout() -> None:
     assert (app / SITE_RELATIVE).is_dir()
 
 
-@pytest.mark.xfail(reason="green after W2: launch agent plist", strict=False)
 def test_launch_agent_plist_points_at_host() -> None:
     app = require_app()
     plist = launch_agent_plist(app)
@@ -51,7 +47,6 @@ def test_launch_agent_plist_points_at_host() -> None:
     assert plist.get("BundleProgram") == BUNDLE_PROGRAM
 
 
-@pytest.mark.xfail(reason="green after W2: bundle identity", strict=False)
 def test_bundle_identity() -> None:
     app = require_app()
     info = load_plist(app / "Contents" / "Info.plist")
@@ -59,7 +54,6 @@ def test_bundle_identity() -> None:
     assert info.get("CFBundleDisplayName") == APP_DISPLAY_NAME
 
 
-@pytest.mark.xfail(reason="green after W2: embedded python prints 3.13", strict=False)
 def test_embedded_python_runs() -> None:
     app = require_app()
     python = app / PYTHON_RELATIVE
@@ -83,7 +77,6 @@ def test_embedded_python_runs() -> None:
     assert resolved.is_relative_to(python_root), executable
 
 
-@pytest.mark.xfail(reason="green after W2: launch agent health", strict=False)
 def test_launch_agent_health() -> None:
     app = require_app()
     binary = app / MAIN_EXECUTABLE_RELATIVE
@@ -98,7 +91,6 @@ def test_launch_agent_health() -> None:
     assert wait_until_health_stops(port, timeout_s=HEALTH_TIMEOUT_S) != 200
 
 
-@pytest.mark.xfail(reason="green after W2: helper --health", strict=False)
 def test_helper_health() -> None:
     app = require_app()
     result = helper_output(app, "--health", timeout=10)
