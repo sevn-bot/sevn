@@ -881,6 +881,185 @@
         }
       ]
     },
+    "MessageRecord": {
+      "additionalProperties": false,
+      "description": "One UI message returned by ``messages.list``.",
+      "properties": {
+        "agent_id": {
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "author": {
+          "title": "Author",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "parts": {
+          "items": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "title": "Parts",
+          "type": "array"
+        },
+        "role": {
+          "title": "Role",
+          "type": "string"
+        },
+        "thread_id": {
+          "title": "Thread Id",
+          "type": "string"
+        },
+        "turn_id": {
+          "title": "Turn Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "thread_id",
+        "turn_id",
+        "agent_id",
+        "role",
+        "author",
+        "parts",
+        "created_at"
+      ],
+      "title": "MessageRecord",
+      "type": "object"
+    },
+    "MessagesListParams": {
+      "additionalProperties": false,
+      "properties": {
+        "bot_id": {
+          "title": "Bot Id",
+          "type": "string"
+        },
+        "cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cursor"
+        }
+      },
+      "required": [
+        "bot_id"
+      ],
+      "title": "MessagesListParams",
+      "type": "object"
+    },
+    "MessagesListResult": {
+      "additionalProperties": false,
+      "properties": {
+        "messages": {
+          "items": {
+            "$ref": "#/$defs/MessageRecord"
+          },
+          "title": "Messages",
+          "type": "array"
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Next Cursor"
+        }
+      },
+      "required": [
+        "messages",
+        "next_cursor"
+      ],
+      "title": "MessagesListResult",
+      "type": "object"
+    },
+    "MessagesSendParams": {
+      "additionalProperties": false,
+      "properties": {
+        "agent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Agent Id"
+        },
+        "bot_id": {
+          "title": "Bot Id",
+          "type": "string"
+        },
+        "new_agent": {
+          "default": false,
+          "title": "New Agent",
+          "type": "boolean"
+        },
+        "op_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op Id"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "bot_id",
+        "text"
+      ],
+      "title": "MessagesSendParams",
+      "type": "object"
+    },
+    "MessagesSendResult": {
+      "additionalProperties": false,
+      "properties": {
+        "agent_id": {
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "job_id": {
+          "title": "Job Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "job_id",
+        "agent_id"
+      ],
+      "title": "MessagesSendResult",
+      "type": "object"
+    },
     "ModelInfo": {
       "additionalProperties": false,
       "properties": {
@@ -926,6 +1105,130 @@
         "models"
       ],
       "title": "ModelsListResult",
+      "type": "object"
+    },
+    "PendingAnswerParams": {
+      "additionalProperties": false,
+      "properties": {
+        "answer": {
+          "enum": [
+            "approve",
+            "deny"
+          ],
+          "title": "Answer",
+          "type": "string"
+        },
+        "op_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op Id"
+        },
+        "pending_id": {
+          "title": "Pending Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "pending_id",
+        "answer"
+      ],
+      "title": "PendingAnswerParams",
+      "type": "object"
+    },
+    "PendingAnswerResult": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "status"
+      ],
+      "title": "PendingAnswerResult",
+      "type": "object"
+    },
+    "PendingListParams": {
+      "additionalProperties": false,
+      "properties": {},
+      "title": "PendingListParams",
+      "type": "object"
+    },
+    "PendingListResult": {
+      "additionalProperties": false,
+      "properties": {
+        "pending": {
+          "items": {
+            "$ref": "#/$defs/PendingRecord"
+          },
+          "title": "Pending",
+          "type": "array"
+        }
+      },
+      "required": [
+        "pending"
+      ],
+      "title": "PendingListResult",
+      "type": "object"
+    },
+    "PendingRecord": {
+      "additionalProperties": false,
+      "description": "One request the user still has to answer, or has just answered.",
+      "properties": {
+        "agent_id": {
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "tool_call_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Tool Call Id"
+        },
+        "turn_id": {
+          "title": "Turn Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "turn_id",
+        "agent_id",
+        "kind",
+        "tool_call_id",
+        "status"
+      ],
+      "title": "PendingRecord",
       "type": "object"
     },
     "Req": {
@@ -1140,6 +1443,84 @@
       "title": "Tick",
       "type": "object"
     },
+    "TurnsCancelParams": {
+      "additionalProperties": false,
+      "properties": {
+        "op_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op Id"
+        },
+        "turn_id": {
+          "title": "Turn Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "turn_id"
+      ],
+      "title": "TurnsCancelParams",
+      "type": "object"
+    },
+    "TurnsCancelResult": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "turn_id": {
+          "title": "Turn Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "turn_id",
+        "status"
+      ],
+      "title": "TurnsCancelResult",
+      "type": "object"
+    },
+    "TurnsSnapshotParams": {
+      "additionalProperties": false,
+      "properties": {
+        "turn_id": {
+          "title": "Turn Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "turn_id"
+      ],
+      "title": "TurnsSnapshotParams",
+      "type": "object"
+    },
+    "TurnsSnapshotResult": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "status"
+      ],
+      "title": "TurnsSnapshotResult",
+      "type": "object"
+    },
     "Welcome": {
       "properties": {
         "caps": {
@@ -1266,10 +1647,30 @@
       "params": "BotsUpdateParams",
       "result": "BotRecord"
     },
+    "messages.list": {
+      "mutating": false,
+      "params": "MessagesListParams",
+      "result": "MessagesListResult"
+    },
+    "messages.send": {
+      "mutating": true,
+      "params": "MessagesSendParams",
+      "result": "MessagesSendResult"
+    },
     "models.list": {
       "mutating": false,
       "params": "ModelsListParams",
       "result": "ModelsListResult"
+    },
+    "pending.answer": {
+      "mutating": true,
+      "params": "PendingAnswerParams",
+      "result": "PendingAnswerResult"
+    },
+    "pending.list": {
+      "mutating": false,
+      "params": "PendingListParams",
+      "result": "PendingListResult"
     },
     "sync.since": {
       "mutating": false,
@@ -1285,6 +1686,16 @@
       "mutating": true,
       "params": "SystemPingParams",
       "result": "SystemPingResult"
+    },
+    "turns.cancel": {
+      "mutating": true,
+      "params": "TurnsCancelParams",
+      "result": "TurnsCancelResult"
+    },
+    "turns.snapshot": {
+      "mutating": false,
+      "params": "TurnsSnapshotParams",
+      "result": "TurnsSnapshotResult"
     }
   },
   "oneOf": [

@@ -36,10 +36,30 @@ export const methods = {
     params: "BotsUpdateParams",
     result: "BotRecord",
   },
+  "messages.list": {
+    mutating: false,
+    params: "MessagesListParams",
+    result: "MessagesListResult",
+  },
+  "messages.send": {
+    mutating: true,
+    params: "MessagesSendParams",
+    result: "MessagesSendResult",
+  },
   "models.list": {
     mutating: false,
     params: "ModelsListParams",
     result: "ModelsListResult",
+  },
+  "pending.answer": {
+    mutating: true,
+    params: "PendingAnswerParams",
+    result: "PendingAnswerResult",
+  },
+  "pending.list": {
+    mutating: false,
+    params: "PendingListParams",
+    result: "PendingListResult",
   },
   "sync.since": {
     mutating: false,
@@ -55,5 +75,15 @@ export const methods = {
     mutating: true,
     params: "SystemPingParams",
     result: "SystemPingResult",
+  },
+  "turns.cancel": {
+    mutating: true,
+    params: "TurnsCancelParams",
+    result: "TurnsCancelResult",
+  },
+  "turns.snapshot": {
+    mutating: false,
+    params: "TurnsSnapshotParams",
+    result: "TurnsSnapshotResult",
   },
 } as const;

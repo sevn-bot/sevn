@@ -8,13 +8,22 @@ import os
 from collections.abc import AsyncIterator
 from typing import cast
 
-from pydantic_ai import Agent, AgentRunResultEvent, DeferredToolRequests
+from pydantic_ai import (
+    Agent,
+    AgentRunResultEvent,
+    DeferredToolRequests,
+    DeferredToolResults,
+    Tool,
+    ToolDenied,
+)
 from pydantic_ai.capabilities.thinking import Thinking
 from pydantic_ai.messages import (
     FunctionToolCallEvent,
     FunctionToolResultEvent,
     ModelMessage,
     ModelMessagesTypeAdapter,
+    ModelRequest,
+    ModelResponse,
     PartDeltaEvent,
     PartStartEvent,
     TextPart,
@@ -29,9 +38,9 @@ from pydantic_ai.usage import RunUsage
 
 from sevn.domain.agents import AgentRecord
 from sevn.domain.bots import BotRecord
-from sevn.runtime.base import PendingAnswer, SessionRef, TurnContext
+from sevn.runtime.base import PendingAnswer, SessionRef, ToolDecision, TurnContext
 from sevn.runtime.errors import TurnError
-from sevn.runtime.events import RuntimeEvent
+from sevn.runtime.events import ApprovalCall, RuntimeEvent
 from sevn.runtime.models import resolve_model
 
 os.environ.setdefault("PYDANTIC_AI_NO_BANNER", "1")
@@ -55,9 +64,20 @@ class PydanticAIRuntime:
             instructions=build_instructions(turn.bot),
             output_type=[str, DeferredToolRequests],
             capabilities=[_thinking(turn.bot.effort)],
+            tools=_tools(turn.bot.approval_policy),
+            deps_type=None,
         )
         history = _history(turn.message_history)
-        async with agent.run_stream_events(turn.text, message_history=history) as events:
+        deferred = _deferred(turn.approvals)
+        if deferred is None:
+            stream = agent.run_stream_events(turn.text, message_history=history)
+        else:
+            stream = agent.run_stream_events(
+                None,
+                message_history=history,
+                deferred_tool_results=deferred,
+            )
+        async with stream as events:
             async for event in events:
                 mapped = _map(event)
                 if mapped is not None:
@@ -71,6 +91,39 @@ class PydanticAIRuntime:
 
     async def close(self, agent_id: str) -> None:
         _ = agent_id
+
+
+def shell(command: str) -> str:
+    """Accept a shell command. Execution waits for the sandbox."""
+    _ = command
+    return "ok"
+
+
+def write_file(path: str, content: str) -> str:
+    """Accept a file write. Execution waits for the sandbox."""
+    _ = content
+    return path
+
+
+def _tools(policy: str) -> list[Tool[None]]:
+    """``ask`` defers shell and write. Other policies run them immediately."""
+    ask = policy == "ask"
+    return [
+        Tool(shell, takes_ctx=False, requires_approval=ask),
+        Tool(write_file, name="write", takes_ctx=False, requires_approval=ask),
+    ]
+
+
+def _deferred(decisions: tuple[ToolDecision, ...] | None) -> DeferredToolResults | None:
+    if decisions is None or len(decisions) == 0:
+        return None
+    results = DeferredToolResults()
+    for decision in decisions:
+        if decision.approved:
+            results.approvals[decision.tool_call_id] = True
+        else:
+            results.approvals[decision.tool_call_id] = ToolDenied("The tool call was denied.")
+    return results
 
 
 def build_instructions(bot: BotRecord) -> str:
@@ -168,7 +221,37 @@ def _from_result(event: AgentRunResultEvent[object]) -> RuntimeEvent:
         text=text,
         usage=_usage(event.result.usage),
         model_messages=_dump_messages(event.result.all_messages()),
+        approvals=_approval_calls(output),
     )
+
+
+def _approval_calls(output: object) -> tuple[ApprovalCall, ...] | None:
+    if not isinstance(output, DeferredToolRequests):
+        return None
+    calls: list[ApprovalCall] = []
+    for part in output.approvals:
+        if part.tool_call_id == "":
+            continue
+        calls.append(
+            ApprovalCall(
+                tool_call_id=part.tool_call_id,
+                name=part.tool_name,
+                args=_json_args(part.args),
+            )
+        )
+    if len(calls) == 0:
+        return None
+    return tuple(calls)
+
+
+def _json_args(raw: object) -> dict[str, object]:
+    if isinstance(raw, str):
+        try:
+            loaded = json.loads(raw)
+        except json.JSONDecodeError:
+            return {}
+        return _tool_args(loaded)
+    return _tool_args(raw)
 
 
 def _tool_args(raw: object) -> dict[str, object]:
@@ -196,3 +279,20 @@ def _dump_messages(messages: list[ModelMessage]) -> list[object]:
     if not isinstance(parsed, list):
         raise TurnError("model messages must be a list")
     return list(cast("list[object]", parsed))
+
+
+def _message_dump(self: ModelMessage, *, mode: str = "python", **_kwargs: object) -> object:
+    """JSON form of one model message. These classes are dataclasses."""
+    _ = (mode, _kwargs)
+    parsed: object = json.loads(ModelMessagesTypeAdapter.dump_json([self]))
+    if not isinstance(parsed, list):
+        raise TurnError("model message dump failed")
+    items = cast("list[object]", parsed)
+    if len(items) != 1:
+        raise TurnError("model message dump failed")
+    return items[0]
+
+
+for _message_cls in (ModelRequest, ModelResponse):
+    if "model_dump" not in _message_cls.__dict__:
+        _message_cls.model_dump = _message_dump  # type: ignore[attr-defined]

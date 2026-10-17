@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 class Base(DeclarativeBase):
@@ -143,6 +143,8 @@ class Message(Base):
     author: Mapped[str] = mapped_column(String, nullable=False)
     parts: Mapped[list[object]] = mapped_column(JSON, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # Orders a flush so a new turn row exists before its messages.
+    turn: Mapped[Turn] = relationship(foreign_keys=[turn_id])
 
 
 class Job(Base):

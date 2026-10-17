@@ -18,6 +18,15 @@ type RuntimeEventKind = Literal[
 ]
 
 
+@dataclass(frozen=True, slots=True)
+class ApprovalCall:
+    """One tool call the runtime paused for approval."""
+
+    tool_call_id: str
+    name: str
+    args: dict[str, object]
+
+
 @dataclass(slots=True)
 class RuntimeEvent:
     """One mapped runtime event. Only the fields for ``kind`` are meaningful."""
@@ -35,3 +44,4 @@ class RuntimeEvent:
     session_ref: str | None = None
     native_type: str | None = None
     model_messages: list[object] | None = None
+    approvals: tuple[ApprovalCall, ...] | None = None

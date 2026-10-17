@@ -27,6 +27,14 @@ class PendingAnswer:
 
 
 @dataclass(frozen=True, slots=True)
+class ToolDecision:
+    """Whether one deferred tool call may run."""
+
+    tool_call_id: str
+    approved: bool
+
+
+@dataclass(frozen=True, slots=True)
 class TurnContext:
     """Inputs for one ``run_turn`` call."""
 
@@ -35,6 +43,7 @@ class TurnContext:
     job_id: str
     text: str
     message_history: list[object] | None = None
+    approvals: tuple[ToolDecision, ...] | None = None
 
 
 class Runtime(Protocol):

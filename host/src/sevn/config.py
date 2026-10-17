@@ -32,6 +32,12 @@ class HttpSettings(BaseModel):
     port: int = 8787
 
 
+class RuntimeSettings(BaseModel):
+    """Host-wide runtime caps (D7). Absent config keeps the defaults."""
+
+    max_running_turns: int = 3
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="SEVN_",
@@ -42,6 +48,7 @@ class Settings(BaseSettings):
     protocol: ProtocolSettings = Field(default_factory=ProtocolSettings)
     secrets: SecretsSettings = Field(default_factory=SecretsSettings)
     http: HttpSettings = Field(default_factory=HttpSettings)
+    runtime: RuntimeSettings = Field(default_factory=RuntimeSettings)
 
     @classmethod
     def settings_customise_sources(

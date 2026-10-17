@@ -53,6 +53,26 @@ type Agent = {
   last_activity_at: string;
 };
 
+type ChatMessage = {
+  id: string;
+  thread_id: string;
+  turn_id: string;
+  agent_id: string;
+  role: string;
+  author: string;
+  parts: Record<string, string>[];
+  created_at: string;
+};
+
+type PendingItem = {
+  id: string;
+  turn_id: string;
+  agent_id: string;
+  kind: string;
+  tool_call_id: string | null;
+  status: string;
+};
+
 export type MethodParams = {
   "system.info": Record<string, never>;
   "system.ping": { note: string; op_id?: string };
@@ -94,6 +114,22 @@ export type MethodParams = {
   "agents.list": { bot_id: string };
   "agents.get": { agent_id: string };
   "models.list": Record<string, never>;
+  "messages.send": {
+    bot_id: string;
+    text: string;
+    agent_id?: string;
+    new_agent?: boolean;
+    op_id?: string;
+  };
+  "messages.list": { bot_id: string; cursor?: string };
+  "pending.list": Record<string, never>;
+  "pending.answer": {
+    pending_id: string;
+    answer: "approve" | "deny";
+    op_id?: string;
+  };
+  "turns.snapshot": { turn_id: string };
+  "turns.cancel": { turn_id: string; op_id?: string };
 };
 
 export type MethodResult = {
@@ -114,6 +150,12 @@ export type MethodResult = {
   "agents.list": { agents: Agent[] };
   "agents.get": Agent;
   "models.list": { models: ModelInfo[] };
+  "messages.send": { job_id: string; agent_id: string };
+  "messages.list": { messages: ChatMessage[]; next_cursor: string | null };
+  "pending.list": { pending: PendingItem[] };
+  "pending.answer": { id: string; status: string };
+  "turns.snapshot": { text: string; status: string };
+  "turns.cancel": { turn_id: string; status: string };
 };
 
 export type Status = "connecting" | "connected" | "reconnecting";

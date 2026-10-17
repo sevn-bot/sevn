@@ -22,7 +22,9 @@ from starlette.websockets import WebSocket
 
 import sevn.api.agents as agent_api
 import sevn.api.bots as bot_api
+import sevn.api.messages as message_api
 import sevn.api.models as model_api
+import sevn.api.pending as pending_api
 import sevn.system as system
 from sevn import __version__
 from sevn.config import Settings
@@ -30,6 +32,8 @@ from sevn.log import logger
 from sevn.paths import Paths
 from sevn.protocol.hub import Hub
 from sevn.protocol.session import Session
+from sevn.runtime.recovery import recover
+from sevn.runtime.worker import Worker, bind
 from sevn.secrets.registry import register
 from sevn.store.db import upgrade
 from sevn.store.oplog import OpLog
@@ -49,6 +53,12 @@ _REGISTERED = (
     agent_api.agents_list,
     agent_api.agents_get,
     model_api.models_list,
+    message_api.messages_send,
+    message_api.messages_list,
+    message_api.turns_snapshot,
+    message_api.turns_cancel,
+    pending_api.pending_list,
+    pending_api.pending_answer,
 )
 
 CSP = (
@@ -156,8 +166,11 @@ async def _lifespan(app: ASGIApp) -> AsyncGenerator[None]:
     state.outbox = outbox
     state.oplog = oplog
     browser: asyncio.Task[None] | None = None
+    worker: Worker | None = None
     try:
         state.hub = Hub(outbox, oplog)
+        await recover()
+        worker = bind(state.hub)
         state.token = await asyncio.to_thread(_write_token, paths.run / "token")
         await asyncio.to_thread(
             _write_bind,
@@ -174,6 +187,8 @@ async def _lifespan(app: ASGIApp) -> AsyncGenerator[None]:
             browser.cancel()
             with suppress(asyncio.CancelledError):
                 await browser
+        if worker is not None:
+            await worker.aclose()
         await outbox.aclose()
         await oplog.aclose()
 

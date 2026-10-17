@@ -74,8 +74,24 @@ def model_allowed(model_id: str) -> bool:
     return True
 
 
+_override: Model | None = None
+
+
+def use_model(model: Model | None) -> None:
+    """Install ``model`` for later ``resolve_model`` calls. ``None`` clears it.
+
+    Tests script a ``FunctionModel`` this way. Production leaves the override unset,
+    so resolution still reads provider keys from the secret backend.
+    """
+    global _override
+    _override = model
+
+
 def resolve_model(name: str) -> Model:
     """Build a model for ``name``. API keys come from the secret backend and are not logged."""
+    chosen = _override
+    if chosen is not None:
+        return chosen
     if name == ECHO_ID:
         if not echo_enabled():
             raise ModelError("echo model is disabled")
