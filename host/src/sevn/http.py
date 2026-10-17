@@ -20,6 +20,8 @@ from starlette.staticfiles import StaticFiles
 from starlette.types import ASGIApp, Receive, Scope, Send
 from starlette.websockets import WebSocket
 
+import sevn.api.agents as agent_api
+import sevn.api.bots as bot_api
 import sevn.system as system
 from sevn import __version__
 from sevn.config import Settings
@@ -33,8 +35,19 @@ from sevn.store.oplog import OpLog
 from sevn.store.outbox import Outbox
 from sevn.transports.ws import WsConnection
 
-# Importing sevn.system registers system.info, system.ping, and sync.since.
-_REGISTERED = (system.system_info, system.system_ping, system.sync_since)
+# Importing these modules registers their protocol methods.
+_REGISTERED = (
+    system.system_info,
+    system.system_ping,
+    system.sync_since,
+    bot_api.bots_create,
+    bot_api.bots_list,
+    bot_api.bots_get,
+    bot_api.bots_update,
+    bot_api.bots_delete,
+    agent_api.agents_list,
+    agent_api.agents_get,
+)
 
 CSP = (
     "default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'"

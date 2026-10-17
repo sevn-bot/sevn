@@ -12,6 +12,7 @@ type ErrorCode = Literal[
     "forbidden",
     "method_not_found",
     "invalid_params",
+    "not_found",
     "op_id_required",
     "resync_required",
     "internal",

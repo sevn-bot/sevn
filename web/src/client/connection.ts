@@ -6,10 +6,87 @@ const MAX_BACKOFF_MS = 10_000;
 
 export type MethodName = keyof typeof methods;
 
+type RuntimeName = "pydantic_ai" | "claude";
+type AccessName = "workspace" | "full" | "isolated";
+type ApprovalPolicy = "ask" | "auto" | "allow_all";
+type AgentStatus = "running" | "waiting" | "idle" | "done" | "archived";
+
+type Bot = {
+  id: string;
+  name: string;
+  title: string;
+  scope: string;
+  instructions: string;
+  avatar: string;
+  runtime: RuntimeName;
+  model: string;
+  effort: string | null;
+  access: AccessName;
+  approval_policy: ApprovalPolicy;
+  workspace_path: string;
+  folder_id: string | null;
+  paused: boolean;
+  can_create_bots: boolean;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type Agent = {
+  id: string;
+  bot_id: string;
+  thread_id: string;
+  title: string;
+  summary: string;
+  status: AgentStatus;
+  runtime: RuntimeName;
+  runtime_session_ref: string | null;
+  origin_job_id: string | null;
+  isolation: string;
+  created_at: string;
+  last_activity_at: string;
+};
+
 export type MethodParams = {
   "system.info": Record<string, never>;
   "system.ping": { note: string; op_id?: string };
   "sync.since": { seq: number };
+  "bots.create": {
+    name: string;
+    title?: string;
+    scope?: string;
+    instructions?: string;
+    avatar?: string;
+    runtime?: RuntimeName;
+    model?: string;
+    effort?: string;
+    access?: AccessName;
+    approval_policy?: ApprovalPolicy;
+    folder_id?: string;
+    op_id?: string;
+  };
+  "bots.list": Record<string, never>;
+  "bots.get": { bot_id: string };
+  "bots.update": {
+    bot_id: string;
+    name?: string;
+    title?: string;
+    scope?: string;
+    instructions?: string;
+    avatar?: string;
+    runtime?: RuntimeName;
+    model?: string;
+    effort?: string;
+    access?: AccessName;
+    approval_policy?: ApprovalPolicy;
+    folder_id?: string;
+    paused?: boolean;
+    can_create_bots?: boolean;
+    op_id?: string;
+  };
+  "bots.delete": { bot_id: string; purge?: boolean; op_id?: string };
+  "agents.list": { bot_id: string };
+  "agents.get": { agent_id: string };
 };
 
 export type MethodResult = {
@@ -22,6 +99,13 @@ export type MethodResult = {
   };
   "system.ping": { seq: number };
   "sync.since": { host_seq: number };
+  "bots.create": Bot;
+  "bots.list": { bots: Bot[] };
+  "bots.get": Bot;
+  "bots.update": Bot;
+  "bots.delete": { id: string };
+  "agents.list": { agents: Agent[] };
+  "agents.get": Agent;
 };
 
 export type Status = "connecting" | "connected" | "reconnecting";

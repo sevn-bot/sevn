@@ -1,5 +1,160 @@
 {
   "$defs": {
+    "AccessName": {
+      "enum": [
+        "workspace",
+        "full",
+        "isolated"
+      ],
+      "type": "string"
+    },
+    "AgentRecord": {
+      "additionalProperties": false,
+      "description": "One agent and the thread it owns.",
+      "properties": {
+        "bot_id": {
+          "title": "Bot Id",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "isolation": {
+          "title": "Isolation",
+          "type": "string"
+        },
+        "last_activity_at": {
+          "format": "date-time",
+          "title": "Last Activity At",
+          "type": "string"
+        },
+        "origin_job_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Origin Job Id"
+        },
+        "runtime": {
+          "$ref": "#/$defs/RuntimeName"
+        },
+        "runtime_session_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Runtime Session Ref"
+        },
+        "status": {
+          "$ref": "#/$defs/AgentStatus"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "thread_id": {
+          "title": "Thread Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "bot_id",
+        "thread_id",
+        "title",
+        "summary",
+        "status",
+        "runtime",
+        "runtime_session_ref",
+        "origin_job_id",
+        "isolation",
+        "created_at",
+        "last_activity_at"
+      ],
+      "title": "AgentRecord",
+      "type": "object"
+    },
+    "AgentStatus": {
+      "enum": [
+        "running",
+        "waiting",
+        "idle",
+        "done",
+        "archived"
+      ],
+      "type": "string"
+    },
+    "AgentsGetParams": {
+      "additionalProperties": false,
+      "properties": {
+        "agent_id": {
+          "title": "Agent Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "agent_id"
+      ],
+      "title": "AgentsGetParams",
+      "type": "object"
+    },
+    "AgentsListParams": {
+      "additionalProperties": false,
+      "properties": {
+        "bot_id": {
+          "title": "Bot Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "bot_id"
+      ],
+      "title": "AgentsListParams",
+      "type": "object"
+    },
+    "AgentsListResult": {
+      "additionalProperties": false,
+      "properties": {
+        "agents": {
+          "items": {
+            "$ref": "#/$defs/AgentRecord"
+          },
+          "title": "Agents",
+          "type": "array"
+        }
+      },
+      "required": [
+        "agents"
+      ],
+      "title": "AgentsListResult",
+      "type": "object"
+    },
+    "ApprovalPolicy": {
+      "enum": [
+        "ask",
+        "auto",
+        "allow_all"
+      ],
+      "type": "string"
+    },
     "AuthDevice": {
       "properties": {
         "device_sig": {
@@ -36,6 +191,523 @@
         "token"
       ],
       "title": "AuthToken",
+      "type": "object"
+    },
+    "BotRecord": {
+      "additionalProperties": false,
+      "description": "One persisted bot, returned by the service and the protocol.",
+      "properties": {
+        "access": {
+          "$ref": "#/$defs/AccessName"
+        },
+        "approval_policy": {
+          "$ref": "#/$defs/ApprovalPolicy"
+        },
+        "avatar": {
+          "title": "Avatar",
+          "type": "string"
+        },
+        "can_create_bots": {
+          "title": "Can Create Bots",
+          "type": "boolean"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "created_by": {
+          "title": "Created By",
+          "type": "string"
+        },
+        "effort": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Effort"
+        },
+        "folder_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Folder Id"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "instructions": {
+          "title": "Instructions",
+          "type": "string"
+        },
+        "model": {
+          "title": "Model",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "paused": {
+          "title": "Paused",
+          "type": "boolean"
+        },
+        "runtime": {
+          "$ref": "#/$defs/RuntimeName"
+        },
+        "scope": {
+          "title": "Scope",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        },
+        "workspace_path": {
+          "title": "Workspace Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "title",
+        "scope",
+        "instructions",
+        "avatar",
+        "runtime",
+        "model",
+        "effort",
+        "access",
+        "approval_policy",
+        "workspace_path",
+        "folder_id",
+        "paused",
+        "can_create_bots",
+        "created_by",
+        "created_at",
+        "updated_at"
+      ],
+      "title": "BotRecord",
+      "type": "object"
+    },
+    "BotsCreateParams": {
+      "additionalProperties": false,
+      "properties": {
+        "access": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AccessName"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approval_policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ApprovalPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "avatar": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Avatar"
+        },
+        "effort": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effort"
+        },
+        "folder_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Folder Id"
+        },
+        "instructions": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Instructions"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "op_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op Id"
+        },
+        "runtime": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RuntimeName"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "scope": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scope"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "BotsCreateParams",
+      "type": "object"
+    },
+    "BotsDeleteParams": {
+      "additionalProperties": false,
+      "properties": {
+        "bot_id": {
+          "title": "Bot Id",
+          "type": "string"
+        },
+        "op_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op Id"
+        },
+        "purge": {
+          "default": false,
+          "title": "Purge",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "bot_id"
+      ],
+      "title": "BotsDeleteParams",
+      "type": "object"
+    },
+    "BotsDeleteResult": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "BotsDeleteResult",
+      "type": "object"
+    },
+    "BotsGetParams": {
+      "additionalProperties": false,
+      "properties": {
+        "bot_id": {
+          "title": "Bot Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "bot_id"
+      ],
+      "title": "BotsGetParams",
+      "type": "object"
+    },
+    "BotsListParams": {
+      "additionalProperties": false,
+      "properties": {},
+      "title": "BotsListParams",
+      "type": "object"
+    },
+    "BotsListResult": {
+      "additionalProperties": false,
+      "properties": {
+        "bots": {
+          "items": {
+            "$ref": "#/$defs/BotRecord"
+          },
+          "title": "Bots",
+          "type": "array"
+        }
+      },
+      "required": [
+        "bots"
+      ],
+      "title": "BotsListResult",
+      "type": "object"
+    },
+    "BotsUpdateParams": {
+      "additionalProperties": false,
+      "properties": {
+        "access": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AccessName"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approval_policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ApprovalPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "avatar": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Avatar"
+        },
+        "bot_id": {
+          "title": "Bot Id",
+          "type": "string"
+        },
+        "can_create_bots": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Can Create Bots"
+        },
+        "effort": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effort"
+        },
+        "folder_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Folder Id"
+        },
+        "instructions": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Instructions"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "op_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op Id"
+        },
+        "paused": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Paused"
+        },
+        "runtime": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RuntimeName"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "scope": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scope"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        }
+      },
+      "required": [
+        "bot_id"
+      ],
+      "title": "BotsUpdateParams",
       "type": "object"
     },
     "Challenge": {
@@ -278,6 +950,13 @@
       "title": "Res",
       "type": "object"
     },
+    "RuntimeName": {
+      "enum": [
+        "pydantic_ai",
+        "claude"
+      ],
+      "type": "string"
+    },
     "SyncSinceParams": {
       "additionalProperties": false,
       "properties": {
@@ -449,6 +1128,12 @@
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "events": {
+    "agent.updated": {
+      "durable": true
+    },
+    "bot.deleted": {
+      "durable": true
+    },
     "bot.updated": {
       "durable": true
     },
@@ -499,6 +1184,41 @@
     }
   },
   "methods": {
+    "agents.get": {
+      "mutating": false,
+      "params": "AgentsGetParams",
+      "result": "AgentRecord"
+    },
+    "agents.list": {
+      "mutating": false,
+      "params": "AgentsListParams",
+      "result": "AgentsListResult"
+    },
+    "bots.create": {
+      "mutating": true,
+      "params": "BotsCreateParams",
+      "result": "BotRecord"
+    },
+    "bots.delete": {
+      "mutating": true,
+      "params": "BotsDeleteParams",
+      "result": "BotsDeleteResult"
+    },
+    "bots.get": {
+      "mutating": false,
+      "params": "BotsGetParams",
+      "result": "BotRecord"
+    },
+    "bots.list": {
+      "mutating": false,
+      "params": "BotsListParams",
+      "result": "BotsListResult"
+    },
+    "bots.update": {
+      "mutating": true,
+      "params": "BotsUpdateParams",
+      "result": "BotRecord"
+    },
     "sync.since": {
       "mutating": false,
       "params": "SyncSinceParams",
