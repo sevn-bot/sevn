@@ -13,7 +13,6 @@ final class RenderTests: XCTestCase {
     private let formDate = "2026-10-17"
 
     func testFormRendersAndSubmits() throws {
-        try redGate("W3")
         guard let host = loadHost() else { return }
         let payload = try loadPayload("p1-form")
         let messages = messageList(payload, includeUpdate: false)
@@ -53,7 +52,6 @@ final class RenderTests: XCTestCase {
     }
 
     func testSecretFieldUsesSecureFieldAndKeepsValueOutOfDataModel() throws {
-        try redGate("W3")
         guard let host = loadHost() else { return }
         let payload = try loadPayload("p3-secret")
         let messages = messageList(payload, includeUpdate: true)
@@ -93,7 +91,6 @@ final class RenderTests: XCTestCase {
     }
 
     func testIncrementalUpdateAppliesRow() throws {
-        try redGate("W3")
         guard let host = loadHost() else { return }
         let payload = try loadPayload("p2-table-update")
         let initial = messageList(payload, includeUpdate: false)
@@ -124,7 +121,6 @@ final class RenderTests: XCTestCase {
     }
 
     func testUnknownComponentFallback() throws {
-        try redGate("W3")
         guard let host = loadHost() else { return }
         let messages: [Any] = [
             [
@@ -153,7 +149,6 @@ final class RenderTests: XCTestCase {
     }
 
     func testApprovalEmitsDistinctActions() throws {
-        try redGate("W3")
         guard let host = loadHost() else { return }
         let payload = try loadPayload("p4-approval")
         let messages = messageList(payload, includeUpdate: true)
@@ -169,7 +164,6 @@ final class RenderTests: XCTestCase {
     }
 
     func testAssistEmitsOpenComputerPanel() throws {
-        try redGate("W3")
         guard let host = loadHost() else { return }
         let payload = try loadPayload("p5-assist")
         let messages = messageList(payload, includeUpdate: true)
