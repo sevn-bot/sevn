@@ -56,7 +56,9 @@ fn main() {
         thread::sleep(Duration::from_millis(5));
     }
 
-    let listener = match TcpListener::bind("127.0.0.1:0") {
+    let http_bind = std::env::var("SPIKE_HTTP_BIND").unwrap_or_else(|_| "127.0.0.1".to_owned());
+    let http_host = std::env::var("SPIKE_HTTP_HOST").unwrap_or_else(|_| "127.0.0.1".to_owned());
+    let listener = match TcpListener::bind((http_bind.as_str(), 0)) {
         Ok(listener) => listener,
         Err(err) => {
             eprintln!("spike-peer: {err}");
@@ -70,8 +72,16 @@ fn main() {
             std::process::exit(1);
         }
     };
+    let relay = if std::env::var("SPIKE_TURN_URL")
+        .ok()
+        .is_some_and(|value| !value.is_empty())
+    {
+        "&relay=1"
+    } else {
+        ""
+    };
     let page = format!(
-        "http://127.0.0.1:{port}/?scenario={}&signal={}",
+        "http://{http_host}:{port}/?scenario={}&signal={}{relay}",
         query_encode(&scenario),
         query_encode(&room.url),
     );
@@ -91,8 +101,11 @@ fn main() {
             .split('?')
             .next()
             .unwrap_or("/");
+        let ice = ice_json();
         let (status, content_type, body) = if path == "/peer.ts" {
             ("200 OK", "text/javascript; charset=utf-8", PEER_JS)
+        } else if path == "/ice.json" {
+            ("200 OK", "application/json", ice.as_str())
         } else if path == "/" {
             ("200 OK", "text/html; charset=utf-8", INDEX_HTML)
         } else {
@@ -169,6 +182,34 @@ fn parse_args() -> Result<(String, String), String> {
         return Err(format!("unknown scenario {scenario}"));
     }
     Ok((lib, scenario))
+}
+
+fn ice_json() -> String {
+    let url = std::env::var("SPIKE_TURN_URL").unwrap_or_default();
+    let username = std::env::var("SPIKE_TURN_USERNAME").unwrap_or_default();
+    let credential = std::env::var("SPIKE_TURN_CREDENTIAL").unwrap_or_default();
+    if url.is_empty() || username.is_empty() || credential.is_empty() {
+        return "{\"iceServers\":[]}".to_owned();
+    }
+    format!(
+        "{{\"iceServers\":[{{\"urls\":[\"{}\"],\"username\":\"{}\",\"credential\":\"{}\"}}]}}",
+        json_escape(&url),
+        json_escape(&username),
+        json_escape(&credential),
+    )
+}
+
+fn json_escape(value: &str) -> String {
+    let mut out = String::new();
+    for ch in value.chars() {
+        match ch {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            c if c.is_control() => out.push_str(&format!("\\u{:04x}", u32::from(c))),
+            c => out.push(c),
+        }
+    }
+    out
 }
 
 fn query_encode(value: &str) -> String {

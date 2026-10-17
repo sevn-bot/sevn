@@ -26,7 +26,21 @@ function log(line) {
   }
 }
 
-const pc = new RTCPeerConnection({ iceServers: [] });
+const relay = params.get("relay") === "1";
+const iceServers = relay ? await relayServers() : [];
+const pc = new RTCPeerConnection(
+  relay ? { iceServers, iceTransportPolicy: "relay" } : { iceServers: [] },
+);
+
+async function relayServers() {
+  const response = await fetch("/ice.json");
+  if (!response.ok) {
+    log("relay configuration unavailable");
+    return [];
+  }
+  const body = await response.json();
+  return Array.isArray(body.iceServers) ? body.iceServers : [];
+}
 pc.ontrack = (event) => {
   const video = document.querySelector("video");
   if (!video) {

@@ -1,7 +1,28 @@
 {
   "scenario": "s-turn",
   "lib": "webrtcrs",
-  "skipped": true,
-  "reason": "no live gate",
-  "detail": "CF_TURN_KEY_ID and CF_TURN_API_TOKEN are unset"
+  "ice_transport_policy": "relay",
+  "udp": {
+    "scenario": "s-turn",
+    "lib": "webrtcrs",
+    "transport": "udp",
+    "ice_transport_policy": "relay",
+    "candidate_type": "relay",
+    "runs": 20,
+    "connect_p50_ms": 5066.2897,
+    "connect_p95_ms": 5353.7754,
+    "mbps_10mb": 6.5702,
+    "ice_restart_ms": 3079.6247,
+    "first_frame_ms": 1,
+    "rss_mb": 127.0312,
+    "cpu_pct": 3.7407
+  },
+  "tls443": {
+    "scenario": "s-turn",
+    "lib": "webrtcrs",
+    "transport": "tls443",
+    "ice_transport_policy": "relay",
+    "ok": false,
+    "reason": "run 1: no relay candidate"
+  }
 }

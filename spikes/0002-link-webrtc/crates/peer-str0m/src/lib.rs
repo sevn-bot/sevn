@@ -6,6 +6,8 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+mod relay;
+
 use str0m::change::{SdpAnswer, SdpOffer, SdpPendingOffer};
 use str0m::channel::{ChannelConfig, ChannelId, Reliability};
 use str0m::format::Codec;
@@ -107,8 +109,11 @@ struct SendJob {
 
 struct World {
     rtc: Rtc,
-    sock: UdpSocket,
+    sock: Arc<UdpSocket>,
     local_addr: SocketAddr,
+    relay: Option<relay::TurnSide>,
+    net_rx: mpsc::UnboundedReceiver<Vec<u8>>,
+    tls_relay: bool,
     signal_tx: mpsc::UnboundedSender<String>,
     signal_rx: mpsc::UnboundedReceiver<String>,
     role: String,
@@ -281,6 +286,14 @@ async fn worker(
             break;
         }
 
+        if let Some(side) = world.relay.as_mut()
+            && let Err(err) = side.flush().await
+        {
+            spike_log(&format!("relay: {err}"));
+            fail_waits(&mut connect_wait, &mut restart_wait, &mut send_job, err);
+            break;
+        }
+
         if let Err(err) = drain(&mut world, &incoming_tx).await {
             spike_log(&format!("drain: {err}"));
             fail_waits(&mut connect_wait, &mut restart_wait, &mut send_job, err);
@@ -296,7 +309,7 @@ async fn worker(
             finished = match status {
                 Pump::Done => Some(Ok(())),
                 Pump::Failed(err) => Some(Err(err)),
-                Pump::Wait if job.started.elapsed() > SEND_TIMEOUT => Some(Err(Error::Timeout)),
+                Pump::Wait if job.started.elapsed() > send_limit() => Some(Err(Error::Timeout)),
                 Pump::Wait => None,
             };
         }
@@ -325,6 +338,7 @@ async fn worker(
         settle_restart(&mut restart_wait, &world, &stats);
 
         let sleep_for = Duration::from_millis(20);
+        let tls_relay = world.tls_relay;
         tokio::select! {
             _ = cancel_rx.changed() => {
                 if *cancel_rx.borrow() {
@@ -336,15 +350,49 @@ async fn worker(
                     spike_log(&format!("timeout input: {err}"));
                 }
             }
-            packet = world.sock.recv_from(&mut world.buf) => {
+            packet = world.sock.recv_from(&mut world.buf), if !tls_relay => {
                 match packet {
                     Ok((size, source)) => {
                         let owned = world.buf[..size].to_vec();
-                        if let Err(err) = on_packet(&mut world, &owned, source) {
+                        if world.relay.is_some() {
+                            let server = world.relay.as_ref().map(|side| side.server());
+                            if server == Some(source)
+                                && let Err(err) = take_relay(&mut world, &owned).await
+                            {
+                                spike_log(&format!("relay: {err}"));
+                                fail_waits(
+                                    &mut connect_wait,
+                                    &mut restart_wait,
+                                    &mut send_job,
+                                    err,
+                                );
+                                break;
+                            }
+                        } else if let Err(err) = on_packet(&mut world, &owned, source) {
                             spike_log(&format!("packet: {err}"));
                         }
                     }
                     Err(err) => spike_log(&format!("udp: {err}")),
+                }
+            }
+            frame = world.net_rx.recv(), if tls_relay => {
+                match frame {
+                    Some(frame) => {
+                        if let Err(err) = take_relay(&mut world, &frame).await {
+                            spike_log(&format!("relay: {err}"));
+                            fail_waits(&mut connect_wait, &mut restart_wait, &mut send_job, err);
+                            break;
+                        }
+                    }
+                    None => {
+                        fail_waits(
+                            &mut connect_wait,
+                            &mut restart_wait,
+                            &mut send_job,
+                            Error::Failed("relay tls failed".into()),
+                        );
+                        break;
+                    }
                 }
             }
             incoming = world.signal_rx.recv() => {
@@ -401,9 +449,33 @@ async fn setup(url: &str, local_sdp: &Arc<Mutex<String>>, video: bool) -> Result
         .await
         .map_err(|err| Error::Failed(err.to_string()))?;
     let (role, signal_tx, signal_rx) = conn.into_split();
-    let std_sock = std::net::UdpSocket::bind("127.0.0.1:0").map_err(failed)?;
-    std_sock.set_nonblocking(true).map_err(failed)?;
-    let sock = UdpSocket::from_std(std_sock).map_err(failed)?;
+    let creds = relay::credentials()?;
+    let (sock, relay, net_rx, tls_relay, candidate) = if let Some(creds) = creds {
+        let bring = relay::allocate(creds).await?;
+        let candidate =
+            Candidate::relayed(bring.side.relayed(), bring.side.local(), "udp").map_err(failed)?;
+        (
+            bring.sock,
+            Some(bring.side),
+            bring.net_rx,
+            bring.tls,
+            candidate,
+        )
+    } else {
+        let std_sock = std::net::UdpSocket::bind("127.0.0.1:0").map_err(failed)?;
+        std_sock.set_nonblocking(true).map_err(failed)?;
+        let sock = Arc::new(UdpSocket::from_std(std_sock).map_err(failed)?);
+        let local_addr = sock.local_addr().map_err(failed)?;
+        let (tx, net_rx) = mpsc::unbounded_channel();
+        drop(tx);
+        (
+            sock,
+            None,
+            net_rx,
+            false,
+            Candidate::host(local_addr, "udp").map_err(failed)?,
+        )
+    };
     let local_addr = sock.local_addr().map_err(failed)?;
     // Both roles advertise constrained-baseline H.264. The video peer is not
     // always the signalling offerer, and an answer cannot add an m-line.
@@ -414,7 +486,7 @@ async fn setup(url: &str, local_sdp: &Arc<Mutex<String>>, video: bool) -> Result
         .codec_config()
         .add_h264(108.into(), Some(109.into()), true, 0x42e0_1f);
     let mut rtc = builder.build(Instant::now());
-    let host = Candidate::host(local_addr, "udp").map_err(failed)?;
+    let host = candidate;
     let candidate_sdp = rtc
         .add_local_candidate(host)
         .map(|candidate| candidate.to_sdp_string())
@@ -424,13 +496,16 @@ async fn setup(url: &str, local_sdp: &Arc<Mutex<String>>, video: bool) -> Result
         rtc,
         sock,
         local_addr,
+        relay,
+        net_rx,
+        tls_relay,
         signal_tx,
         signal_rx,
         role,
         channels: Vec::new(),
         pending: None,
         candidate_sdp,
-        buf: vec![0; 4096],
+        buf: vec![0; 16 * 1024],
         video,
         video_mid: None,
         video_units: if video {
@@ -649,8 +724,17 @@ async fn on_signal(
             if line.is_empty() {
                 return Ok(());
             }
+            if world.relay.is_some() && !line.contains(" typ relay") {
+                return Ok(());
+            }
             match Candidate::from_sdp_string(line) {
-                Ok(candidate) => world.rtc.add_remote_candidate(candidate),
+                Ok(candidate) => {
+                    if let Some(side) = world.relay.as_mut() {
+                        side.permit(candidate.addr())?;
+                        side.flush().await?;
+                    }
+                    world.rtc.add_remote_candidate(candidate);
+                }
                 Err(err) => spike_log(&format!("candidate: {err}")),
             }
         }
@@ -660,11 +744,28 @@ async fn on_signal(
 }
 
 fn on_packet(world: &mut World, packet: &[u8], source: SocketAddr) -> Result<(), Error> {
-    let received = Receive::new(Protocol::Udp, source, world.local_addr, packet).map_err(failed)?;
+    let destination = world
+        .relay
+        .as_ref()
+        .map(|side| side.relayed())
+        .unwrap_or(world.local_addr);
+    let received = Receive::new(Protocol::Udp, source, destination, packet).map_err(failed)?;
     world
         .rtc
         .handle_input(Input::Receive(Instant::now(), received))
         .map_err(failed)
+}
+
+async fn take_relay(world: &mut World, datagram: &[u8]) -> Result<(), Error> {
+    let inbound = world
+        .relay
+        .as_mut()
+        .ok_or_else(|| Error::Failed("relay allocation failed".into()))?
+        .ingest(datagram)?;
+    for (source, bytes) in inbound {
+        on_packet(world, &bytes, source)?;
+    }
+    Ok(())
 }
 
 async fn drain(
@@ -675,11 +776,22 @@ async fn drain(
         match world.rtc.poll_output().map_err(failed)? {
             Output::Timeout(_) => return Ok(()),
             Output::Transmit(transmit) => {
-                world
-                    .sock
-                    .send_to(&transmit.contents, transmit.destination)
-                    .await
-                    .map_err(failed)?;
+                if world.relay.is_some() {
+                    let dest = transmit.destination;
+                    let bytes = transmit.contents.to_vec();
+                    let side = world
+                        .relay
+                        .as_mut()
+                        .ok_or_else(|| Error::Failed("relay allocation failed".into()))?;
+                    side.send_payload(dest, &bytes)?;
+                    side.flush().await?;
+                } else {
+                    world
+                        .sock
+                        .send_to(&transmit.contents, transmit.destination)
+                        .await
+                        .map_err(failed)?;
+                }
             }
             Output::Event(event) => {
                 if let Event::MediaAdded(added) = &event
@@ -769,7 +881,7 @@ fn settle_connect(wait: &mut Option<ConnectWait>, world: &World, stats: &StatsIn
     let Some(pending) = wait.as_ref() else {
         return;
     };
-    if pending.started.elapsed() > CONNECT_TIMEOUT {
+    if pending.started.elapsed() > connect_limit() {
         if let Some(pending) = wait.take() {
             let _ = pending.reply.send(Err(Error::Timeout));
         }
@@ -790,7 +902,7 @@ fn settle_restart(wait: &mut Option<RestartWait>, world: &World, stats: &StatsIn
     let Some(pending) = wait.as_mut() else {
         return;
     };
-    if pending.started.elapsed() > RESTART_TIMEOUT {
+    if pending.started.elapsed() > restart_limit() {
         if let Some(pending) = wait.take() {
             let _ = pending.reply.send(Err(Error::Timeout));
         }
@@ -879,6 +991,36 @@ fn pump_video(world: &mut World, stats: &StatsInner) -> Result<(), Error> {
     world.video_rtp = world.video_rtp.wrapping_add(3_000);
     world.video_next = now + Duration::from_millis(33);
     Ok(())
+}
+
+fn relay_requested() -> bool {
+    std::env::var("SPIKE_TURN_URL")
+        .ok()
+        .is_some_and(|value| !value.is_empty())
+}
+
+fn connect_limit() -> Duration {
+    if relay_requested() {
+        Duration::from_secs(45)
+    } else {
+        CONNECT_TIMEOUT
+    }
+}
+
+fn restart_limit() -> Duration {
+    if relay_requested() {
+        Duration::from_secs(20)
+    } else {
+        RESTART_TIMEOUT
+    }
+}
+
+fn send_limit() -> Duration {
+    if relay_requested() {
+        Duration::from_secs(180)
+    } else {
+        SEND_TIMEOUT
+    }
 }
 
 fn elapsed_ms(start: Instant) -> u64 {

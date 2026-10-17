@@ -1,8 +1,6 @@
-//! D5 measurements for S-LAN. Writes `results/s-lan-<lib>.json`.
-//!
-//! S-TURN is not measured here: without `CF_TURN_KEY_ID` and
-//! `CF_TURN_API_TOKEN` the scenario is skipped, and str0m 0.24.1 has no
-//! TURN client either way.
+//! D5 measurements. S-LAN writes `results/s-lan-<lib>.json`.
+//! S-TURN writes `results/s-turn-<lib>-<transport>.json` when the parent
+//! process has put relay settings in the environment.
 
 use std::env;
 use std::fs;
@@ -19,6 +17,7 @@ const RUNS: usize = 20;
 fn main() {
     let scenario = arg_value("--scenario").unwrap_or_else(|| "s-lan".to_owned());
     match scenario.as_str() {
+        "s-turn" => measure_turn(),
         "s-lan" => {
             for lib in LIBS {
                 match measure_lan(lib) {
@@ -87,6 +86,19 @@ struct Summary {
 }
 
 impl Summary {
+    fn to_turn_json(&self, lib: &str, transport: &str) -> String {
+        format!(
+            "{{\n  \"scenario\": \"s-turn\",\n  \"lib\": \"{lib}\",\n  \"transport\": \"{transport}\",\n  \"ice_transport_policy\": \"relay\",\n  \"candidate_type\": \"relay\",\n  \"runs\": {RUNS},\n  \"connect_p50_ms\": {p50},\n  \"connect_p95_ms\": {p95},\n  \"mbps_10mb\": {mbps},\n  \"ice_restart_ms\": {ice},\n  \"first_frame_ms\": {frame},\n  \"rss_mb\": {rss},\n  \"cpu_pct\": {cpu}\n}}\n",
+            p50 = num(self.connect_p50_ms),
+            p95 = num(self.connect_p95_ms),
+            mbps = num(self.mbps_10mb),
+            ice = num(self.ice_restart_ms),
+            frame = num(self.first_frame_ms),
+            rss = num(self.rss_mb),
+            cpu = num(self.cpu_pct),
+        )
+    }
+
     fn to_json(&self, lib: &str) -> String {
         format!(
             "{{\n  \"scenario\": \"s-lan\",\n  \"lib\": \"{lib}\",\n  \"runs\": {RUNS},\n  \"connect_p50_ms\": {p50},\n  \"connect_p95_ms\": {p95},\n  \"mbps_10mb\": {mbps},\n  \"ice_restart_ms\": {ice},\n  \"first_frame_ms\": {frame},\n  \"rss_mb\": {rss},\n  \"cpu_pct\": {cpu}\n}}\n",
@@ -109,11 +121,115 @@ struct Run {
     pauses: u64,
 }
 
-fn measure_lan(lib: &str) -> Result<Option<Summary>, String> {
-    let runs = env::var("SPIKE_RUNS")
+fn measure_turn() {
+    let transport = env::var("SPIKE_TURN_TRANSPORT").unwrap_or_default();
+    if transport != "udp" && transport != "tls443" {
+        eprintln!("relay transport is unset");
+        std::process::exit(2);
+    }
+    if env::var("SPIKE_TURN_URL")
+        .ok()
+        .is_none_or(|value| value.is_empty())
+    {
+        eprintln!("relay measurement env is unset");
+        std::process::exit(1);
+    }
+    let official = run_count() == RUNS;
+    let mut failed = false;
+    for lib in LIBS {
+        match measure_lan(lib) {
+            Ok(None) => {}
+            Ok(Some(summary)) => {
+                let path = results_path(&format!("s-turn-{lib}-{transport}.json"));
+                fs::write(&path, summary.to_turn_json(lib, &transport)).unwrap_or_else(|err| {
+                    eprintln!("spike-measure: write {}: {err}", path.display());
+                    std::process::exit(1);
+                });
+                println!(
+                    "{lib} {transport} connect p50 {:.1} ms p95 {:.1} ms  {:.2} MiB/s  ice {:.1} ms",
+                    summary.connect_p50_ms,
+                    summary.connect_p95_ms,
+                    summary.mbps_10mb,
+                    summary.ice_restart_ms,
+                );
+            }
+            Err(err) => {
+                let reason = safe_reason(&err);
+                eprintln!("spike-measure: {lib}: {reason}");
+                failed = true;
+                if official {
+                    let path = results_path(&format!("s-turn-{lib}-{transport}.json"));
+                    let body = format!(
+                        "{{\n  \"scenario\": \"s-turn\",\n  \"lib\": \"{lib}\",\n  \"transport\": \"{transport}\",\n  \"ice_transport_policy\": \"relay\",\n  \"ok\": false,\n  \"reason\": \"{reason}\"\n}}\n"
+                    );
+                    fs::write(&path, body).unwrap_or_else(|err| {
+                        eprintln!("spike-measure: write {}: {err}", path.display());
+                        std::process::exit(1);
+                    });
+                }
+            }
+        }
+    }
+    if failed && !official {
+        std::process::exit(1);
+    }
+}
+
+fn run_count() -> usize {
+    env::var("SPIKE_RUNS")
         .ok()
         .and_then(|value| value.parse().ok())
-        .unwrap_or(RUNS);
+        .unwrap_or(RUNS)
+}
+
+fn relay_on() -> bool {
+    env::var("SPIKE_TURN_URL")
+        .ok()
+        .is_some_and(|value| !value.is_empty())
+}
+
+fn probe_wait() -> Duration {
+    if relay_on() {
+        Duration::from_secs(15)
+    } else {
+        Duration::from_secs(5)
+    }
+}
+
+fn blob_wait() -> Duration {
+    if relay_on() {
+        Duration::from_secs(180)
+    } else {
+        Duration::from_secs(90)
+    }
+}
+
+fn safe_reason(err: &str) -> String {
+    let leaked = err.contains("turn:")
+        || err.contains("credential")
+        || err.contains("token")
+        || err.contains("SPIKE_TURN")
+        || ipv4(err);
+    if leaked {
+        "relay measurement failed".to_owned()
+    } else {
+        err.replace('"', "'")
+    }
+}
+
+fn ipv4(text: &str) -> bool {
+    text.split(|ch: char| !ch.is_ascii_digit() && ch != '.')
+        .any(|part| {
+            let octets: Vec<_> = part.split('.').collect();
+            octets.len() == 4
+                && octets
+                    .iter()
+                    .all(|octet| !octet.is_empty() && octet.parse::<u16>().is_ok_and(|n| n <= 255))
+        })
+}
+
+fn measure_lan(lib: &str) -> Result<Option<Summary>, String> {
+    let runs = run_count();
     let (_rss_before, cpu_before) = usage();
     let wall = Instant::now();
     let mut samples = Vec::with_capacity(RUNS);
@@ -139,7 +255,7 @@ fn measure_lan(lib: &str) -> Result<Option<Summary>, String> {
         / wall_s
         * 100.0;
     if runs != RUNS {
-        println!("{lib} debug runs {runs}; not writing s-lan json");
+        println!("{lib} debug runs {runs}; not writing json");
         return Ok(None);
     }
     Ok(Some(Summary {
@@ -204,7 +320,7 @@ fn one_run(lib: &str) -> Result<Run, String> {
     left.send(CHANNEL_RPC, b"connect")
         .map_err(|err| format!("connect probe send: {err}"))?;
     let probe = right
-        .recv_timeout(Duration::from_secs(5))
+        .recv_timeout(probe_wait())
         .map_err(|err| format!("connect probe: {err}"))?;
     if probe.channel != CHANNEL_RPC || probe.bytes != b"connect" {
         return Err("connect probe mismatch".into());
@@ -232,7 +348,7 @@ fn one_run(lib: &str) -> Result<Run, String> {
         .map_err(|err| format!("ice restart: {err}"))?;
     left.send(CHANNEL_RPC, b"restart")
         .map_err(|err| format!("restart probe send: {err}"))?;
-    let deadline = Instant::now() + Duration::from_secs(5);
+    let deadline = Instant::now() + probe_wait();
     loop {
         let left_time = deadline.saturating_duration_since(Instant::now());
         if left_time.is_zero() {
@@ -271,7 +387,7 @@ fn wait_frame(peer: &std::sync::Arc<dyn Peer>) -> Result<f64, String> {
 }
 
 fn recv_blob(peer: &std::sync::Arc<dyn Peer>, len: usize) -> Result<(), String> {
-    let deadline = Instant::now() + Duration::from_secs(90);
+    let deadline = Instant::now() + blob_wait();
     let mut got = 0_usize;
     while got < len {
         let left = deadline.saturating_duration_since(Instant::now());

@@ -1,7 +1,35 @@
 {
   "scenario": "s-turn",
   "lib": "str0m",
-  "skipped": true,
-  "reason": "no live gate",
-  "detail": "CF_TURN_KEY_ID and CF_TURN_API_TOKEN are unset"
+  "ice_transport_policy": "relay",
+  "udp": {
+    "scenario": "s-turn",
+    "lib": "str0m",
+    "transport": "udp",
+    "ice_transport_policy": "relay",
+    "candidate_type": "relay",
+    "runs": 20,
+    "connect_p50_ms": 150.0176,
+    "connect_p95_ms": 184.3637,
+    "mbps_10mb": 12.2219,
+    "ice_restart_ms": 25.7201,
+    "first_frame_ms": 1,
+    "rss_mb": 134.6719,
+    "cpu_pct": 40.4155
+  },
+  "tls443": {
+    "scenario": "s-turn",
+    "lib": "str0m",
+    "transport": "tls443",
+    "ice_transport_policy": "relay",
+    "candidate_type": "relay",
+    "runs": 20,
+    "connect_p50_ms": 214.7898,
+    "connect_p95_ms": 365.6118,
+    "mbps_10mb": 3.4009,
+    "ice_restart_ms": 40.2473,
+    "first_frame_ms": 1,
+    "rss_mb": 119.3594,
+    "cpu_pct": 19.3291
+  }
 }

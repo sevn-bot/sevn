@@ -20,7 +20,8 @@ use webrtc::media_stream::track_local::TrackLocal;
 use webrtc::media_stream::track_local::static_sample::TrackLocalStaticSample;
 use webrtc::peer_connection::{
     PeerConnection, PeerConnectionBuilder, PeerConnectionEventHandler, RTCConfigurationBuilder,
-    RTCIceCandidateInit, RTCPeerConnectionIceEvent, RTCPeerConnectionState, RTCSessionDescription,
+    RTCIceCandidateInit, RTCIceGatheringState, RTCIceServer, RTCIceTransportPolicy,
+    RTCPeerConnectionIceEvent, RTCPeerConnectionState, RTCSessionDescription,
 };
 use webrtc::rtp_transceiver::RtpSender;
 use webrtc::runtime::TokioRuntime;
@@ -221,10 +222,17 @@ impl Drop for Peer {
     }
 }
 
+struct GatherWatch {
+    saw_relay: AtomicBool,
+    saw_other: AtomicBool,
+    done: AtomicBool,
+}
+
 struct Handler {
     state_tx: watch::Sender<RTCPeerConnectionState>,
     connected_gen: Arc<AtomicU64>,
     signal_tx: mpsc::UnboundedSender<String>,
+    gather: Option<Arc<GatherWatch>>,
 }
 
 #[async_trait]
@@ -236,6 +244,14 @@ impl PeerConnectionEventHandler for Handler {
         if init.candidate.is_empty() {
             return;
         }
+        if let Some(gather) = &self.gather {
+            if init.candidate.contains(" typ relay") {
+                gather.saw_relay.store(true, Ordering::SeqCst);
+            } else {
+                gather.saw_other.store(true, Ordering::SeqCst);
+                return;
+            }
+        }
         let _ = signal::queue(
             &self.signal_tx,
             &signal::Sig::Candidate {
@@ -244,6 +260,14 @@ impl PeerConnectionEventHandler for Handler {
                 sdp_mline_index: init.sdp_mline_index,
             },
         );
+    }
+
+    async fn on_ice_gathering_state_change(&self, state: RTCIceGatheringState) {
+        if state == RTCIceGatheringState::Complete
+            && let Some(gather) = &self.gather
+        {
+            gather.done.store(true, Ordering::SeqCst);
+        }
     }
 
     async fn on_connection_state_change(&self, state: RTCPeerConnectionState) {
@@ -261,6 +285,8 @@ struct Session {
     state_rx: watch::Receiver<RTCPeerConnectionState>,
     connected_gen: Arc<AtomicU64>,
     answer_gen: Arc<AtomicU64>,
+    relay: bool,
+    gather: Option<Arc<GatherWatch>>,
 }
 
 async fn worker(
@@ -369,16 +395,44 @@ async fn connect_session(
     media_engine
         .register_codec(h264_codec(), RtpCodecKind::Video)
         .map_err(|err| Error::Failed(err.to_string()))?;
+    let relay = relay_config()?;
+    let relay_on = relay.is_some();
+    let gather = relay_on.then(|| {
+        Arc::new(GatherWatch {
+            saw_relay: AtomicBool::new(false),
+            saw_other: AtomicBool::new(false),
+            done: AtomicBool::new(false),
+        })
+    });
+    let (configuration, udp_addrs) = if let Some((url, username, credential)) = relay {
+        (
+            RTCConfigurationBuilder::new()
+                .with_ice_servers(vec![RTCIceServer {
+                    urls: vec![url],
+                    username,
+                    credential,
+                }])
+                .with_ice_transport_policy(RTCIceTransportPolicy::Relay)
+                .build(),
+            vec!["0.0.0.0:0".to_string()],
+        )
+    } else {
+        (
+            RTCConfigurationBuilder::new().build(),
+            vec!["127.0.0.1:0".to_string()],
+        )
+    };
     let pc = PeerConnectionBuilder::new()
-        .with_configuration(RTCConfigurationBuilder::new().build())
+        .with_configuration(configuration)
         .with_media_engine(media_engine)
         .with_handler(Arc::new(Handler {
             state_tx,
             connected_gen: Arc::clone(&connected_gen),
             signal_tx: signal_tx.clone(),
+            gather: gather.clone(),
         }))
         .with_runtime(Arc::new(TokioRuntime))
-        .with_udp_addrs(vec!["127.0.0.1:0".to_string()])
+        .with_udp_addrs(udp_addrs)
         .with_data_channel_send_buffer_limit(4 * 1024 * 1024)
         .build()
         .await
@@ -457,7 +511,7 @@ async fn connect_session(
     }
 
     let mut state_rx = state_rx;
-    wait_state(&mut state_rx, CONNECT_TIMEOUT).await?;
+    wait_connected(&mut state_rx, connect_limit(), gather.as_deref()).await?;
     // PC Connected can precede SCTP OnOpen. A send in that gap is dropped by
     // the stack, so connect does not return until every negotiated channel is open.
     for slot in &slots {
@@ -480,6 +534,8 @@ async fn connect_session(
             state_rx,
             connected_gen,
             answer_gen,
+            relay: relay_on,
+            gather,
         },
         connect_ms: elapsed_ms(started),
     })
@@ -610,14 +666,65 @@ async fn add_candidate(
         .map_err(|err| Error::Failed(err.to_string()))
 }
 
-async fn wait_state(
+fn relay_config() -> Result<Option<(String, String, String)>, Error> {
+    let Ok(url) = std::env::var("SPIKE_TURN_URL") else {
+        return Ok(None);
+    };
+    if url.is_empty() {
+        return Ok(None);
+    }
+    let username = std::env::var("SPIKE_TURN_USERNAME").unwrap_or_default();
+    let credential = std::env::var("SPIKE_TURN_CREDENTIAL").unwrap_or_default();
+    if username.is_empty() || credential.is_empty() {
+        return Err(Error::Failed("relay measurement env is unset".into()));
+    }
+    Ok(Some((url, username, credential)))
+}
+
+fn relay_requested() -> bool {
+    std::env::var("SPIKE_TURN_URL")
+        .ok()
+        .is_some_and(|value| !value.is_empty())
+}
+
+fn connect_limit() -> Duration {
+    if relay_requested() {
+        Duration::from_secs(45)
+    } else {
+        CONNECT_TIMEOUT
+    }
+}
+
+fn open_limit() -> Duration {
+    if relay_requested() {
+        Duration::from_secs(20)
+    } else {
+        OPEN_TIMEOUT
+    }
+}
+
+async fn wait_connected(
     state_rx: &mut watch::Receiver<RTCPeerConnectionState>,
     timeout: Duration,
+    gather: Option<&GatherWatch>,
 ) -> Result<(), Error> {
     let deadline = Instant::now() + timeout;
     loop {
+        if let Some(gather) = gather {
+            if gather.saw_other.load(Ordering::SeqCst) {
+                return Err(Error::Failed("non-relay candidate gathered".into()));
+            }
+            if gather.done.load(Ordering::SeqCst) && !gather.saw_relay.load(Ordering::SeqCst) {
+                return Err(Error::Failed("no relay candidate".into()));
+            }
+        }
         let state = *state_rx.borrow();
         if state == RTCPeerConnectionState::Connected {
+            if let Some(gather) = gather
+                && !gather.saw_relay.load(Ordering::SeqCst)
+            {
+                return Err(Error::Failed("no relay candidate".into()));
+            }
             return Ok(());
         }
         if state == RTCPeerConnectionState::Failed || state == RTCPeerConnectionState::Closed {
@@ -625,14 +732,13 @@ async fn wait_state(
         }
         let left = deadline.saturating_duration_since(Instant::now());
         if left.is_zero() {
+            if gather.is_some() {
+                return Err(Error::Failed("no relay candidate".into()));
+            }
             return Err(Error::Timeout);
         }
-        if tokio::time::timeout(left, state_rx.changed())
-            .await
-            .is_err()
-        {
-            return Err(Error::Timeout);
-        }
+        let _ =
+            tokio::time::timeout(left.min(Duration::from_millis(100)), state_rx.changed()).await;
     }
 }
 
@@ -651,8 +757,12 @@ async fn send_on(
     if channel == CHANNEL_FILES {
         let chunks = chunk::chunk_blob(bytes);
         let mut gate = PauseGate::new();
+        let started = Instant::now();
         for chunk in chunks {
             loop {
+                if relay_requested() && started.elapsed() > Duration::from_secs(180) {
+                    return Err(Error::Timeout);
+                }
                 let outstanding = slot
                     .dc
                     .outstanding_bytes()
@@ -684,7 +794,7 @@ async fn send_on(
 }
 
 async fn wait_open(open: &AtomicBool, opened: &Notify) -> Result<(), Error> {
-    let deadline = Instant::now() + OPEN_TIMEOUT;
+    let deadline = Instant::now() + open_limit();
     loop {
         if open.load(Ordering::SeqCst) {
             return Ok(());
@@ -726,8 +836,18 @@ async fn ice_restart(session: &Session, local_sdp: &Arc<Mutex<String>>) -> Resul
         .map_err(|err| Error::Failed(err.to_string()))?;
 
     let mut state_rx = session.state_rx.clone();
-    let deadline = Instant::now() + RESTART_TIMEOUT;
+    let timeout = if session.relay {
+        Duration::from_secs(20)
+    } else {
+        RESTART_TIMEOUT
+    };
+    let deadline = Instant::now() + timeout;
     loop {
+        if let Some(gather) = &session.gather
+            && gather.saw_other.load(Ordering::SeqCst)
+        {
+            return Err(Error::Failed("non-relay candidate gathered".into()));
+        }
         let answered = session.answer_gen.load(Ordering::SeqCst) > before_answer;
         let state = *state_rx.borrow();
         let reconnected = session.connected_gen.load(Ordering::SeqCst) > before_connected;

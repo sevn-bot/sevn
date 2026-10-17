@@ -1,8 +1,8 @@
 # Spike S1 — sevn-link WebRTC library
 
 Verdict: **blocked**. No library is chosen. Desktop WebKit passed data and video for both
-libraries. iOS Safari was not run, and `CF_TURN_KEY_ID` / `CF_TURN_API_TOKEN` were unset.
-Decision D7 forbids a choice without both Safari gates.
+libraries. S-TURN was measured through Cloudflare. iOS Safari was not run. Decision D7
+forbids a choice without that Safari gate.
 
 `VERDICT.json` leaves `sha` null. The commit that adds this report is the revision; a commit
 object cannot contain its own id. The wave plan annotation records that commit.
@@ -72,13 +72,27 @@ p95 the 19th).
 
 Source: `results/s-lan-webrtcrs.json`, `results/s-lan-str0m.json`.
 
-### S-TURN (skipped)
+### S-TURN (measured, release, 20 runs, relay only)
 
-`CF_TURN_KEY_ID` and `CF_TURN_API_TOKEN` were unset. No relay rate, connect time, or
-candidate type was recorded. `results/s-turn-*.json` is `skipped: true`, reason
-`no live gate`.
+Both peers used `iceTransportPolicy: relay`. webrtc-rs gathered through its own TURN
+client. str0m 0.24.1 still has no TURN client; this spike allocated the relay with
+`rtc-turn` 0.21.1 and handed str0m only the unwrapped datagrams. UDP is `turn` port
+3478. TLS:443 is `turns` on 443, self-delimited TURN on the stream. Result files name
+the transports `udp` and `tls443` and the candidate type `relay`.
 
-str0m 0.24.1 documents no TURN client. That is an API gap, not a measured failure.
+| Field | webrtc-rs UDP | str0m UDP | webrtc-rs TLS:443 | str0m TLS:443 |
+|-------|---------------|-----------|-------------------|---------------|
+| connect p50 | 5066.3 ms | 150.0 ms | no relay candidate | 214.8 ms |
+| connect p95 | 5353.8 ms | 184.4 ms | — | 365.6 ms |
+| 10 MiB median | 6.57 MiB/s | 12.22 MiB/s | — | 3.40 MiB/s |
+| ICE restart median | 3079.6 ms | 25.7 ms | — | 40.2 ms |
+| sender first frame | 1.0 ms | 1.0 ms | — | 1.0 ms |
+| process RSS | 127.0 MB | 134.7 MB | — | 119.4 MB |
+| process CPU | 3.7% | 40.4% | — | 19.3% |
+
+webrtc-rs 0.21.1 does not gather a relay candidate for TLS:443 (it skips secure TURN).
+That row is one failed attempt, not 20 timeouts. Source:
+`results/s-turn-webrtcrs.json`, `results/s-turn-str0m.json`.
 
 ### S-iOS (skipped)
 
@@ -105,16 +119,18 @@ stored millisecond. The callback reported width 1280 and height 720 for both lib
 | Bar | webrtc-rs | str0m |
 |-----|-----------|-------|
 | S-LAN connect p50 < 1.0 s | pass (412 ms) | pass (30 ms) |
-| S-TURN connect p50 < 3.0 s | not measured | not measured |
+| S-TURN connect p50 < 3.0 s | fail (UDP 5066 ms; TLS:443 no relay candidate) | pass (UDP 150 ms, TLS:443 215 ms) |
 | LAN 10 MB ≥ 5 MB/s | pass (77.7 MiB/s) | pass (35.4 MiB/s) |
 | ICE restart < 5 s | pass (1.0 ms) | pass (23.5 ms) |
 | Chrome data + video | pass | pass |
 | Safari data + video | desktop WebKit pass; iOS Safari not run | desktop WebKit pass; iOS Safari not run |
 | 100 connects, no crash | pass | pass |
 
-Both libraries clear every bar that was actually run. D7 says a tie goes to str0m, and that
-neither passing means plan C (pion). Neither of those outcomes applies: iOS Safari evidence
-is missing, so the verdict is **blocked** and `choice` is null.
+webrtc-rs misses the S-TURN connect bar. str0m clears the bars that were run, including
+both relay transports, using the spike's TURN adapter rather than a client inside str0m.
+D7 says a tie goes to str0m, and that neither passing means plan C (pion). Neither of
+those outcomes applies: iOS Safari evidence is missing, so the verdict is **blocked**
+and `choice` is null.
 
 ## iOS build (0068)
 
@@ -139,23 +155,25 @@ cross-compile.
 
 ## Risks
 
-- **TURN.** Spec §3.1 allows only TURN (UDP, TCP, TLS:443). str0m 0.24.1 has no TURN
-  client. webrtc-rs does, and it was not exercised. A library that cannot relay cannot
-  meet S-TURN no matter how the LAN numbers look.
+- **TURN.** Spec §3.1 allows only TURN (UDP, TCP, TLS:443). webrtc-rs relayed UDP;
+  connect p50 was 5.07 s, over the 3.0 s bar, and TLS:443 produced no relay candidate.
+  str0m 0.24.1 has no TURN client. The numbers above are from an adapter in this spike
+  (`rtc-turn` 0.21.1), not from str0m itself.
 - **H.264 packetization.** Chrome and Safari want constrained baseline `42e01f`. libx264
   baseline emits `42c01f`. The spike rewrites that byte. A later VideoToolbox encoder that
   emits plain baseline will negotiate and then fail to decode.
 - **str0m media events.** `MediaAdded` fires for media in the remote offer, not for media
   this side added. The writer uses the `Mid` returned by `add_media`.
-- **ICE restart.** Both recover on loopback well under 5 s. Restart through TURN was not
-  tested.
+- **ICE restart.** Both recover on loopback well under 5 s. Through UDP relay, webrtc-rs
+  took 3.08 s and str0m 26 ms. TLS:443 restart was 40 ms on str0m. webrtc-rs had no TLS
+  relay to restart.
 - **webrtc-rs first send.** `Connected` can arrive before SCTP `OnOpen`. A send in that gap
   was dropped under parallel load (the first ordered message never arrived). `connect` now
   waits until all three channels are open.
 - **CPU.** str0m's measure process used 131% CPU across the 20 runs; webrtc-rs used 27%.
   D7 does not set a CPU cap. The gap matters for a phone.
 - **Maintenance.** str0m is the smaller sans-IO crate (D7's tie-break). webrtc-rs is the
-  larger stack and is the one that already speaks TURN.
+  larger stack and already speaks UDP TURN. It does not speak TLS:443 TURN.
 
 ## Decision text for downstream plans
 
@@ -164,10 +182,13 @@ Do not copy a library into product code off this spike.
 **0065 (sevn-link).** WebRTC library is undecided (spike 0002 verdict `blocked`). On loopback,
 release, 20 runs: webrtc-rs 0.21.1 connect p50 412 ms, 77.7 MiB/s, ICE restart 1.0 ms;
 str0m 0.24.1 connect p50 30 ms, 35.4 MiB/s, ICE restart 23.5 ms. Both did Chrome and desktop
-WebKit data plus 1280×720 H.264, and 100 connects with no failure. S-TURN and iOS Safari were
-not run. str0m 0.24.1 has no TURN client, which §3.1 requires. Revisit after those gates. A
-tie, if both later pass, selects str0m. If str0m cannot relay, the choice is webrtc-rs or
-plan C (pion sidecar).
+WebKit data plus 1280×720 H.264, and 100 connects with no failure. S-TURN, same profile,
+relay only: webrtc-rs UDP connect p50 5066 ms (over 3.0 s) at 6.57 MiB/s, ICE restart 3.08 s;
+TLS:443 gathered no relay candidate. str0m, via this spike's `rtc-turn` adapter, UDP connect
+p50 150 ms at 12.22 MiB/s and TLS:443 connect p50 215 ms at 3.40 MiB/s. str0m 0.24.1 still
+has no TURN client of its own. iOS Safari was not run. A tie, if both later pass, selects
+str0m. If the adapter is not acceptable as str0m, the choice is webrtc-rs or plan C (pion
+sidecar).
 
 **0068 (UniFFI / Apple).** `ios_build` is false. Cross-builds for `aarch64-apple-ios` and
 `aarch64-apple-ios-sim` stop in `ring` 0.17.14 (webrtc-rs) and `aws-lc-sys` 0.46.0 (str0m)
@@ -179,6 +200,7 @@ Xcode toolchain before blaming either crate.
 baseline does not emit that profile id; the SPS constraint byte was patched. VideoToolbox
 was not used.
 
-**0080 (edge / TURN).** No TURN measurement. Credentials were unset. Do not record a relay
-candidate type or a TLS:443 rate from this spike. str0m 0.24.1 cannot place a TURN
-allocation without new code.
+**0080 (edge / TURN).** Release, 20 runs, relay only. webrtc-rs UDP candidate type `relay`,
+connect p50 5066 ms, 6.57 MiB/s; TLS:443 produced no relay candidate. str0m UDP connect p50
+150 ms, 12.22 MiB/s; TLS:443 connect p50 215 ms, 3.40 MiB/s. Those str0m numbers used an
+adapter in this spike. str0m 0.24.1 cannot place a TURN allocation by itself.

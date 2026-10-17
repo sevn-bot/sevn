@@ -20,8 +20,8 @@
       ]
     },
     "cf-turn": {
-      "outcome": "skipped",
-      "reason": "CF_TURN_KEY_ID and CF_TURN_API_TOKEN are unset",
+      "outcome": "passed",
+      "reason": "release 20-run relay: webrtcrs UDP connect p50 5066 ms, 6.57 MiB/s, candidate type relay; TLS:443 no relay candidate. str0m UDP connect p50 150 ms, 12.22 MiB/s; TLS:443 connect p50 215 ms, 3.40 MiB/s. Choice stays null until iOS Safari.",
       "evidence": [
         "spikes/0002-link-webrtc/results/s-turn-webrtcrs.json",
         "spikes/0002-link-webrtc/results/s-turn-str0m.json"
@@ -29,7 +29,7 @@
     },
     "ios-safari": {
       "outcome": "skipped",
-      "reason": "no operator iPhone confirmed",
+      "reason": "physical iPhone was not driven; the simulator does not count",
       "evidence": [
         "spikes/0002-link-webrtc/results/s-ios-webrtcrs.json",
         "spikes/0002-link-webrtc/results/s-ios-str0m.json"

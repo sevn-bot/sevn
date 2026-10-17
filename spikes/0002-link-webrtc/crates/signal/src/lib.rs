@@ -158,7 +158,9 @@ async fn run_server(
     mut shutdown_rx: oneshot::Receiver<()>,
     peers: Arc<AtomicUsize>,
 ) {
-    let listener = match TcpListener::bind("127.0.0.1:0").await {
+    let bind_host = std::env::var("SPIKE_SIGNAL_BIND").unwrap_or_else(|_| "127.0.0.1".to_owned());
+    let advertise = std::env::var("SPIKE_SIGNAL_HOST").unwrap_or_else(|_| "127.0.0.1".to_owned());
+    let listener = match TcpListener::bind((bind_host.as_str(), 0)).await {
         Ok(listener) => listener,
         Err(err) => {
             let _ = url_tx.send(Err(err.to_string()));
@@ -172,7 +174,7 @@ async fn run_server(
             return;
         }
     };
-    if url_tx.send(Ok(format!("ws://127.0.0.1:{port}"))).is_err() {
+    if url_tx.send(Ok(format!("ws://{advertise}:{port}"))).is_err() {
         return;
     }
 
