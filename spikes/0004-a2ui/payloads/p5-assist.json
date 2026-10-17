@@ -1,0 +1,24 @@
+{
+  "messages": [
+    {
+      "version": "v0.9",
+      "createSurface": {
+        "surfaceId": "p5-assist",
+        "catalogId": "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"
+      }
+    },
+    {
+      "version": "v0.9",
+      "updateComponents": {
+        "surfaceId": "p5-assist",
+        "components": [
+          {
+            "id": "root",
+            "component": "sevn.AssistCard",
+            "prompt": "The computer is waiting"
+          }
+        ]
+      }
+    }
+  ]
+}

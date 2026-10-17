@@ -1,0 +1,104 @@
+{
+  "messages": [
+    {
+      "version": "v0.9",
+      "createSurface": {
+        "surfaceId": "p1-form",
+        "catalogId": "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"
+      }
+    },
+    {
+      "version": "v0.9",
+      "updateComponents": {
+        "surfaceId": "p1-form",
+        "components": [
+          {
+            "id": "root",
+            "component": "Column",
+            "children": [
+              "email",
+              "choice",
+              "when",
+              "submit"
+            ]
+          },
+          {
+            "id": "email",
+            "component": "TextField",
+            "label": "Email",
+            "value": {
+              "path": "/email"
+            }
+          },
+          {
+            "id": "choice",
+            "component": "ChoicePicker",
+            "label": "Plan",
+            "variant": "mutuallyExclusive",
+            "options": [
+              {
+                "label": "Daily",
+                "value": "daily"
+              },
+              {
+                "label": "Weekly",
+                "value": "weekly"
+              }
+            ],
+            "value": {
+              "path": "/choice"
+            }
+          },
+          {
+            "id": "when",
+            "component": "DateTimeInput",
+            "value": {
+              "path": "/when"
+            },
+            "enableDate": true,
+            "label": "When"
+          },
+          {
+            "id": "submit",
+            "component": "Button",
+            "child": "submit-label",
+            "action": {
+              "event": {
+                "name": "submit",
+                "context": {
+                  "email": {
+                    "path": "/email"
+                  },
+                  "when": {
+                    "path": "/when"
+                  },
+                  "choice": {
+                    "path": "/choice"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "id": "submit-label",
+            "component": "Text",
+            "text": "Submit",
+            "variant": "h5"
+          }
+        ]
+      }
+    },
+    {
+      "version": "v0.9",
+      "updateDataModel": {
+        "surfaceId": "p1-form",
+        "path": "/",
+        "value": {
+          "email": "",
+          "when": "",
+          "choice": []
+        }
+      }
+    }
+  ]
+}

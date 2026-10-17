@@ -1,0 +1,24 @@
+{
+  "messages": [
+    {
+      "version": "v0.9",
+      "createSurface": {
+        "surfaceId": "p4-approval",
+        "catalogId": "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"
+      }
+    },
+    {
+      "version": "v0.9",
+      "updateComponents": {
+        "surfaceId": "p4-approval",
+        "components": [
+          {
+            "id": "root",
+            "component": "sevn.ApprovalCard",
+            "title": "Deploy the host"
+          }
+        ]
+      }
+    }
+  ]
+}
