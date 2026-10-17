@@ -29,7 +29,7 @@
     },
     "ios-safari": {
       "outcome": "skipped",
-      "reason": "Physical iPhone Safari on private Wi-Fi rendered both pages. The harness log has no channels open line. It has 'webrtcrs spike-peer: no relay candidate' and 'str0m spike-peer: timed out'. Wi-Fi half not recorded. Cellular half not run. The simulator does not count",
+      "reason": "Private Wi-Fi Safari visit logged 'webrtcrs spike-peer: browser connected' and 'str0m spike-peer: browser connected'. Neither line is channels open with a time. D6 also requires 5G. Cellular half not run. The simulator does not count",
       "evidence": [
         "spikes/0002-link-webrtc/results/s-ios-webrtcrs.json",
         "spikes/0002-link-webrtc/results/s-ios-str0m.json"

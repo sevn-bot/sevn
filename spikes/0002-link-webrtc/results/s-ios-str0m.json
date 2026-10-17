@@ -3,5 +3,5 @@
   "lib": "str0m",
   "skipped": true,
   "reason": "no live gate",
-  "detail": "pages rendered on private Wi-Fi; harness log has no channels open line (spike-peer: timed out). Cellular half not run"
+  "detail": "private Wi-Fi visit logged spike-peer: browser connected; no channels open time. Cellular half not run"
 }

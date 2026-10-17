@@ -96,17 +96,14 @@ That row is one failed attempt, not 20 timeouts. Source:
 
 ### S-iOS (skipped)
 
-Safari on the physical iPhone, on the same private Wi-Fi, rendered both fixed harness
-pages. The harness log for those listeners does not contain `channels open`. The only
-peer lines are `webrtcrs spike-peer: no relay candidate` and `str0m spike-peer: timed out`.
-Those are the offerer `drive()` connect failures. `connect` starts when the process
-starts and gives up after 45 seconds, and the log has no per-line timestamps, so the
-lines are not a Wi-Fi `channels open` time. The cellular half was not run: with Wi-Fi
+Safari on the physical iPhone, on the same private Wi-Fi, opened both fresh pages. The
+operator said the visit worked. The harness log for that visit does not contain
+`channels open` with a time. The peer lines are `webrtcrs spike-peer: browser connected`
+and `str0m spike-peer: browser connected`. That line means the browser joined the signal
+room. The page writes `channels open <ms>` only in its own log panel, and that panel was
+not captured. D6 requires Wi-Fi and then 5G. The cellular half was not run: with Wi-Fi
 off the phone cannot reach this Mac on a private address, and no tunnel was started.
-The simulator does not count. The connect deadline in that run started when the
-process started, so it expired before the phone opened the pages. The harness now
-starts that deadline when the browser joins the signal room. `results/s-ios-*.json`
-stays `skipped: true`.
+The simulator does not count. `results/s-ios-*.json` stays `skipped: true`.
 
 ### Other checks from this run
 
@@ -194,8 +191,8 @@ WebKit data plus 1280×720 H.264, and 100 connects with no failure. S-TURN, same
 relay only: webrtc-rs UDP connect p50 5066 ms (over 3.0 s) at 6.57 MiB/s, ICE restart 3.08 s;
 TLS:443 gathered no relay candidate. str0m, via this spike's `rtc-turn` adapter, UDP connect
 p50 150 ms at 12.22 MiB/s and TLS:443 connect p50 215 ms at 3.40 MiB/s. str0m 0.24.1 still
-has no TURN client of its own. iOS Safari rendered the pages on private Wi-Fi; the
-harness log has no `channels open` line, and the cellular half was not run. A tie, if
+has no TURN client of its own. iOS Safari on private Wi-Fi logged `browser connected`
+for both libraries and no `channels open` time. The cellular half was not run. A tie, if
 both later pass, selects str0m. If the adapter is not acceptable as str0m, the choice is
 webrtc-rs or plan C (pion sidecar).
 
