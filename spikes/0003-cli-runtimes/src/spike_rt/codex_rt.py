@@ -117,7 +117,7 @@ class CodexSession:
             await self._request(
                 "initialize",
                 {"clientInfo": {"name": "sevn-spike", "version": "0.1.0"}},
-                timeout=_HANDSHAKE_TIMEOUT_S,
+                timeout_s=_HANDSHAKE_TIMEOUT_S,
             )
             await self._notify("initialized", {})
             await self._open_thread()
@@ -209,9 +209,9 @@ class CodexSession:
         }
         if self.session_ref:
             params["threadId"] = self.session_ref
-            result = await self._request("thread/resume", params, timeout=_HANDSHAKE_TIMEOUT_S)
+            result = await self._request("thread/resume", params, timeout_s=_HANDSHAKE_TIMEOUT_S)
         else:
-            result = await self._request("thread/start", params, timeout=_HANDSHAKE_TIMEOUT_S)
+            result = await self._request("thread/start", params, timeout_s=_HANDSHAKE_TIMEOUT_S)
         thread = result.get("thread")
         thread_id = thread.get("id") if isinstance(thread, dict) else None
         if not isinstance(thread_id, str) or not thread_id:
@@ -332,7 +332,7 @@ class CodexSession:
         self,
         method: str,
         params: dict[str, object],
-        timeout: float | None = None,
+        timeout_s: float | None = None,
     ) -> dict[str, object]:
         if self._proc is None or self._proc.stdin is None:
             raise RuntimeError("codex session is closed")
@@ -342,7 +342,7 @@ class CodexSession:
         self._pending[request_id] = future
         await self._send({"jsonrpc": "2.0", "id": request_id, "method": method, "params": params})
         try:
-            message = await (asyncio.wait_for(future, timeout) if timeout else future)
+            message = await (asyncio.wait_for(future, timeout_s) if timeout_s else future)
         except TimeoutError as exc:
             self._pending.pop(request_id, None)
             raise RuntimeError(f"codex {method} timed out") from exc

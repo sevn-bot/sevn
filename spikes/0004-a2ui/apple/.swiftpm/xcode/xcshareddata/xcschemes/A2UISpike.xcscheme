@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Scheme
+   LastUpgradeVersion = "1640"
+   version = "1.7">
+   <BuildAction
+      parallelizeBuildables = "YES"
+      buildImplicitDependencies = "YES">
+      <BuildActionEntries>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "A2UISpikeTests"
+               BuildableName = "A2UISpikeTests"
+               BlueprintName = "A2UISpikeTests"
+               ReferencedContainer = "container:">
+            </BuildableReference>
+         </BuildActionEntry>
+      </BuildActionEntries>
+   </BuildAction>
+   <TestAction
+      buildConfiguration = "Debug"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      shouldUseLaunchSchemeArgsEnv = "NO"
+      runPostActionsOnFailure = "YES">
+      <PreActions>
+         <ExecutionAction
+            ActionType = "Xcode.IDEStandardExecutionActionsCore.ExecutionActionType.ShellScriptAction">
+            <ActionContent
+               title = "Expose payloads outside Documents"
+               scriptText = "pid=$$&#10;while [ &quot;$pid&quot; -gt 1 ]; do&#10;  cwd=$(lsof -a -p &quot;$pid&quot; -d cwd -Fn 2&gt;/dev/null | awk &apos;/^n/{print substr($0,2); exit}&apos;)&#10;  if [ -n &quot;$cwd&quot; ] &amp;&amp; [ -f &quot;$cwd/scripts/expose-payloads.sh&quot; ]; then&#10;    /bin/sh &quot;$cwd/scripts/expose-payloads.sh&quot;&#10;    exit 0&#10;  fi&#10;  pid=$(ps -o ppid= -p &quot;$pid&quot; | tr -d &apos; &apos;)&#10;done&#10;echo &quot;expose-payloads.sh not found&quot; &gt;&gt; /tmp/sevn-scheme-pre.txt&#10;exit 1&#10;">
+            </ActionContent>
+         </ExecutionAction>
+      </PreActions>
+      <PostActions>
+         <ExecutionAction
+            ActionType = "Xcode.IDEStandardExecutionActionsCore.ExecutionActionType.ShellScriptAction">
+            <ActionContent
+               title = "Restore payload files"
+               scriptText = "pid=$$&#10;while [ &quot;$pid&quot; -gt 1 ]; do&#10;  cwd=$(lsof -a -p &quot;$pid&quot; -d cwd -Fn 2&gt;/dev/null | awk &apos;/^n/{print substr($0,2); exit}&apos;)&#10;  if [ -n &quot;$cwd&quot; ] &amp;&amp; [ -f &quot;$cwd/scripts/restore-payloads.sh&quot; ]; then&#10;    /bin/sh &quot;$cwd/scripts/restore-payloads.sh&quot;&#10;    exit 0&#10;  fi&#10;  pid=$(ps -o ppid= -p &quot;$pid&quot; | tr -d &apos; &apos;)&#10;done&#10;exit 0&#10;">
+            </ActionContent>
+         </ExecutionAction>
+      </PostActions>
+      <EnvironmentVariables>
+         <EnvironmentVariable
+            key = "SEVN_RUN_MARKED"
+            value = "1"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+      </EnvironmentVariables>
+      <Testables>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "A2UISpikeTests"
+               BuildableName = "A2UISpikeTests"
+               BlueprintName = "A2UISpikeTests"
+               ReferencedContainer = "container:">
+            </BuildableReference>
+         </TestableReference>
+      </Testables>
+   </TestAction>
+   <LaunchAction
+      buildConfiguration = "Debug"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      launchStyle = "0"
+      useCustomWorkingDirectory = "NO"
+      ignoresPersistentStateOnLaunch = "NO"
+      debugDocumentVersioning = "YES"
+      debugServiceExtension = "internal"
+      allowLocationSimulation = "YES">
+   </LaunchAction>
+   <ProfileAction
+      buildConfiguration = "Release"
+      shouldUseLaunchSchemeArgsEnv = "YES"
+      savedToolIdentifier = ""
+      useCustomWorkingDirectory = "NO"
+      debugDocumentVersioning = "YES">
+   </ProfileAction>
+   <AnalyzeAction
+      buildConfiguration = "Debug">
+   </AnalyzeAction>
+   <ArchiveAction
+      buildConfiguration = "Release"
+      revealArchiveInOrganizer = "YES">
+   </ArchiveAction>
+</Scheme>

@@ -1,0 +1,11 @@
+# Spike tests use pytest asserts. Host ruff allows S101 only under host/tests.
+line-length = 100
+
+[lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC", "S", "BLE", "RUF"]
+
+[lint.per-file-ignores]
+"*.py" = ["S101"]
+
+[format]
+exclude = ["*.py"]

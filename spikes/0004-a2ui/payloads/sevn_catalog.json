@@ -1,0 +1,93 @@
+{
+  "catalogId": "https://sevn.bot/a2ui/catalog.json",
+  "protocolVersion": "v0.9",
+  "components": {
+    "sevn.SecretField": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Masked secret input. The value is not part of the schema and must not enter the data model.",
+      "required": [
+        "name",
+        "label",
+        "help",
+        "link"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Secret name handed back with the action."
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Field label."
+        },
+        "help": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Help text shown beside the field."
+        },
+        "link": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Link the operator can open, for example a provider page."
+        }
+      }
+    },
+    "sevn.ApprovalCard": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Approve or deny a pending action.",
+      "required": [
+        "title"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What the operator is approving."
+        }
+      }
+    },
+    "sevn.AssistCard": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Offers the Open Computer panel action.",
+      "required": [
+        "prompt"
+      ],
+      "properties": {
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Short prompt shown on the card."
+        }
+      }
+    },
+    "Table": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Renders a data-model list as table rows.",
+      "required": [
+        "rows"
+      ],
+      "properties": {
+        "rows": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "JSON Pointer into the surface data model."
+            }
+          }
+        }
+      }
+    }
+  },
+  "functions": {}
+}
