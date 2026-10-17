@@ -1,4 +1,4 @@
-"""Bot services, protocol methods, and migration 0002 (green after W2)."""
+"""Bot services, protocol methods, and migration 0002."""
 
 from __future__ import annotations
 
@@ -18,8 +18,6 @@ from support.chat import (
     request,
 )
 from support.repo import repo_root
-
-pytestmark = pytest.mark.xfail(reason="green after W2", strict=False)
 
 
 def _assert_workspace(body: dict[str, object], bot_id: str) -> None:
