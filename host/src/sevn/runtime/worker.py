@@ -16,7 +16,7 @@ from sevn.protocol.hub import Hub
 from sevn.runtime.base import Runtime, ToolDecision
 from sevn.runtime.runtimes.claude import ClaudeRuntime, installed_client
 from sevn.runtime.runtimes.pydantic_ai import PydanticAIRuntime
-from sevn.runtime.turn import TurnRunner
+from sevn.runtime.turn import TurnRunner, record_turn_failure
 from sevn.store.models import Job as JobRow
 from sevn.store.models import Turn as TurnRow
 
@@ -97,13 +97,20 @@ class Worker:
         decisions: tuple[ToolDecision, ...],
     ) -> None:
         runtime = await self._choose(agent_id)
-        async with self._lock(agent_id):
-            await self._slots.acquire()
-            try:
-                runner = TurnRunner(self.hub, runtime, watch=self._board)
-                await runner.resume(turn_id, decisions)
-            finally:
-                self._slots.release()
+        try:
+            async with self._lock(agent_id):
+                await self._slots.acquire()
+                try:
+                    runner = TurnRunner(self.hub, runtime, watch=self._board)
+                    try:
+                        await runner.resume(turn_id, decisions)
+                    except Exception as exc:  # noqa: BLE001 — record the failure, then continue
+                        logger.exception("turn failed")
+                        await record_turn_failure(self.hub, exc, turn_id=turn_id)
+                finally:
+                    self._slots.release()
+        finally:
+            self.kick(agent_id)
 
     async def cancel(self, turn_id: str) -> None:
         self._board.cancel(turn_id)
@@ -128,6 +135,10 @@ class Worker:
         async with self._lock(agent_id):
             while not self._closed:
                 self._again.discard(agent_id)
+                if await _agent_is_waiting(agent_id):
+                    if agent_id in self._again:
+                        continue
+                    return
                 job_id = await _next_queued(agent_id)
                 if job_id is None:
                     if agent_id in self._again:
@@ -135,17 +146,24 @@ class Worker:
                     return
                 await self._slots.acquire()
                 try:
-                    await self._run(job_id)
+                    stuck = await self._run(job_id)
                 finally:
                     self._slots.release()
+                if stuck:
+                    logger.error("job stayed queued after its turn")
+                    return
 
-    async def _run(self, job_id: str) -> None:
+    async def _run(self, job_id: str) -> bool:
+        """Run one job. True means it is still queued and must not be retried in a loop."""
         runtime = await self._choose(await _agent_id_for_job(job_id))
         runner = TurnRunner(self.hub, runtime, watch=self._board)
         try:
             await runner.run(job_id)
-        except Exception:  # noqa: BLE001 — one failed turn must not stop the agent pump
+        except Exception as exc:  # noqa: BLE001 — one failed turn must not stop the agent pump
             logger.exception("turn failed")
+            await record_turn_failure(self.hub, exc, job_id=job_id)
+            return await _job_queued(job_id)
+        return False
 
     async def _choose(self, agent_id: str | None) -> Runtime:
         if self._override is not None:
@@ -186,6 +204,24 @@ def _log_task(task: asyncio.Task[None]) -> None:
     exc = task.exception()
     if exc is not None:
         logger.opt(exception=exc).error("worker pump failed")
+
+
+async def _agent_is_waiting(agent_id: str) -> bool:
+    """True while this agent has a turn paused for approval."""
+    async with open_session() as session:
+        found = await session.scalar(
+            select(TurnRow.id)
+            .where(TurnRow.agent_id == agent_id)
+            .where(TurnRow.status == "waiting")
+            .limit(1)
+        )
+    return found is not None
+
+
+async def _job_queued(job_id: str) -> bool:
+    async with open_session() as session:
+        status = await session.scalar(select(JobRow.status).where(JobRow.id == job_id))
+    return status == "queued"
 
 
 async def _next_queued(agent_id: str) -> str | None:

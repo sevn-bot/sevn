@@ -170,8 +170,10 @@ async def _lifespan(app: ASGIApp) -> AsyncGenerator[None]:
     worker: Worker | None = None
     try:
         state.hub = Hub(outbox, oplog)
-        await recover()
+        requeued = await recover()
         worker = bind(state.hub)
+        for agent_id in requeued:
+            worker.kick(agent_id)
         state.token = await asyncio.to_thread(_write_token, paths.run / "token")
         await asyncio.to_thread(
             _write_bind,

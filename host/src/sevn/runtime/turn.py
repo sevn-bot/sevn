@@ -16,7 +16,7 @@ from sevn.domain.session import open_session
 from sevn.log import logger
 from sevn.protocol.hub import Hub
 from sevn.runtime.base import Runtime, ToolDecision, TurnContext
-from sevn.runtime.errors import TurnError
+from sevn.runtime.errors import ModelError, TurnError
 from sevn.runtime.events import ApprovalCall, RuntimeEvent
 from sevn.store.db import utcnow
 from sevn.store.models import Agent as AgentRow
@@ -431,10 +431,12 @@ async def _mark_started(job_id: str) -> _Job:
 
 
 async def _previous_messages(agent_id: str) -> list[object] | None:
+    """History for a new turn. A waiting turn still ends on an open tool call."""
     async with open_session() as session:
         row = await session.scalar(
             select(TurnRow)
             .where(TurnRow.agent_id == agent_id)
+            .where(TurnRow.status == "done")
             .where(TurnRow.model_messages.is_not(None))
             .order_by(TurnRow.started_at.desc())
             .limit(1)
@@ -559,3 +561,204 @@ async def _set_agent(session: AsyncSession, agent_id: str, status: str, when: da
         return
     row.status = status
     row.last_activity_at = when
+
+
+_TERMINAL = frozenset({"done", "cancelled", "failed", "interrupted"})
+_FAILED = "This turn failed."
+
+
+async def record_turn_failure(
+    hub: Hub,
+    exc: BaseException,
+    *,
+    job_id: str | None = None,
+    turn_id: str | None = None,
+) -> None:
+    """Finish a turn that raised after it started, and show that to the client.
+
+    A turn already committed as ``done`` or still paused on an open approval
+    is left alone. Anything else becomes ``failed``, the job leaves the
+    queue, and the agent returns to ``idle``.
+    """
+    notice = _failure_notice(exc)
+    async with open_session() as session:
+        job, turn = await _failure_rows(session, job_id, turn_id)
+        if _leave_failure_alone(turn) or (
+            turn is not None
+            and turn.status == "waiting"
+            and await _has_waiting_pending(session, turn.id)
+        ):
+            return
+        now = utcnow()
+        events: list[Event] = []
+        if job is not None and job.status in {"queued", "started"}:
+            job.status = "failed"
+            job.finished_at = now
+            if job.agent_id is not None:
+                events.append(_job_event("job.done", job.id, job.agent_id, "failed"))
+        if turn is not None and turn.status in {"running", "waiting"}:
+            events.extend(await _fail_open_turn(session, turn, job, notice, now))
+        agent_id = turn.agent_id if turn is not None else None
+        if agent_id is None and job is not None:
+            agent_id = job.agent_id
+        if agent_id is not None:
+            failed_id = turn.id if turn is not None else None
+            status = await _sync_agent_status(session, agent_id, failed_id, now)
+            if status is not None:
+                events.append(_agent_event(agent_id, status))
+        for event in events:
+            session.add(event)
+        await session.commit()
+        for event in events:
+            try:
+                await hub.relay(event)
+            except Exception:  # noqa: BLE001 — the row is committed; delivery can fail alone
+                logger.exception("turn failure event was not delivered")
+
+
+def _failure_notice(exc: BaseException) -> str:
+    """Text safe to store. Provider errors can echo the prompt."""
+    if isinstance(exc, ModelError | TurnError) and exc.message != "":
+        return exc.message
+    return _FAILED
+
+
+def _leave_failure_alone(turn: TurnRow | None) -> bool:
+    return turn is not None and turn.status in _TERMINAL
+
+
+async def _failure_rows(
+    session: AsyncSession,
+    job_id: str | None,
+    turn_id: str | None,
+) -> tuple[JobRow | None, TurnRow | None]:
+    turn = await session.get(TurnRow, turn_id) if turn_id is not None else None
+    if job_id is None and turn is not None and len(turn.job_ids) > 0:
+        job_id = turn.job_ids[0]
+    job = await session.get(JobRow, job_id) if job_id is not None else None
+    if turn is None and job is not None and job.agent_id is not None and job_id is not None:
+        turn = await _open_turn_for_job(session, job.agent_id, job_id)
+    return job, turn
+
+
+async def _open_turn_for_job(session: AsyncSession, agent_id: str, job_id: str) -> TurnRow | None:
+    rows = await session.scalars(
+        select(TurnRow)
+        .where(TurnRow.agent_id == agent_id)
+        .where(TurnRow.status.in_(("running", "waiting")))
+    )
+    for row in rows:
+        if job_id in row.job_ids:
+            return row
+    return None
+
+
+async def _has_waiting_pending(session: AsyncSession, turn_id: str) -> bool:
+    found = await session.scalar(
+        select(PendingRow.id)
+        .where(PendingRow.turn_id == turn_id)
+        .where(PendingRow.status == "waiting")
+        .limit(1)
+    )
+    return found is not None
+
+
+async def _fail_open_turn(
+    session: AsyncSession,
+    turn: TurnRow,
+    job: JobRow | None,
+    notice: str,
+    now: datetime,
+) -> list[Event]:
+    turn.status = "failed"
+    turn.finished_at = now
+    turn.model_messages = None
+    events = await _resolve_open_pendings(session, turn, now)
+    if job is not None and not await _has_user_message(session, turn.id):
+        user = Message(
+            id=new_id("msg_"),
+            thread_id=turn.thread_id,
+            turn_id=turn.id,
+            agent_id=turn.agent_id,
+            role="user",
+            author="user",
+            parts=_text_parts(job.text),
+            created_at=turn.started_at,
+        )
+        session.add(user)
+        events.append(_message_event(user))
+    author = job.to_bot_id if job is not None else "system"
+    assistant = Message(
+        id=new_id("msg_"),
+        thread_id=turn.thread_id,
+        turn_id=turn.id,
+        agent_id=turn.agent_id,
+        role="assistant",
+        author=author,
+        parts=_text_parts(notice),
+        created_at=now,
+    )
+    session.add(assistant)
+    events.append(_message_event(assistant))
+    events.append(_turn_event("turn.finished", turn.id, turn.agent_id, "failed"))
+    return events
+
+
+async def _resolve_open_pendings(
+    session: AsyncSession,
+    turn: TurnRow,
+    now: datetime,
+) -> list[Event]:
+    rows = list(
+        await session.scalars(
+            select(PendingRow)
+            .where(PendingRow.turn_id == turn.id)
+            .where(PendingRow.status == "waiting")
+        )
+    )
+    events: list[Event] = []
+    answer: dict[str, object] = {"decision": "failed"}
+    for row in rows:
+        row.status = "resolved"
+        row.answer = answer
+        row.resolved_at = now
+        payload: dict[str, object] = {
+            "pending_id": row.id,
+            "turn_id": row.turn_id,
+            "agent_id": row.agent_id,
+            "status": "resolved",
+        }
+        events.append(
+            Event(type="pending.resolved", entity=row.id, payload=payload, created_at=now)
+        )
+    return events
+
+
+async def _sync_agent_status(
+    session: AsyncSession,
+    agent_id: str,
+    failed_turn_id: str | None,
+    now: datetime,
+) -> str | None:
+    """Match the agent to any turn still open. Return the status when it changes."""
+    await session.flush()
+    stmt = (
+        select(TurnRow.status)
+        .where(TurnRow.agent_id == agent_id)
+        .where(TurnRow.status.in_(("running", "waiting")))
+    )
+    if failed_turn_id is not None:
+        stmt = stmt.where(TurnRow.id != failed_turn_id)
+    open_status = set(await session.scalars(stmt))
+    if "running" in open_status:
+        desired = "running"
+    elif "waiting" in open_status:
+        desired = "waiting"
+    else:
+        desired = "idle"
+    agent = await session.get(AgentRow, agent_id)
+    if agent is None or agent.status == desired:
+        return None
+    agent.status = desired
+    agent.last_activity_at = now
+    return desired
