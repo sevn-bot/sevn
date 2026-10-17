@@ -1,0 +1,8 @@
+line-length = 100
+target-version = "py313"
+
+[lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC", "S", "BLE", "RUF"]
+
+[lint.per-file-ignores]
+"host/tests/**" = ["S101"]

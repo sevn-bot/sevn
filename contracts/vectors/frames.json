@@ -1,0 +1,79 @@
+{
+  "auth_device": {
+    "device_sig": "c2ln",
+    "t": "auth"
+  },
+  "auth_token": {
+    "t": "auth",
+    "token": "loopback-token"
+  },
+  "challenge": {
+    "host": "host_1",
+    "host_sig": "c2ln",
+    "nonce": "nonce-1",
+    "t": "challenge"
+  },
+  "evt": {
+    "d": {
+      "job": "job_1"
+    },
+    "k": "job.queued",
+    "s": 10432,
+    "t": "evt"
+  },
+  "hello": {
+    "caps": [
+      "files"
+    ],
+    "client": "web",
+    "device": "dev_1",
+    "last_seq": 10420,
+    "proto": [
+      1,
+      1
+    ],
+    "t": "hello"
+  },
+  "req": {
+    "id": "c7",
+    "m": "messages.send",
+    "p": {
+      "bot": "bot_1",
+      "op_id": "op_1",
+      "text": "hi"
+    },
+    "t": "req"
+  },
+  "res_error": {
+    "e": {
+      "code": "invalid_params",
+      "message": "bad"
+    },
+    "id": "c7",
+    "t": "res"
+  },
+  "res_ok": {
+    "id": "c7",
+    "r": {
+      "job": "job_1",
+      "seq": 10432
+    },
+    "t": "res"
+  },
+  "tick": {
+    "d": {
+      "text": "hi",
+      "turn": "turn_1"
+    },
+    "k": "turn.delta",
+    "t": "tick"
+  },
+  "welcome": {
+    "caps": [
+      "files"
+    ],
+    "host_seq": 10431,
+    "proto": 1,
+    "t": "welcome"
+  }
+}
