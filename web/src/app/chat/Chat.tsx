@@ -177,7 +177,13 @@ function ChatView({ botId }: { botId: string }) {
       </div>
       <div className="space-y-2">
         {pending.map((item) => (
-          <ApprovalCard key={item.id} pendingId={item.id} kind={item.kind} />
+          <ApprovalCard
+            key={item.id}
+            pendingId={item.id}
+            kind={item.kind}
+            name={item.name}
+            args={item.args}
+          />
         ))}
       </div>
       <label className="block text-sm">

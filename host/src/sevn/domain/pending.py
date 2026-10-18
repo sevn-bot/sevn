@@ -24,6 +24,8 @@ class PendingRecord(BaseModel):
     agent_id: str
     kind: str
     tool_call_id: str | None
+    name: str
+    args: dict[str, object]
     status: str
 
 
@@ -135,11 +137,27 @@ def _response_tool_call_ids(parts: object) -> set[str]:
 
 
 def _record(row: PendingRequest) -> PendingRecord:
+    name, args = _tool_view(row.payload)
     return PendingRecord(
         id=row.id,
         turn_id=row.turn_id,
         agent_id=row.agent_id,
         kind=row.kind,
         tool_call_id=row.tool_call_id,
+        name=name,
+        args=args,
         status=row.status,
     )
+
+
+def _tool_view(payload: object) -> tuple[str, dict[str, object]]:
+    """Tool name and arguments stored on the pending row."""
+    body = _object_dict(payload)
+    if body is None:
+        return "", {}
+    raw_name = body.get("name")
+    name = raw_name if isinstance(raw_name, str) else ""
+    args = _object_dict(body.get("args"))
+    if args is None:
+        return name, {}
+    return name, args

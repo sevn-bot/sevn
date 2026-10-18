@@ -1192,12 +1192,21 @@
           "title": "Agent Id",
           "type": "string"
         },
+        "args": {
+          "additionalProperties": true,
+          "title": "Args",
+          "type": "object"
+        },
         "id": {
           "title": "Id",
           "type": "string"
         },
         "kind": {
           "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
           "type": "string"
         },
         "status": {
@@ -1226,6 +1235,8 @@
         "agent_id",
         "kind",
         "tool_call_id",
+        "name",
+        "args",
         "status"
       ],
       "title": "PendingRecord",

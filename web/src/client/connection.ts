@@ -70,6 +70,8 @@ type PendingItem = {
   agent_id: string;
   kind: string;
   tool_call_id: string | null;
+  name: string;
+  args: Record<string, unknown>;
   status: string;
 };
 

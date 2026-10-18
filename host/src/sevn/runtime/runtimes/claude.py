@@ -39,6 +39,7 @@ from sevn.protocol.hub import Hub
 from sevn.runtime.base import PendingAnswer, SessionRef, TurnContext
 from sevn.runtime.errors import TurnError
 from sevn.runtime.events import RuntimeEvent
+from sevn.runtime.runtimes.pydantic_ai import build_instructions
 from sevn.store.db import utcnow
 from sevn.store.models import Agent as AgentRow
 from sevn.store.models import PendingRequest as PendingRow
@@ -84,20 +85,22 @@ class SdkClaudeClient:
         cwd: str | None = None,
         resume: str | None = None,
         can_use_tool: object = None,
-        **_options: object,
+        **options: object,
     ) -> None:
         if self._sdk is not None:
             await self.disconnect()
         self._tool_names = {}
         self._saw_session = False
-        options = ClaudeAgentOptions(
+        system_prompt = options.get("system_prompt")
+        sdk_options = ClaudeAgentOptions(
             cwd=cwd,
             resume=resume if isinstance(resume, str) and resume != "" else None,
             permission_mode="default",
             can_use_tool=_sdk_hook(can_use_tool),
             include_partial_messages=True,
+            system_prompt=system_prompt if isinstance(system_prompt, str) else None,
         )
-        self._sdk = ClaudeSDKClient(options)
+        self._sdk = ClaudeSDKClient(sdk_options)
         await self._sdk.connect()
 
     async def query(self, prompt: str, **options: object) -> None:
@@ -212,6 +215,7 @@ class ClaudeRuntime:
             cwd=bot.workspace_path,
             resume=agent.runtime_session_ref,
             can_use_tool=_can_use_tool,
+            system_prompt=build_instructions(bot),
         )
         return SessionRef(agent_id=agent.id, session_ref=agent.runtime_session_ref)
 
@@ -267,6 +271,8 @@ class ClaudeRuntime:
         turn_id = None if turn is None else turn.turn_id
         if turn_id is None or not await _turn_exists(turn_id):
             return "deny"
+        if _policy_allows(turn):
+            return "approve"
         if isinstance(request_id, str) and request_id != "":
             call_id = request_id
         else:
@@ -306,6 +312,14 @@ class ClaudeRuntime:
         if decision == "approve":
             return "approve"
         return "deny"
+
+
+def _policy_allows(turn: TurnContext | None) -> bool:
+    """``auto`` and ``allow_all`` approve a tool without waiting. ``ask`` does not."""
+    if turn is None or turn.bot is None:
+        return False
+    policy = turn.bot.approval_policy
+    return policy == "auto" or policy == "allow_all"
 
 
 def map_claude_event(native: Mapping[str, object]) -> RuntimeEvent:
