@@ -1,4 +1,4 @@
-"""Bot memory store, user-turn block, and capture hint (green after W4)."""
+"""Bot memory store, user-turn block, and capture hint."""
 
 from __future__ import annotations
 
@@ -9,11 +9,6 @@ import pytest
 from support.botcore import arm_configured, upgrade_home
 from support.canary import model_request_payloads, reset_model_requests
 from support.chat import connected, fetch_all, load_modules, mint_id, poll_rows
-
-pytestmark = pytest.mark.xfail(
-    reason="green after W4: bot memories",
-    strict=False,
-)
 
 
 async def _bot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
