@@ -14,6 +14,7 @@ from support.chat import (
     connected,
     error_body,
     fetch_all,
+    job_done_statuses,
     load_modules,
     mint_id,
     ok,
@@ -393,3 +394,45 @@ async def test_cancel_persisted_waiting_approval_releases_agent(
         payloads = model_request_payloads()
         blob = json.dumps(payloads[-1]["messages"])
         assert follow_up in blob
+
+
+async def test_cancel_persisted_waiting_emits_job_done(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Cancelling a stored waiting turn emits a durable job.done for that job."""
+    load_modules("sevn.api.bots", "sevn.api.messages", "sevn.api.pending")
+    async with connected(tmp_path, monkeypatch) as (host, client):
+        await _arm(host)
+        bot = await _bot(client)
+        sent, _earlier = await request(
+            client,
+            "messages.send",
+            {"bot_id": bot["id"], "text": "run it", "op_id": mint_id("op_")},
+        )
+        first = ok(sent)
+        await _wait_pending(tmp_path, client)
+        waiting = fetch_all(tmp_path, "SELECT id, status FROM turns")
+        assert len(waiting) == 1 and waiting[0]["status"] == "waiting"
+        turn_id = str(waiting[0]["id"])
+        job_id = str(first["job_id"])
+        frame, _earlier = await request(
+            client,
+            "turns.cancel",
+            {"turn_id": turn_id, "op_id": mint_id("op_")},
+        )
+        assert str(ok(frame)["status"]) == "cancelled"
+        await poll_rows(
+            tmp_path,
+            "SELECT status FROM turns WHERE id = ?",
+            (turn_id,),
+            lambda rows: bool(rows) and rows[0]["status"] == "cancelled",
+        )
+        stored = await host.outbox.since(0)
+        done = job_done_statuses(stored, job_id)
+        types = [str(getattr(row, "type", "")) for row in stored]
+        proof = (
+            f"job.done={types.count('job.done')} "
+            f"turn.finished={types.count('turn.finished')} "
+            f"{','.join(types)}"
+        )
+        assert done == ["cancelled"], proof

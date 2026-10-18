@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 
@@ -14,6 +15,7 @@ from support.chat import (
     fetch_all,
     insert_job,
     insert_turn,
+    job_done_statuses,
     load_modules,
     mint_id,
     ok,
@@ -246,6 +248,121 @@ async def test_turns_cancel_stops_turn(tmp_path: Path, monkeypatch: pytest.Monke
             )
     finally:
         pause.set()
+
+
+@asynccontextmanager
+async def _cancelled_running_turn(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, prompt: str):
+    """Cancel a pydantic_ai turn while its model call is still open.
+
+    ``PydanticAIRuntime.interrupt`` stays the real no-op. The pause is released
+    after ``turns.cancel`` returns, so the stream is allowed to finish.
+    """
+    from sevn.runtime.models import use_model
+    from sevn.runtime.worker import bind
+
+    pause = asyncio.Event()
+    use_model(function_model([{"kind": "text", "text": "partial"}], pause=pause))
+    load_modules("sevn.api.bots", "sevn.api.messages")
+    try:
+        async with connected(tmp_path, monkeypatch) as (host, client):
+            bind(host.hub)
+            bot = await _create_bot(client)
+            sent = await _send(client, bot["id"], prompt)
+            turns = await poll_rows(
+                tmp_path,
+                "SELECT id FROM turns",
+                (),
+                lambda rows: bool(rows),
+            )
+            turn_id = str(turns[0]["id"])
+            await _wait_running_partial(client, turn_id)
+            frame, _earlier = await request(
+                client,
+                "turns.cancel",
+                {"turn_id": turn_id, "op_id": mint_id("op_")},
+            )
+            ok(frame)
+            pause.set()
+            await poll_rows(
+                tmp_path,
+                "SELECT status FROM turns WHERE id = ?",
+                (turn_id,),
+                lambda rows: bool(rows) and rows[0]["status"] == "cancelled",
+            )
+            yield host, client, bot, str(sent["job_id"])
+    finally:
+        pause.set()
+        use_model(None)
+
+
+async def _wait_running_partial(client: object, turn_id: str) -> None:
+    deadline = asyncio.get_running_loop().time() + 2
+    last: dict[str, object] = {}
+    while asyncio.get_running_loop().time() < deadline:
+        frame, _earlier = await request(client, "turns.snapshot", {"turn_id": turn_id})
+        body = ok(frame)
+        last = body
+        text = str(body.get("text") or "")
+        if "partial" in text and str(body.get("status") or "") == "running":
+            return
+        await asyncio.sleep(0.02)
+    raise AssertionError(f"turn never streamed while running: {last}")
+
+
+def _user_prompt_texts(messages: object) -> list[str]:
+    assert isinstance(messages, list)
+    texts: list[str] = []
+    for message in messages:
+        if not isinstance(message, dict) or message.get("role") != "user":
+            continue
+        parts = message.get("parts")
+        if not isinstance(parts, list):
+            continue
+        for part in parts:
+            text = part.get("text") if isinstance(part, dict) else None
+            if isinstance(text, str):
+                texts.append(text)
+    return texts
+
+
+async def test_cancel_running_pydantic_turn_keeps_user_prompt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A running pydantic_ai cancel keeps the user prompt in messages.list.
+
+    The in-flight stream is not required to abort. ``interrupt`` is not patched.
+    """
+    prompt = "keep-this-prompt"
+    async with _cancelled_running_turn(tmp_path, monkeypatch, prompt) as (
+        _host,
+        client,
+        bot,
+        _job_id,
+    ):
+        listed, _earlier = await request(client, "messages.list", {"bot_id": bot["id"]})
+        messages = ok(listed)["messages"]
+        assert prompt in _user_prompt_texts(messages), messages
+
+
+async def test_cancel_running_pydantic_turn_emits_job_done(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Cancelling a running turn emits a durable job.done for that job."""
+    async with _cancelled_running_turn(tmp_path, monkeypatch, "cancel-this-turn") as (
+        host,
+        _client,
+        _bot,
+        job_id,
+    ):
+        stored = await host.outbox.since(0)
+        done = job_done_statuses(stored, job_id)
+        types = [str(getattr(row, "type", "")) for row in stored]
+        proof = (
+            f"job.done={types.count('job.done')} "
+            f"turn.finished={types.count('turn.finished')} "
+            f"{','.join(types)}"
+        )
+        assert done == ["cancelled"], proof
 
 
 _PROVIDER_CANARY = "provider-echo-CANARY-9f3a"

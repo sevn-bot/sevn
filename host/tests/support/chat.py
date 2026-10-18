@@ -237,3 +237,20 @@ async def poll_rows(
                 return last
         await asyncio.sleep(0.02)
     raise AssertionError(f"timed out waiting for {sql}: {list(map(dict, last))}")
+
+
+def job_done_statuses(stored: object, job_id: str) -> list[object]:
+    """Statuses of durable ``job.done`` rows whose entity or payload is ``job_id``."""
+    assert isinstance(stored, list)
+    done: list[object] = []
+    for row in stored:
+        if str(getattr(row, "type", "")) != "job.done":
+            continue
+        payload = getattr(row, "payload", None)
+        entity = getattr(row, "entity", None)
+        owned = entity == job_id or (isinstance(payload, dict) and payload.get("job_id") == job_id)
+        if not owned:
+            continue
+        status = payload.get("status") if isinstance(payload, dict) else None
+        done.append(status)
+    return done

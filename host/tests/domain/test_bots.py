@@ -66,6 +66,47 @@ async def test_create_bot_creates_workspace(
         _assert_workspace(body, bot_id)
 
 
+def _assert_model_invalid(frame: dict[str, object]) -> None:
+    error = error_body(frame)
+    assert error["code"] == "invalid_params"
+    data = error["data"]
+    assert isinstance(data, dict)
+    errors = data["errors"]
+    assert isinstance(errors, list)
+    assert errors[0]["loc"] == ["model"]
+
+
+async def test_create_rejects_empty_model(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """bots.create with model "" is invalid_params. Other ids stay selectable."""
+    load_modules("sevn.api.bots")
+    async with connected(tmp_path, monkeypatch) as (_host, client):
+        frame, _earlier = await request(
+            client,
+            "bots.create",
+            {"name": "alpha", "model": "", "op_id": mint_id("op_")},
+        )
+        _assert_model_invalid(frame)
+
+
+async def test_update_rejects_empty_model(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """bots.update with model "" is invalid_params. Other ids stay selectable."""
+    from sevn.config import Settings
+    from sevn.paths import Paths
+    from sevn.secrets.backends import open_backend
+
+    load_modules("sevn.api.bots")
+    async with connected(tmp_path, monkeypatch) as (_host, client):
+        open_backend(Settings.load(), Paths.from_env()).set("provider/anthropic", mint_id("key_"))
+        created = await _create(client, "alpha")
+        assert created["model"] != ""
+        frame, _earlier = await request(
+            client,
+            "bots.update",
+            {"bot_id": created["id"], "model": "", "op_id": mint_id("op_")},
+        )
+        _assert_model_invalid(frame)
+
+
 async def test_create_requires_name(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     load_modules("sevn.api.bots")
     async with connected(tmp_path, monkeypatch) as (_host, client):

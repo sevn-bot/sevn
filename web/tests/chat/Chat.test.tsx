@@ -22,7 +22,9 @@ test("streams ticks into the current assistant bubble", async () => {
       messages: [textMessage("msg_user", "hi")],
       next_cursor: null,
     },
-    "agents.list": { agents: [] },
+    "agents.list": {
+      agents: [{ id: "agent_1", title: "Nimbus", status: "running" }],
+    },
     "pending.list": { pending: [] },
   });
   const testing = await import("@testing-library/react");
@@ -201,7 +203,9 @@ test("shows newest-first pages oldest-first and prepends older pages", async () 
 
 test("keeps the latest line in view until the user scrolls up", async () => {
   const harness = await startHarness({
-    "agents.list": { agents: [] },
+    "agents.list": {
+      agents: [{ id: "agent_1", title: "Nimbus", status: "running" }],
+    },
     "pending.list": { pending: [] },
     "bots.get": { name: "Nimbus", model: "echo" },
     "messages.list": {
@@ -285,6 +289,40 @@ test("does not show or answer another bot's approval", async () => {
       otherBotVisible: false,
       answered: ["pend_own"],
     });
+  } finally {
+    testing.cleanup();
+    harness.stop();
+  }
+});
+
+test("does not show another bot's streaming tick", async () => {
+  const harness = await startHarness({
+    "messages.list": { messages: [], next_cursor: null },
+    "agents.list": {
+      agents: [{ id: "agent_nimbus", title: "Nimbus lane", status: "running" }],
+    },
+    "pending.list": { pending: [] },
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Chat = await loadChat();
+    testing.render(createElement(Chat, { botId }));
+    await testing.screen.findByText("Nimbus lane");
+    const log = await testing.screen.findByRole("log");
+    harness.tick("turn.delta", {
+      turn_id: "turn_other",
+      agent_id: "agent_other",
+      text: "other-bot-tick",
+    });
+    harness.tick("turn.delta", {
+      turn_id: "turn_own",
+      agent_id: "agent_nimbus",
+      text: "own-tick",
+    });
+    await testing.waitFor(() => {
+      expect(logTexts(log)).toContain("own-tick");
+    });
+    expect(logTexts(log)).toEqual(["own-tick"]);
   } finally {
     testing.cleanup();
     harness.stop();
