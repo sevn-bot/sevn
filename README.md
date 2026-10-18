@@ -15,6 +15,59 @@ Create a bot and send a message. The reply streams into the chat. `sevn secret l
 
 Pydantic AI approvals stay waiting across a host restart, and answering one resumes the turn. A Claude turn waiting on approval does not: Claude holds that answer in memory, so a restart marks the turn interrupted and you send the message again. Cancelling a turn is kept if the host stops before the model finishes, so that request is not sent again.
 
+## Bots and agents
+
+A bot has a runtime, a model, instructions, a workspace, an access level, an approval policy, and a network flag. Network stays off until you turn it on for that bot. Several agents of one bot can run at once, up to `bots.max_parallel_agents` (default 3). The host also caps running turns at `runtime.max_running_turns` (default 3). A new task past the bot cap waits, and the chat shows how many jobs are ahead.
+
+Each agent owns one thread. Statuses are `running`, `waiting`, `idle`, `done`, and `archived`. A finished turn with nothing pending becomes idle. Idle for 24 hours becomes done, and done for 7 days becomes archived. A follow-up sent to a done or archived agent continues the same thread. Each turn's instructions name up to ten other open agents of that bot, with title and status.
+
+Every agent gets its own `tasks/<agent_id>/` folder inside the bot workspace. The folder stays when the agent is archived. A write outside that folder takes an advisory lock for ten minutes, refreshed on each write. A second agent that writes the same path gets `path_locked`, with the holder's id and title. Locks are released when the turn finishes and when the agent is done. Writes inside the agent's own scratch folder are not locked.
+
+New agents start with isolation `shared`, so file tools and the shell use the bot workspace. When an agent's isolation is `worktree` and that workspace is a git repository, those tools use a git worktree at `.sevn/worktrees/<agent_id>` on branch `sevn/<agent_id>`. A workspace that is not a git repository stays on the scratch folder.
+
+## Routing
+
+Every incoming message is routed, and the choice is written to the decision log. Rules run first, and the first match wins: a reply to an agent's message, an explicit agent, a message that is `/new` or starts with `/new `, a `/continue` prefix that matches exactly one open title, or a user reply within ten minutes of the only pending question. Plugins can add earlier rules for a source.
+
+If no rule matches, the host asks jev (`decisions.jev_model`, default `jev-1.13.0`) one request covering the intent and the target agent. When an open agent is running, that request also asks whether to queue, steer, or interrupt. The text sent out is redacted. The jev key is the secret `provider/typesafe`, or the `TYPESAFE_API_KEY` environment variable. Intent must reach 0.70, the target 0.65, and the busy question 0.60 (`decisions.thresholds` in `$SEVN_HOME/config.toml`). A busy answer below its gate rejects the jev route. The accepted route follows the intent, and the busy label is stored on the decision log.
+
+Below a gate, or when jev has no key or does not answer, the host walks a fallback chain. A step whose own confidence is under 0.6 moves on:
+
+1. A Pydantic AI model, when a provider key is configured (`decisions.llm_model`, otherwise the cheapest configured model).
+2. Local Ollama, when `SEVN_OLLAMA_URL` answers `/api/chat` (`decisions.ollama_model`, default `llama3.2:3b`).
+3. When the bot runtime is Claude, one tool-less prompt in a throwaway session that is closed afterward. This call spends that runtime's subscription quota. `decisions.allow_cli_fallback` defaults to true and turns the step off when set to false.
+4. A deterministic default: one open agent is continued; none starts a new task; more than one asks you, with a chip for a new task and one chip per open title.
+
+`decisions.provider` defaults to `jev`. `rules` stops after the rules and does not call a model; with no rule match the route is a new task. `llm` skips jev and starts at the Pydantic AI step.
+
+The route then runs. A new request starts an agent. Chit-chat starts an agent with no tools and closes it after one reply. A follow-up queues on the target. Steer injects the text into a running Pydantic AI turn; other runtimes queue it. An answer fills the pending question. Cancel stops the agent.
+
+**Move to…** and **Start new** call `messages.reroute`. A job that has not started moves. A running turn is cancelled and the job is queued on the new agent. The decision log stores `corrected_to`, and the host emits `route.corrected`.
+
+## Memory
+
+A bot stores memories in two tiers, `pinned` and `recall`, and searches them with FTS5. The agent can save, search, forget, and pin. Pinned text shares one budget, `memory.pinned_budget` (default 4 KB). The bot settings list memories and can edit, pin, unpin, and delete them.
+
+The memory block is added to the user turn and labelled untrusted data. Later turns receive a diff of what changed. Writes from a turn are staged and committed only when that turn succeeds. A failed or cancelled turn keeps none of them. Writes for one bot are serialized. The bot cannot change a tier whose origin is the user (`memory_locked`).
+
+The host does not save a memory on its own. After a successful turn, a jev score of at least 0.8 that the user stated a durable fact or preference adds a one-line hint on that agent's next turn to consider `memory.save`.
+
+## Sandbox
+
+The bot access level defaults to `workspace`. Bot settings can switch the level and the network flag.
+
+`workspace` file tools resolve paths and refuse anything outside the bot workspace and the `Shared` directory next to the workspaces folder (`path_outside_workspace`). The shell runs under Seatbelt on macOS, using `host/src/sevn/sandbox/profiles/sevn-workspace.sb`, or under bubblewrap on Linux. The workspace and `Shared` are writable. The rest of the system is read-only. Reads and writes are denied for `.ssh`, `.aws`, `Library/Keychains`, and the CLI credential directories. Network follows the bot flag, which defaults to off. Other platforms do not run that confined command.
+
+`workspace` and `isolated` run the shell inside that confinement without an approval prompt. `full` runs the shell with no confinement. `approval.risk` scores each `full` command as `low`, `medium`, `high`, or `destructive`. With approval policy `auto`, a `low` command runs without asking and every other score waits. Policy `ask` waits on every `full` command. A bot policy of `allow_all` skips that wait and still uses the bot's access level. `rm -rf /`, `sudo`, a `curl` or `wget` pipe into a shell, and a redirect onto a dotfile are always `destructive`.
+
+`isolated` runs the command with `docker run --rm`, the workspace and `Shared` mounted, and the working directory set to the workspace. Network is off unless the bot flag is on. This level needs Docker.
+
+Host sandbox mode defaults to `enforced`. A missing mode file means enforced. An owner can switch it with `host.set_sandbox_mode` only after confirming with the phrase `I understand`. `allow_all` runs every bot as `full` and skips approvals, so shell commands are neither confined nor held for review. The host emits an audit event, and `system.info` reports `caps.allow_all` so clients keep a banner up. Setting the mode back to `enforced` restores each bot's own level. The default config leaves `allow_all` off.
+
+## Evals
+
+`decisions.evals_on` defaults to false. `sevn evals run decisions` then prints `evals disabled`, replays nothing, and exports no decision state. When `evals_on` is true, the same command replays the synthetic routing cases in `host/evals/decisions/` and writes a local JSON report. A missing `judge-jev` binary skips the judge. The cases are synthetic messages.
+
 ## Development
 
 Install the toolchain, then start the host and the Vite dev server:
