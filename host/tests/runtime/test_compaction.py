@@ -1,14 +1,8 @@
-"""Compaction keeps the last six messages and capability pairs (green after W7)."""
+"""Compaction keeps the last six messages and capability pairs."""
 
 from __future__ import annotations
 
-import pytest
 from fakes.models import function_model
-
-pytestmark = pytest.mark.xfail(
-    reason="green after W7: compaction",
-    strict=False,
-)
 
 
 def _messages() -> list[object]:

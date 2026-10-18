@@ -1,4 +1,4 @@
-"""Decision evals stay off unless evals_on is set (green after W7)."""
+"""Decision evals stay off unless evals_on is set."""
 
 from __future__ import annotations
 
@@ -11,11 +11,6 @@ import pytest
 from fakes.fake_jev import FakeJev
 from support.botcore import arm_configured, secrets_toml
 from support.repo import repo_root
-
-pytestmark = pytest.mark.xfail(
-    reason="green after W7: decision evals",
-    strict=False,
-)
 
 _REPORT_DAY = "2026-10-18"
 _INTENTS = ("new_request", "follow_up", "steer", "answer", "chit_chat")

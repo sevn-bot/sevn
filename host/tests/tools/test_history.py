@@ -1,4 +1,4 @@
-"""History search and cursor reads survive compaction (green after W7)."""
+"""History search and cursor reads survive compaction."""
 
 from __future__ import annotations
 
@@ -9,11 +9,6 @@ from pathlib import Path
 import pytest
 from support.botcore import arm_configured, upgrade_home
 from support.chat import fetch_all, insert_turn, mint_id
-
-pytestmark = pytest.mark.xfail(
-    reason="green after W7: history tools",
-    strict=False,
-)
 
 
 async def _thread(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[object, object, str]:
