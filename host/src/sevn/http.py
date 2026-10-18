@@ -15,11 +15,17 @@ from typing import cast
 
 from fastapi import FastAPI
 from starlette.datastructures import Headers
+from starlette.exceptions import HTTPException
 from starlette.responses import PlainTextResponse, RedirectResponse, Response
 from starlette.staticfiles import StaticFiles
 from starlette.types import ASGIApp, Receive, Scope, Send
 from starlette.websockets import WebSocket
 
+import sevn.api.agents as agent_api
+import sevn.api.bots as bot_api
+import sevn.api.messages as message_api
+import sevn.api.models as model_api
+import sevn.api.pending as pending_api
 import sevn.system as system
 from sevn import __version__
 from sevn.config import Settings
@@ -27,14 +33,34 @@ from sevn.log import logger
 from sevn.paths import Paths
 from sevn.protocol.hub import Hub
 from sevn.protocol.session import Session
+from sevn.runtime.recovery import recover
+from sevn.runtime.worker import Worker, bind
 from sevn.secrets.registry import register
 from sevn.store.db import upgrade
 from sevn.store.oplog import OpLog
 from sevn.store.outbox import Outbox
 from sevn.transports.ws import WsConnection
 
-# Importing sevn.system registers system.info, system.ping, and sync.since.
-_REGISTERED = (system.system_info, system.system_ping, system.sync_since)
+# Importing these modules registers their protocol methods.
+_REGISTERED = (
+    system.system_info,
+    system.system_ping,
+    system.sync_since,
+    bot_api.bots_create,
+    bot_api.bots_list,
+    bot_api.bots_get,
+    bot_api.bots_update,
+    bot_api.bots_delete,
+    agent_api.agents_list,
+    agent_api.agents_get,
+    model_api.models_list,
+    message_api.messages_send,
+    message_api.messages_list,
+    message_api.turns_snapshot,
+    message_api.turns_cancel,
+    pending_api.pending_list,
+    pending_api.pending_answer,
+)
 
 CSP = (
     "default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'"
@@ -141,8 +167,19 @@ async def _lifespan(app: ASGIApp) -> AsyncGenerator[None]:
     state.outbox = outbox
     state.oplog = oplog
     browser: asyncio.Task[None] | None = None
+    worker: Worker | None = None
+    resumes: list[asyncio.Task[None]] = []
     try:
         state.hub = Hub(outbox, oplog)
+        recovered = await recover()
+        worker = bind(state.hub)
+        for item in recovered.resume:
+            logger.info("resuming answered turn {turn_id}", turn_id=item.turn_id)
+            resumes.append(
+                asyncio.create_task(worker.resume(item.agent_id, item.turn_id, item.decisions))
+            )
+        for agent_id in recovered.kick:
+            worker.kick(agent_id)
         state.token = await asyncio.to_thread(_write_token, paths.run / "token")
         await asyncio.to_thread(
             _write_bind,
@@ -155,10 +192,18 @@ async def _lifespan(app: ASGIApp) -> AsyncGenerator[None]:
             browser = asyncio.create_task(_open_browser(state))
         yield
     finally:
+        for task in resumes:
+            if not task.done():
+                task.cancel()
+        for task in resumes:
+            with suppress(asyncio.CancelledError, Exception):
+                await task
         if browser is not None:
             browser.cancel()
             with suppress(asyncio.CancelledError):
                 await browser
+        if worker is not None:
+            await worker.aclose()
         await outbox.aclose()
         await oplog.aclose()
 
@@ -198,9 +243,23 @@ class _Spa(StaticFiles):
         super().__init__(directory=directory, html=True)
 
     async def get_response(self, path: str, scope: Scope) -> Response:
-        response = await super().get_response(path, scope)
+        try:
+            response = await super().get_response(path, scope)
+        except HTTPException as exc:
+            # A missing file raises. It is not a response whose status is 404.
+            if exc.status_code != 404 or not _client_route(path):
+                raise
+            response = await super().get_response("index.html", scope)
+        if response.status_code == 404 and _client_route(path):
+            response = await super().get_response("index.html", scope)
         response.headers["Content-Security-Policy"] = CSP
         return response
+
+
+def _client_route(path: str) -> bool:
+    """App paths such as ``bots/<id>`` fall back to the SPA. Asset files do not."""
+    name = path.rsplit("/", 1)[-1]
+    return "." not in name
 
 
 def refusal(headers: Headers, port: int, *, server: object = None) -> str | None:

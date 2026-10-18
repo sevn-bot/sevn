@@ -21,6 +21,7 @@ from sevn.secrets.registry import register
 
 _locks_guard = threading.Lock()
 _locks: dict[str, threading.Lock] = {}
+_KEYCHAIN_INDEX = "sevn.names"
 
 
 def _path_lock(path: Path) -> threading.Lock:
@@ -74,6 +75,11 @@ class KeychainBackend:
     def set(self, name: str, value: str) -> None:
         keyring.set_password(self._service, name, value)
         register(name, value)
+        if name == _KEYCHAIN_INDEX:
+            return
+        found = [item for item in self.names() if item != name]
+        found.append(name)
+        self._store_names(sorted(found))
 
     def get(self, name: str) -> str:
         value = keyring.get_password(self._service, name)
@@ -87,6 +93,24 @@ class KeychainBackend:
             keyring.delete_password(self._service, name)
         except keyring.errors.PasswordDeleteError as exc:
             raise SecretNotFound(name) from exc
+        if name == _KEYCHAIN_INDEX:
+            return
+        self._store_names([item for item in self.names() if item != name])
+
+    def names(self) -> list[str]:
+        raw = keyring.get_password(self._service, _KEYCHAIN_INDEX)
+        if raw is None or raw == "":
+            return []
+        return _decode_names(raw)
+
+    def _store_names(self, names: list[str]) -> None:
+        if not names:
+            try:
+                keyring.delete_password(self._service, _KEYCHAIN_INDEX)
+            except keyring.errors.PasswordDeleteError:
+                return
+            return
+        keyring.set_password(self._service, _KEYCHAIN_INDEX, json.dumps(names))
 
 
 class EnvBackend:
@@ -102,6 +126,10 @@ class EnvBackend:
 
     def delete(self, name: str) -> None:
         raise SecretBackendReadOnly(name)
+
+    def names(self) -> list[str]:
+        prefix = "SEVN_SECRET_"
+        return sorted(key.removeprefix(prefix) for key in os.environ if key.startswith(prefix))
 
 
 class AgeFileBackend:
@@ -134,6 +162,10 @@ class AgeFileBackend:
             del data[name]
             self._write(data)
 
+    def names(self) -> list[str]:
+        with _path_lock(self._secrets_file):
+            return sorted(self._read())
+
     def _identity(self) -> tuple[str, str]:
         path = self._identity_file
         if path.is_file():
@@ -162,6 +194,20 @@ def _object_dict(value: object) -> dict[object, object] | None:
     if not isinstance(value, dict):
         return None
     return cast(dict[object, object], value)
+
+
+def _decode_names(raw: str) -> list[str]:
+    try:
+        parsed: object = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(parsed, list):
+        return []
+    names: list[str] = []
+    for item in cast("list[object]", parsed):
+        if isinstance(item, str) and item != "":
+            names.append(item)
+    return names
 
 
 def _parse_secret_map(plaintext: bytes) -> dict[str, str]:

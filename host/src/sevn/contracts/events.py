@@ -6,6 +6,8 @@ from dataclasses import dataclass
 
 _DURABLE = (
     "bot.updated",
+    "bot.deleted",
+    "agent.updated",
     "job.queued",
     "job.started",
     "job.done",

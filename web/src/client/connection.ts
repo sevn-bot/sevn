@@ -6,10 +6,132 @@ const MAX_BACKOFF_MS = 10_000;
 
 export type MethodName = keyof typeof methods;
 
+type RuntimeName = "pydantic_ai" | "claude";
+type AccessName = "workspace" | "full" | "isolated";
+type ApprovalPolicy = "ask" | "auto" | "allow_all";
+type AgentStatus = "running" | "waiting" | "idle" | "done" | "archived";
+
+type Bot = {
+  id: string;
+  name: string;
+  title: string;
+  scope: string;
+  instructions: string;
+  avatar: string;
+  runtime: RuntimeName;
+  model: string;
+  effort: string | null;
+  access: AccessName;
+  approval_policy: ApprovalPolicy;
+  workspace_path: string;
+  folder_id: string | null;
+  paused: boolean;
+  can_create_bots: boolean;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type ModelInfo = {
+  id: string;
+  provider: string;
+  name: string;
+};
+
+type Agent = {
+  id: string;
+  bot_id: string;
+  thread_id: string;
+  title: string;
+  summary: string;
+  status: AgentStatus;
+  runtime: RuntimeName;
+  runtime_session_ref: string | null;
+  origin_job_id: string | null;
+  isolation: string;
+  created_at: string;
+  last_activity_at: string;
+};
+
+type ChatMessage = {
+  id: string;
+  thread_id: string;
+  turn_id: string;
+  agent_id: string;
+  role: string;
+  author: string;
+  parts: Record<string, string>[];
+  created_at: string;
+};
+
+type PendingItem = {
+  id: string;
+  turn_id: string;
+  agent_id: string;
+  kind: string;
+  tool_call_id: string | null;
+  name: string;
+  args: Record<string, unknown>;
+  status: string;
+};
+
 export type MethodParams = {
   "system.info": Record<string, never>;
   "system.ping": { note: string; op_id?: string };
   "sync.since": { seq: number };
+  "bots.create": {
+    name: string;
+    title?: string;
+    scope?: string;
+    instructions?: string;
+    avatar?: string;
+    runtime?: RuntimeName;
+    model?: string;
+    effort?: string;
+    access?: AccessName;
+    approval_policy?: ApprovalPolicy;
+    folder_id?: string;
+    op_id?: string;
+  };
+  "bots.list": Record<string, never>;
+  "bots.get": { bot_id: string };
+  "bots.update": {
+    bot_id: string;
+    name?: string;
+    title?: string;
+    scope?: string;
+    instructions?: string;
+    avatar?: string;
+    runtime?: RuntimeName;
+    model?: string;
+    effort?: string;
+    access?: AccessName;
+    approval_policy?: ApprovalPolicy;
+    folder_id?: string;
+    paused?: boolean;
+    can_create_bots?: boolean;
+    op_id?: string;
+  };
+  "bots.delete": { bot_id: string; purge?: boolean; op_id?: string };
+  "agents.list": { bot_id: string };
+  "agents.get": { agent_id: string };
+  "models.list": Record<string, never>;
+  "messages.send": {
+    bot_id: string;
+    text: string;
+    agent_id?: string;
+    new_agent?: boolean;
+    op_id?: string;
+  };
+  "messages.list": { bot_id: string; cursor?: string };
+  "pending.list": Record<string, never>;
+  "pending.answer": {
+    pending_id: string;
+    answer: "approve" | "deny";
+    op_id?: string;
+  };
+  "turns.snapshot": { turn_id: string };
+  "turns.cancel": { turn_id: string; op_id?: string };
 };
 
 export type MethodResult = {
@@ -22,6 +144,20 @@ export type MethodResult = {
   };
   "system.ping": { seq: number };
   "sync.since": { host_seq: number };
+  "bots.create": Bot;
+  "bots.list": { bots: Bot[] };
+  "bots.get": Bot;
+  "bots.update": Bot;
+  "bots.delete": { id: string };
+  "agents.list": { agents: Agent[] };
+  "agents.get": Agent;
+  "models.list": { models: ModelInfo[] };
+  "messages.send": { job_id: string; agent_id: string };
+  "messages.list": { messages: ChatMessage[]; next_cursor: string | null };
+  "pending.list": { pending: PendingItem[] };
+  "pending.answer": { id: string; status: string };
+  "turns.snapshot": { text: string; status: string };
+  "turns.cancel": { turn_id: string; status: string };
 };
 
 export type Status = "connecting" | "connected" | "reconnecting";
@@ -38,7 +174,12 @@ export type Connection = {
     params: MethodParams[M],
   ) => Promise<MethodResult[M]>;
   onEvent: (handler: (event: ProtocolEvent) => void) => void;
+  offEvent: (handler: (event: ProtocolEvent) => void) => void;
   onTick: (
+    kind: string,
+    handler: (data: Record<string, unknown>) => void,
+  ) => void;
+  offTick: (
     kind: string,
     handler: (data: Record<string, unknown>) => void,
   ) => void;
@@ -57,7 +198,47 @@ type Pending = {
   reject: (error: unknown) => void;
 };
 
+type TickHandler = (data: Record<string, unknown>) => void;
+type EventHandler = (event: ProtocolEvent) => void;
+
+const tickListeners: Array<{ kind: string; handler: TickHandler }> = [];
+const eventListeners: EventHandler[] = [];
+
 let active: Connection | null = null;
+
+export function onTick(kind: string, handler: TickHandler): () => void {
+  const entry = { kind, handler };
+  tickListeners.push(entry);
+  active?.onTick(kind, handler);
+  return () => {
+    const index = tickListeners.indexOf(entry);
+    if (index >= 0) {
+      tickListeners.splice(index, 1);
+    }
+    active?.offTick(kind, handler);
+  };
+}
+
+export function onEvent(handler: EventHandler): () => void {
+  eventListeners.push(handler);
+  active?.onEvent(handler);
+  return () => {
+    const index = eventListeners.indexOf(handler);
+    if (index >= 0) {
+      eventListeners.splice(index, 1);
+    }
+    active?.offEvent(handler);
+  };
+}
+
+function attachListeners(connection: Connection): void {
+  for (const entry of tickListeners) {
+    connection.onTick(entry.kind, entry.handler);
+  }
+  for (const handler of eventListeners) {
+    connection.onEvent(handler);
+  }
+}
 
 export function call<M extends MethodName>(
   method: M,
@@ -105,10 +286,28 @@ export function connect(options: ConnectOptions): Promise<Connection> {
     onEvent(handler) {
       eventHandlers.push(handler);
     },
+    offEvent(handler) {
+      const index = eventHandlers.indexOf(handler);
+      if (index >= 0) {
+        eventHandlers.splice(index, 1);
+      }
+    },
     onTick(kind, handler) {
       const list = tickHandlers.get(kind) ?? [];
       list.push(handler);
       tickHandlers.set(kind, list);
+    },
+    offTick(kind, handler) {
+      const list = tickHandlers.get(kind);
+      if (list === undefined) {
+        return;
+      }
+      const next = list.filter((item) => item !== handler);
+      if (next.length === 0) {
+        tickHandlers.delete(kind);
+        return;
+      }
+      tickHandlers.set(kind, next);
     },
     onStatus(handler) {
       statusHandlers.push(handler);
@@ -137,6 +336,7 @@ export function connect(options: ConnectOptions): Promise<Connection> {
   };
 
   active = connection;
+  attachListeners(connection);
   openSocket();
   return ready;
 

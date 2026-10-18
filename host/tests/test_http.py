@@ -25,3 +25,12 @@ def test_spa_served_with_csp(host_app: tuple[object, str, object], tmp_path: Pat
     assert response.text == INDEX_HTML
     assert (tmp_path / "webdist" / "index.html").read_text(encoding="utf-8") == INDEX_HTML
     assert response.headers["content-security-policy"] == CSP
+
+
+def test_direct_bot_route_returns_spa_document(host_app: tuple[object, str, object]) -> None:
+    """A direct GET of /bots/{id} returns the SPA document."""
+    _app, _token, client = host_app
+    response = client.get("/bots/bot_01h455vb4pex5vsknk084sn02q")  # type: ignore[attr-defined]
+    assert response.status_code == 200, response.text
+    assert response.text == INDEX_HTML
+    assert response.headers["content-security-policy"] == CSP

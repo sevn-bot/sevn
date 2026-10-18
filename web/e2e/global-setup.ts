@@ -77,6 +77,9 @@ export default async function globalSetup(): Promise<void> {
         SEVN_HOME: home,
         SEVN_WEB_DIST: dist,
         SEVN_SECRETS__BACKEND: "age-file",
+        SEVN_DEV: "1",
+        SEVN_TEST_MODEL: "echo",
+        SEVN_WORKSPACES: path.join(home, "workspaces"),
       },
     },
   );
