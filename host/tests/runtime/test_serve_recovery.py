@@ -370,3 +370,196 @@ async def test_serve_resumes_answered_turn_and_keeps_open_approval_waiting(
         assert done[0]["status"] == "done"
     finally:
         use_model(None)
+
+
+_SECOND_DONE = "second-round-done"
+_TURN_FAILED = "This turn failed."
+
+
+def _second_round_model() -> object:
+    """Shell ``call_a``, then shell ``call_b``, then ``second-round-done``."""
+    from fakes.models import function_model
+
+    call_a: dict[str, object] = {
+        "kind": "tool",
+        "name": "shell",
+        "args": {"command": "echo a"},
+        "tool_call_id": "call_a",
+    }
+    call_b: dict[str, object] = {
+        "kind": "tool",
+        "name": "shell",
+        "args": {"command": "echo b"},
+        "tool_call_id": "call_b",
+    }
+    finished: dict[str, object] = {"kind": "text", "text": _SECOND_DONE}
+    return function_model([[call_a], [call_b], [finished]])
+
+
+async def _approve(client: object, pending_id: str) -> None:
+    frame, _earlier = await request(
+        client,
+        "pending.answer",
+        {"pending_id": pending_id, "answer": "approve", "op_id": mint_id("op_")},
+        timeout_s=5,
+    )
+    ok(frame)
+
+
+async def _waiting_pending_id(home: Path, tool_call_id: str) -> str:
+    rows = await poll_rows(
+        home,
+        "SELECT id, tool_call_id FROM pending_requests WHERE status = 'waiting'",
+        (),
+        lambda found: any(row["tool_call_id"] == tool_call_id for row in found),
+        timeout_s=5,
+    )
+    chosen = next(row for row in rows if row["tool_call_id"] == tool_call_id)
+    return str(chosen["id"])
+
+
+def _stored_assistant_texts(home: Path) -> list[str]:
+    saved = fetch_all(home, "SELECT parts FROM messages WHERE role = 'assistant'")
+    return [_part_text(row["parts"]) for row in saved]
+
+
+async def _send_shell_turn(home: Path, client: object) -> str:
+    frame, _earlier = await request(
+        client,
+        "bots.create",
+        {"name": "Nimbus", "op_id": mint_id("op_")},
+    )
+    bot = ok(frame)
+    await request(
+        client,
+        "messages.send",
+        {"bot_id": bot["id"], "text": "run it", "op_id": mint_id("op_")},
+    )
+    await _waiting_pending_id(home, "call_a")
+    turns = fetch_all(home, "SELECT id, status FROM turns")
+    assert len(turns) == 1
+    assert str(turns[0]["status"]) == "waiting"
+    return str(turns[0]["id"])
+
+
+def _assert_call_b_waiting(home: Path, turn_id: str) -> str:
+    """``call_a`` is saved and ``call_b`` is the open approval on the same turn."""
+    rows = fetch_all(
+        home,
+        "SELECT id, tool_call_id, status, turn_id FROM pending_requests",
+    )
+    by_call: dict[str, object] = {}
+    pending_ids: dict[str, str] = {}
+    for row in rows:
+        call_id = row["tool_call_id"]
+        if not isinstance(call_id, str):
+            continue
+        by_call[call_id] = (str(row["status"]), str(row["turn_id"]))
+        pending_ids[call_id] = str(row["id"])
+    assert by_call == {
+        "call_a": ("resolved", turn_id),
+        "call_b": ("waiting", turn_id),
+    }
+    turns = fetch_all(home, "SELECT id, status FROM turns")
+    assert [(str(row["id"]), str(row["status"])) for row in turns] == [(turn_id, "waiting")]
+    jobs = fetch_all(home, "SELECT status FROM jobs")
+    assert [str(row["status"]) for row in jobs] == ["started"]
+    assert _TURN_FAILED not in _stored_assistant_texts(home)
+    return pending_ids["call_b"]
+
+
+async def _expect_second_round_done(home: Path, turn_id: str) -> None:
+    turns = await poll_rows(
+        home,
+        "SELECT id, status FROM turns WHERE id = ?",
+        (turn_id,),
+        lambda rows: bool(rows) and str(rows[0]["status"]) in {"done", "failed"},
+        timeout_s=5,
+    )
+    jobs = fetch_all(home, "SELECT status FROM jobs")
+    texts = _stored_assistant_texts(home)
+    observed = {
+        "turn": str(turns[0]["status"]),
+        "job": [str(row["status"]) for row in jobs],
+        "assistant": texts,
+    }
+    assert str(turns[0]["id"]) == turn_id
+    assert observed["turn"] == "done", observed
+    assert observed["job"] == ["done"], observed
+    assert all(_TURN_FAILED not in text for text in texts), observed
+    assert any(text == _SECOND_DONE for text in texts), observed
+
+
+async def test_pending_answer_finishes_second_tool_call_on_same_turn(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Approving shell call_b after call_a finishes that same turn.
+
+    The process stays up. ``pending.answer`` on call_b leaves the turn
+    ``done``, the job not ``failed``, and the assistant text
+    ``second-round-done``. The stored chat does not contain
+    ``This turn failed.``
+    """
+    from sevn.runtime.models import use_model
+    from sevn.runtime.worker import bind
+
+    load_modules("sevn.api.bots", "sevn.api.messages", "sevn.api.pending")
+    use_model(_second_round_model())
+    try:
+        async with connected(tmp_path, monkeypatch) as (host, client):
+            bind(host.hub)
+            turn_id = await _send_shell_turn(tmp_path, client)
+            await _approve(client, await _waiting_pending_id(tmp_path, "call_a"))
+            await _waiting_pending_id(tmp_path, "call_b")
+            call_b = _assert_call_b_waiting(tmp_path, turn_id)
+            await _approve(client, call_b)
+            await _expect_second_round_done(tmp_path, turn_id)
+    finally:
+        use_model(None)
+
+
+async def test_serve_resumes_second_saved_tool_call_on_same_turn(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Startup resumes a second saved approval on the turn that approved call_a.
+
+    call_b is already resolved and the worker is gone. The serve lifespan
+    finishes that same turn ``done`` with assistant text ``second-round-done``.
+    The job is not ``failed``, and ``This turn failed.`` is not stored.
+    """
+    from sevn.domain.pending import PendingService
+    from sevn.runtime.models import use_model
+    from sevn.runtime.worker import bind
+
+    load_modules("sevn.api.bots", "sevn.api.messages", "sevn.api.pending")
+    use_model(_second_round_model())
+    try:
+        async with connected(tmp_path, monkeypatch) as (host, client):
+            bind(host.hub)
+            turn_id = await _send_shell_turn(tmp_path, client)
+            await _approve(client, await _waiting_pending_id(tmp_path, "call_a"))
+            await _waiting_pending_id(tmp_path, "call_b")
+            call_b = _assert_call_b_waiting(tmp_path, turn_id)
+            worker = bind(host.hub)
+            await worker.aclose()
+            await host.outbox.aclose()
+            await host.hub.oplog.aclose()
+        still = fetch_all(tmp_path, "SELECT status FROM turns WHERE id = ?", (turn_id,))
+        assert str(still[0]["status"]) == "waiting"
+        await PendingService().resolve(call_b, "approve")
+        saved = fetch_all(
+            tmp_path,
+            "SELECT tool_call_id, status FROM pending_requests ORDER BY tool_call_id",
+        )
+        assert [(str(row["tool_call_id"]), str(row["status"])) for row in saved] == [
+            ("call_a", "resolved"),
+            ("call_b", "resolved"),
+        ]
+        waiting = fetch_all(tmp_path, "SELECT status FROM turns WHERE id = ?", (turn_id,))
+        assert str(waiting[0]["status"]) == "waiting"
+        jobs = fetch_all(tmp_path, "SELECT status FROM jobs")
+        assert [str(row["status"]) for row in jobs] == ["started"]
+        async with _serve_lifespan():
+            await _expect_second_round_done(tmp_path, turn_id)
+    finally:
+        use_model(None)
