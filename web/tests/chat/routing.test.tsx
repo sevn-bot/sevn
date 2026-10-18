@@ -1,9 +1,7 @@
 import { createElement } from "react";
-import { expect } from "vitest";
-import { red } from "../support/red.ts";
+import { expect, test } from "vitest";
 import { loadChat, requestParams, startHarness } from "./host.ts";
 
-const test = red("W8");
 const botId = "bot_nimbus";
 
 const agents = {

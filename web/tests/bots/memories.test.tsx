@@ -1,13 +1,11 @@
 import { createElement } from "react";
-import { expect } from "vitest";
+import { expect, test } from "vitest";
 import {
   loadMemoriesPanel,
   requestParams,
   startHarness,
 } from "../chat/host.ts";
-import { red } from "../support/red.ts";
 
-const test = red("W8");
 const botId = "bot_nimbus";
 
 const listed = {
