@@ -42,6 +42,7 @@ from sevn.domain.bots import BotRecord
 from sevn.log import logger
 from sevn.memory import MemoryContext
 from sevn.runtime.base import PendingAnswer, SessionRef, ToolDecision, TurnContext
+from sevn.runtime.compaction import Compaction
 from sevn.runtime.errors import TurnError
 from sevn.runtime.events import ApprovalCall, RuntimeEvent
 from sevn.runtime.models import resolve_model
@@ -96,6 +97,7 @@ class PydanticAIRuntime:
                     agent_id=turn.agent.id,
                     prior=bool(turn.message_history),
                 ),
+                Compaction(),
             ],
             tools=[]
             if turn.ephemeral
