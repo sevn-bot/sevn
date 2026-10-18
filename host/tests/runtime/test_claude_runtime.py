@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
@@ -297,6 +298,52 @@ class _AbortOnInterrupt(FakeClaudeClient):
         }
 
 
+class _PermissionAbort(FakeClaudeClient):
+    """Open one tool permission, then end the turn when ``interrupt`` runs.
+
+    The permission callback runs beside ``receive_response``, as the SDK does:
+    interrupt cancels that wait, and the turn then yields an aborted result.
+    A later ``receive_response`` finishes immediately so a resume cannot hang.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._release = asyncio.Event()
+        self._permission_task: asyncio.Task[object] | None = None
+        self._calls = 0
+
+    async def interrupt(self) -> None:
+        await super().interrupt()
+        permission = self._permission_task
+        if permission is not None and not permission.done():
+            permission.cancel()
+        self._release.set()
+
+    async def receive_response(self) -> AsyncIterator[dict[str, object]]:
+        self._calls += 1
+        if self._calls > 1:
+            yield {"type": "result", "usage": {}}
+            return
+        callback = self._can_use_tool
+        if not callable(callback):
+            raise RuntimeError("claude runtime did not pass can_use_tool")
+
+        async def _ask() -> object:
+            outcome: object = callback("Bash", {"command": "ls"}, "req_1")
+            if inspect.isawaitable(outcome):
+                return await outcome
+            return outcome
+
+        self._permission_task = asyncio.create_task(_ask())
+        self.permission_started.set()
+        await self._release.wait()
+        yield {
+            "type": "result",
+            "terminal_reason": "aborted_tools",
+            "usage": {},
+        }
+
+
 def _assistant_text(body: dict[str, Any]) -> str:
     messages = body["messages"]
     assert isinstance(messages, list)
@@ -393,6 +440,103 @@ async def test_cancelled_claude_abort_ends_cancelled(
                     status,
                     assistant,
                 )
+            finally:
+                await worker.aclose()
+    finally:
+        use_client(None)
+
+
+async def test_cancelled_claude_turn_closes_open_permission(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """turns.cancel closes a waiting Claude permission and does not run the prompt again."""
+    from sevn.runtime.runtimes.claude import use_client
+    from sevn.runtime.worker import bind
+
+    prompt = "stop this"
+    fake = _PermissionAbort()
+    use_client(fake)
+    load_modules("sevn.api.bots", "sevn.api.messages", "sevn.api.pending")
+    try:
+        async with connected(tmp_path, monkeypatch) as (host, client):
+            worker = bind(host.hub)
+            try:
+                created = ok(
+                    (
+                        await request(
+                            client,
+                            "bots.create",
+                            {
+                                "name": "Claude",
+                                "runtime": "claude",
+                                "op_id": mint_id("op_"),
+                            },
+                        )
+                    )[0]
+                )
+                await request(
+                    client,
+                    "messages.send",
+                    {
+                        "bot_id": created["id"],
+                        "text": prompt,
+                        "op_id": mint_id("op_"),
+                    },
+                )
+                waiting = await poll_rows(
+                    tmp_path,
+                    "SELECT id, status FROM pending_requests",
+                    (),
+                    lambda rows: bool(rows) and rows[0]["status"] == "waiting",
+                )
+                turns = await poll_rows(
+                    tmp_path,
+                    "SELECT id FROM turns",
+                    (),
+                    lambda rows: bool(rows),
+                )
+                turn_id = str(turns[0]["id"])
+                pending_id = str(waiting[0]["id"])
+                frame, _earlier = await request(
+                    client,
+                    "turns.cancel",
+                    {"turn_id": turn_id, "op_id": mint_id("op_")},
+                )
+                ok(frame)
+                await poll_rows(
+                    tmp_path,
+                    "SELECT status FROM turns WHERE id = ?",
+                    (turn_id,),
+                    lambda rows: bool(rows) and rows[0]["status"] == "cancelled",
+                )
+                pending = fetch_all(
+                    tmp_path,
+                    "SELECT status FROM pending_requests WHERE id = ?",
+                    (pending_id,),
+                )
+                pending_status = str(pending[0]["status"]) if pending else "absent"
+                answered, _answered_earlier = await request(
+                    client,
+                    "pending.answer",
+                    {
+                        "pending_id": pending_id,
+                        "answer": "approve",
+                        "op_id": mint_id("op_"),
+                    },
+                    timeout_s=5,
+                )
+                finished = fetch_all(
+                    tmp_path,
+                    "SELECT status FROM turns WHERE id = ?",
+                    (turn_id,),
+                )
+                turn_status = str(finished[0]["status"])
+                queries = list(fake.queries)
+                assert (
+                    pending_status != "waiting"
+                    and queries == [prompt]
+                    and turn_status == "cancelled"
+                ), (pending_status, queries, turn_status, answered.get("t"))
             finally:
                 await worker.aclose()
     finally:
