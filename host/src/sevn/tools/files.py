@@ -37,10 +37,15 @@ async def write_file(bot_id: str, agent_id: str, path: str, content: str) -> str
 
 
 async def edit_file(bot_id: str, agent_id: str, path: str, old: str, new: str) -> str:
-    """Replace the first ``old`` span in a file."""
+    """Replace the first ``old`` span in the file on disk.
+
+    ``read_file`` may wrap flagged content for the model (D11). That view is not
+    the file, so the replacement is applied to the bytes on disk.
+    """
     if old == "":
         raise DomainError("invalid_params", "edit text is empty")
-    current = await read_file(bot_id, agent_id, path)
+    located = await _owned(bot_id, agent_id)
+    current = await asyncio.to_thread(_read_text, located.root, path)
     if old not in current:
         raise DomainError("invalid_params", "edit text was not found")
     await write_file(bot_id, agent_id, path, current.replace(old, new, 1))
