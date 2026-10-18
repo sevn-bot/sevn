@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
@@ -15,6 +16,7 @@ from sevn.contracts.kinds import AgentStatus, RuntimeName
 from sevn.domain.errors import DomainError
 from sevn.domain.ids import new_id
 from sevn.domain.session import open_session
+from sevn.domain.workspace import drop_locks, make_scratch
 from sevn.store.db import utcnow
 from sevn.store.models import Agent as AgentRow
 from sevn.store.models import Bot as BotRow
@@ -91,6 +93,7 @@ class AgentService:
                     summary_upto=None,
                 )
             )
+            await make_scratch(Path(bot.workspace_path), agent_id)
             await session.commit()
             return _record(agent)
 
@@ -124,6 +127,8 @@ class AgentService:
             row.status = status
             row.last_activity_at = now
             apply_lifecycle(row, status, now)
+            if status == "done" or status == "archived":
+                await drop_locks(session, agent_id)
             await session.commit()
             return _record(row)
 
@@ -204,6 +209,7 @@ async def expire_agents() -> None:
                 row.status = "done"
                 row.idle_since = None
                 row.last_activity_at = now
+                await drop_locks(session, row.id)
             elif (
                 row.status == "done"
                 and row.archived_at is None
@@ -211,6 +217,7 @@ async def expire_agents() -> None:
             ):
                 row.status = "archived"
                 row.archived_at = now
+                await drop_locks(session, row.id)
         await session.commit()
 
 

@@ -247,7 +247,10 @@ class PendingRequest(Base):
     kind: Mapped[str] = mapped_column(String, nullable=False)
     tool_call_id: Mapped[str | None] = mapped_column(String, nullable=True)
     payload: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
-    answer: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
+    answer: Mapped[dict[str, object] | None] = mapped_column(
+        JSON(none_as_null=True),
+        nullable=True,
+    )
     status: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

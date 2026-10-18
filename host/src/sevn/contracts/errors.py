@@ -18,6 +18,8 @@ type ErrorCode = Literal[
     "pinned_budget",
     "memory_locked",
     "revision_conflict",
+    "path_outside_workspace",
+    "path_locked",
     "resync_required",
     "internal",
 ]

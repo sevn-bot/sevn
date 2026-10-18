@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
 import json
 import os
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
@@ -394,3 +395,12 @@ def _message_dump(self: ModelMessage, *, mode: str = "python", **_kwargs: object
 for _message_cls in (ModelRequest, ModelResponse):
     if "model_dump" not in _message_cls.__dict__:
         _message_cls.model_dump = _message_dump  # type: ignore[attr-defined]
+
+
+def _register_feature_tools() -> None:
+    """Import tool modules so ``register_toolset`` runs before a turn."""
+    for module in ("sevn.tools.files", "sevn.tools.user", "sevn.tools.agents"):
+        importlib.import_module(module)
+
+
+_register_feature_tools()

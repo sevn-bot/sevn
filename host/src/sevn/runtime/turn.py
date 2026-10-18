@@ -12,7 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sevn.domain.agents import AgentRecord, AgentService
 from sevn.domain.bots import BotRecord, BotService
 from sevn.domain.ids import new_id
+from sevn.domain.pending import PendingService
 from sevn.domain.session import open_session
+from sevn.domain.workspace import drop_locks
 from sevn.log import logger
 from sevn.memory.context import capture_after_turn
 from sevn.memory.store import MemoryStore
@@ -152,7 +154,7 @@ class TurnRunner:
             if self._watch is not None and self._watch.cancelled(turn_id):
                 await MemoryStore().rollback(turn_id)
                 await self._persist_cancelled(turn_id, started, job, agent, bot, stored=stored)
-            elif outcome.approvals:
+            elif outcome.approvals or await PendingService().has_waiting(turn_id):
                 await self._persist_waiting(
                     turn_id, started, job, agent, bot, outcome, stored=stored
                 )
@@ -266,6 +268,7 @@ class TurnRunner:
             events.append(_agent_event(agent.id, agent_status))
             for event in events:
                 session.add(event)
+            await drop_locks(session, agent.id)
             await session.commit()
             await capture_after_turn(agent.id, job.text)
             for event in events:
@@ -356,6 +359,7 @@ class TurnRunner:
             events.extend(await _resolve_open_pendings(session, turn, finished_at))
             for event in events:
                 session.add(event)
+            await drop_locks(session, agent.id)
             await session.commit()
             for event in events:
                 await self._hub.relay(event)
@@ -802,6 +806,7 @@ async def _fail_open_turn(
     session.add(assistant)
     events.append(_message_event(assistant))
     events.append(_turn_event("turn.finished", turn.id, turn.agent_id, "failed"))
+    await drop_locks(session, turn.agent_id)
     return events
 
 
