@@ -9,6 +9,7 @@ export type MethodName = keyof typeof methods;
 type RuntimeName = "pydantic_ai" | "claude";
 type AccessName = "workspace" | "full" | "isolated";
 type ApprovalPolicy = "ask" | "auto" | "allow_all";
+type NetworkFlag = "on" | "off";
 type AgentStatus = "running" | "waiting" | "idle" | "done" | "archived";
 
 type Bot = {
@@ -23,6 +24,7 @@ type Bot = {
   effort: string | null;
   access: AccessName;
   approval_policy: ApprovalPolicy;
+  network: NetworkFlag;
   workspace_path: string;
   folder_id: string | null;
   paused: boolean;
@@ -121,6 +123,7 @@ export type MethodParams = {
     effort?: string;
     access?: AccessName;
     approval_policy?: ApprovalPolicy;
+    network?: NetworkFlag;
     folder_id?: string;
     paused?: boolean;
     can_create_bots?: boolean;

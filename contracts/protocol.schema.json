@@ -258,6 +258,9 @@
           "title": "Name",
           "type": "string"
         },
+        "network": {
+          "$ref": "#/$defs/NetworkFlag"
+        },
         "paused": {
           "title": "Paused",
           "type": "boolean"
@@ -295,6 +298,7 @@
         "effort",
         "access",
         "approval_policy",
+        "network",
         "workspace_path",
         "folder_id",
         "paused",
@@ -643,6 +647,17 @@
           ],
           "default": null,
           "title": "Name"
+        },
+        "network": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NetworkFlag"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "op_id": {
           "anyOf": [
@@ -1374,6 +1389,13 @@
       ],
       "title": "ModelsListResult",
       "type": "object"
+    },
+    "NetworkFlag": {
+      "enum": [
+        "on",
+        "off"
+      ],
+      "type": "string"
     },
     "Origin": {
       "enum": [

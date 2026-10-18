@@ -1,6 +1,10 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { type UIEvent, useEffect, useRef, useState } from "react";
-import { call, type MethodResult } from "../../client/connection.ts";
+import {
+  call,
+  type MethodResult,
+  type ProtocolEvent,
+} from "../../client/connection.ts";
 import {
   createQueryClient,
   useCall,
@@ -8,10 +12,15 @@ import {
   useTicks,
 } from "../../client/hooks.ts";
 import { ApprovalCard } from "../approvals/ApprovalCard.tsx";
+import { MemoriesPanel } from "../bots/MemoriesPanel.tsx";
+import { SandboxSettings } from "../bots/SandboxSettings.tsx";
 import { ModelPicker } from "../models/ModelPicker.tsx";
 import { go } from "../routes.ts";
+import { type LaneAgent, Lanes, toLane } from "./Lanes.tsx";
+import { AskChips, RoutingChip } from "./RoutingChip.tsx";
 
 type ListedMessage = MethodResult["messages.list"]["messages"][number];
+type LaneRef = { id: string; title: string };
 
 const refreshKinds = new Set([
   "message.created",
@@ -35,6 +44,7 @@ function ChatView({ botId }: { botId: string }) {
   const agentsQuery = useCall("agents.list", { bot_id: botId });
   const pendingQuery = useCall("pending.list", {});
   const botQuery = useCall("bots.get", { bot_id: botId });
+  const infoQuery = useCall("system.info", {});
   const ticks = useTicks("turn.delta");
   const events = useEvents();
   const seenEvents = useRef(0);
@@ -48,6 +58,7 @@ function ChatView({ botId }: { botId: string }) {
   const page = messagesQuery.data?.messages ?? [];
   const messages = [...older, ...chronological(page)];
   const agents = agentsQuery.data?.agents ?? [];
+  const laneAgents = lanesFor(agents, aheadByAgent(events));
   const agentIds = new Set(agents.map((agent) => agent.id));
   const pending = (pendingQuery.data?.pending ?? []).filter((item) =>
     agentIds.has(item.agent_id),
@@ -150,18 +161,12 @@ function ChatView({ botId }: { botId: string }) {
           <h1 className="text-lg font-medium">{botName}</h1>
         ) : null}
       </div>
-      <div className="space-y-2">
-        {agents.map((agent) => (
-          <details
-            key={agent.id}
-            open
-            className="rounded border border-zinc-800 px-3 py-2"
-          >
-            <summary>{agent.title !== "" ? agent.title : agent.id}</summary>
-            <p className="text-sm text-zinc-400">{agent.status}</p>
-          </details>
-        ))}
-      </div>
+      {allowAllOn(infoQuery.data) ? (
+        <p className="rounded border border-amber-700 bg-amber-950 px-3 py-2 text-sm">
+          Sandbox allow all is on
+        </p>
+      ) : null}
+      <Lanes agents={laneAgents} />
       <div
         ref={logRef}
         role="log"
@@ -169,7 +174,12 @@ function ChatView({ botId }: { botId: string }) {
         onScroll={onScroll}
       >
         {messages.map((message) => (
-          <p key={message.id}>{messageText(message.parts)}</p>
+          <MessageBody
+            key={message.id}
+            message={message}
+            botId={botId}
+            agents={laneAgents}
+          />
         ))}
         {groupedTicks(botTicks(ticks, agentIds)).map(([turnId, text]) =>
           persisted.has(turnId) ? null : <p key={turnId}>{text}</p>,
@@ -213,13 +223,138 @@ function ChatView({ botId }: { botId: string }) {
       >
         <summary>Settings</summary>
         {settingsOpen ? (
-          <div className="pt-2">
+          <div className="space-y-3 pt-2">
             <ModelPicker botId={botId} model={model} />
+            <MemoriesPanel botId={botId} />
+            <SandboxSettings botId={botId} />
           </div>
         ) : null}
       </details>
     </section>
   );
+}
+
+function MessageBody({
+  message,
+  botId,
+  agents,
+}: {
+  message: ListedMessage;
+  botId: string;
+  agents: readonly LaneRef[];
+}) {
+  const text = messageText(message.parts);
+  return (
+    <div>
+      {text !== "" ? <p>{text}</p> : null}
+      {partViews(message, botId, agents)}
+    </div>
+  );
+}
+
+function partViews(
+  message: ListedMessage,
+  botId: string,
+  agents: readonly LaneRef[],
+) {
+  const seen = new Map<string, number>();
+  return message.parts.map((part) => {
+    const base = [
+      part.type,
+      part.intent,
+      part.code,
+      part.title,
+      part.choices,
+      part.text,
+    ].join(":");
+    const nth = seen.get(base) ?? 0;
+    seen.set(base, nth + 1);
+    return (
+      <PartView
+        key={`${message.id}:${base}:${nth}`}
+        part={part}
+        messageId={message.id}
+        botId={botId}
+        agents={agents}
+      />
+    );
+  });
+}
+
+function PartView({
+  part,
+  messageId,
+  botId,
+  agents,
+}: {
+  part: Record<string, string>;
+  messageId: string;
+  botId: string;
+  agents: readonly LaneRef[];
+}) {
+  if (part.type === "routing") {
+    return (
+      <RoutingChip
+        messageId={messageId}
+        intent={part.intent ?? ""}
+        title={part.title ?? ""}
+        agents={agents}
+      />
+    );
+  }
+  if (part.type === "routing_ask") {
+    return <AskChips botId={botId} choices={part.choices ?? ""} />;
+  }
+  if (part.type === "error" && part.code === "path_locked") {
+    const holder = part.holder_title ?? "";
+    if (holder === "") {
+      return null;
+    }
+    return <p>{`Locked by ${holder}`}</p>;
+  }
+  if (part.type === "injection") {
+    return <span>Possible injection</span>;
+  }
+  return null;
+}
+
+function lanesFor(
+  agents: MethodResult["agents.list"]["agents"],
+  queued: ReadonlyMap<string, number>,
+): LaneAgent[] {
+  return agents.map((agent) => {
+    const lane = toLane(agent);
+    if (typeof lane.ahead === "number") {
+      return lane;
+    }
+    const ahead = queued.get(agent.id);
+    if (ahead === undefined) {
+      return lane;
+    }
+    return { ...lane, ahead };
+  });
+}
+
+function aheadByAgent(events: ProtocolEvent[]): ReadonlyMap<string, number> {
+  const found = new Map<string, number>();
+  for (const event of events) {
+    if (event.k !== "job.queued") {
+      continue;
+    }
+    const agentId = event.d.agent_id;
+    const ahead = event.d.ahead;
+    if (typeof agentId !== "string" || typeof ahead !== "number") {
+      continue;
+    }
+    found.set(agentId, ahead);
+  }
+  return found;
+}
+
+function allowAllOn(
+  info: { caps?: { allow_all?: boolean } } | undefined,
+): boolean {
+  return info?.caps?.allow_all === true;
 }
 
 function chronological(rows: ListedMessage[]): ListedMessage[] {

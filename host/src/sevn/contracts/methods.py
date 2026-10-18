@@ -7,7 +7,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-from sevn.contracts.kinds import AccessName, ApprovalPolicy, RuntimeName
+from sevn.contracts.kinds import AccessName, ApprovalPolicy, NetworkFlag, RuntimeName
 from sevn.domain.agents import AgentRecord
 from sevn.domain.bots import BotRecord
 from sevn.domain.jobs import MessageRecord
@@ -129,6 +129,7 @@ class BotsUpdateParams(BaseModel):
     effort: str | None = None
     access: AccessName | None = None
     approval_policy: ApprovalPolicy | None = None
+    network: NetworkFlag | None = None
     folder_id: str | None = None
     paused: bool | None = None
     can_create_bots: bool | None = None
