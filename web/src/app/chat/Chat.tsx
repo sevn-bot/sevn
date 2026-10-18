@@ -27,6 +27,7 @@ const refreshKinds = new Set([
   "agent.updated",
   "pending.created",
   "pending.resolved",
+  "turn.started",
   "turn.finished",
 ]);
 

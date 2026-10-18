@@ -27,10 +27,12 @@ from sevn.secrets.backends import open_backend
 from sevn.secrets.errors import SecretNotFound
 
 ECHO_ID = "echo"
-# Long enough that two sequential turns miss the lane e2e window, short enough
-# that two overlapping turns still finish inside it. A real sleep: freezing the
-# clock and then awaiting this hangs.
-_ECHO_TURN_DELAY_S = 2.0
+# The lane e2e starts its clock before both sends. Both replies must be painted
+# before 2500 ms, and the run must last at least 1500 ms. Overlapping turns
+# share this pause, leaving time for the chat log to paint. Twice the pause
+# is past that window, so a serial pair cannot finish inside it. A real sleep:
+# freezing the clock and then awaiting this hangs.
+_ECHO_TURN_DELAY_S = 1.4
 
 _SECRET_NAMES = {
     "anthropic": "provider/anthropic",
