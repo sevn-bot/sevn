@@ -5,9 +5,19 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, TypeDecorator
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    LargeBinary,
+    String,
+    TypeDecorator,
+)
 from sqlalchemy.engine.interfaces import Dialect
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.sql.sqltypes import NullType
 
 
 class Base(DeclarativeBase):
@@ -290,12 +300,61 @@ class Memory(Base):
 
 
 class MemoryFts(Base):
-    """Recall index for memories. Amended to FTS5 with the memory wave."""
+    """Columns of the FTS5 ``memories_fts`` virtual table. The migration creates it."""
 
     __tablename__ = "memories_fts"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True)
-    text: Mapped[str] = mapped_column(String, nullable=False)
+    id: Mapped[str | None] = mapped_column(String, primary_key=True, nullable=True)
+    text: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
+class MemoryFtsConfig(Base):
+    """FTS5 shadow table created with ``memories_fts``."""
+
+    __tablename__ = "memories_fts_config"
+    __table_args__ = ({"sqlite_with_rowid": False},)
+
+    k: Mapped[str] = mapped_column(NullType, primary_key=True)
+    v: Mapped[str | None] = mapped_column(NullType, nullable=True)
+
+
+class MemoryFtsContent(Base):
+    """FTS5 shadow table created with ``memories_fts``."""
+
+    __tablename__ = "memories_fts_content"
+
+    id: Mapped[int | None] = mapped_column(Integer, primary_key=True, nullable=True)
+    c0: Mapped[str | None] = mapped_column(NullType, nullable=True)
+    c1: Mapped[str | None] = mapped_column(NullType, nullable=True)
+
+
+class MemoryFtsData(Base):
+    """FTS5 shadow table created with ``memories_fts``."""
+
+    __tablename__ = "memories_fts_data"
+
+    id: Mapped[int | None] = mapped_column(Integer, primary_key=True, nullable=True)
+    block: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+
+
+class MemoryFtsDocsize(Base):
+    """FTS5 shadow table created with ``memories_fts``."""
+
+    __tablename__ = "memories_fts_docsize"
+
+    id: Mapped[int | None] = mapped_column(Integer, primary_key=True, nullable=True)
+    sz: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+
+
+class MemoryFtsIdx(Base):
+    """FTS5 shadow table created with ``memories_fts``."""
+
+    __tablename__ = "memories_fts_idx"
+    __table_args__ = ({"sqlite_with_rowid": False},)
+
+    segid: Mapped[str] = mapped_column(NullType, primary_key=True)
+    term: Mapped[str] = mapped_column(NullType, primary_key=True)
+    pgno: Mapped[str | None] = mapped_column(NullType, nullable=True)
 
 
 class MessageFts(Base):

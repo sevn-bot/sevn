@@ -15,6 +15,9 @@ type ErrorCode = Literal[
     "not_found",
     "op_id_required",
     "pending_resolved",
+    "pinned_budget",
+    "memory_locked",
+    "revision_conflict",
     "resync_required",
     "internal",
 ]

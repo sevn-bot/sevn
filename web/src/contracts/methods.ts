@@ -36,6 +36,26 @@ export const methods = {
     params: "BotsUpdateParams",
     result: "BotRecord",
   },
+  "memories.delete": {
+    mutating: true,
+    params: "MemoriesDeleteParams",
+    result: "MemoriesDeleteResult",
+  },
+  "memories.list": {
+    mutating: false,
+    params: "MemoriesListParams",
+    result: "MemoriesListResult",
+  },
+  "memories.pin": {
+    mutating: true,
+    params: "MemoriesPinParams",
+    result: "MemoryRecord",
+  },
+  "memories.update": {
+    mutating: true,
+    params: "MemoriesUpdateParams",
+    result: "MemoryRecord",
+  },
   "messages.list": {
     mutating: false,
     params: "MessagesListParams",

@@ -12,6 +12,7 @@ from sevn.domain.agents import AgentRecord
 from sevn.domain.bots import BotRecord
 from sevn.domain.jobs import MessageRecord
 from sevn.domain.pending import PendingRecord
+from sevn.memory.store import MemoryRecord
 
 
 class SystemInfoParams(BaseModel):
@@ -259,6 +260,49 @@ class TurnsCancelResult(BaseModel):
     status: str
 
 
+class MemoriesListParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    bot_id: str
+
+
+class MemoriesListResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    memories: list[MemoryRecord]
+
+
+class MemoriesUpdateParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    text: str
+    revision: int | None = None
+    op_id: str | None = None
+
+
+class MemoriesDeleteParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    op_id: str | None = None
+
+
+class MemoriesDeleteResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+
+
+class MemoriesPinParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    tier: Literal["pinned", "recall"] | None = None
+    revision: int | None = None
+    op_id: str | None = None
+
+
 @dataclass(frozen=True, slots=True)
 class MethodSpec:
     name: str
@@ -298,5 +342,9 @@ METHODS: dict[str, MethodSpec] = {
         _spec("pending.answer", PendingAnswerParams, PendingAnswerResult, mutating=True),
         _spec("turns.snapshot", TurnsSnapshotParams, TurnsSnapshotResult, mutating=False),
         _spec("turns.cancel", TurnsCancelParams, TurnsCancelResult, mutating=True),
+        _spec("memories.list", MemoriesListParams, MemoriesListResult, mutating=False),
+        _spec("memories.update", MemoriesUpdateParams, MemoryRecord, mutating=True),
+        _spec("memories.delete", MemoriesDeleteParams, MemoriesDeleteResult, mutating=True),
+        _spec("memories.pin", MemoriesPinParams, MemoryRecord, mutating=True),
     )
 }

@@ -881,6 +881,212 @@
         }
       ]
     },
+    "MemoriesDeleteParams": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "op_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op Id"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "MemoriesDeleteParams",
+      "type": "object"
+    },
+    "MemoriesDeleteResult": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "MemoriesDeleteResult",
+      "type": "object"
+    },
+    "MemoriesListParams": {
+      "additionalProperties": false,
+      "properties": {
+        "bot_id": {
+          "title": "Bot Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "bot_id"
+      ],
+      "title": "MemoriesListParams",
+      "type": "object"
+    },
+    "MemoriesListResult": {
+      "additionalProperties": false,
+      "properties": {
+        "memories": {
+          "items": {
+            "$ref": "#/$defs/MemoryRecord"
+          },
+          "title": "Memories",
+          "type": "array"
+        }
+      },
+      "required": [
+        "memories"
+      ],
+      "title": "MemoriesListResult",
+      "type": "object"
+    },
+    "MemoriesPinParams": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "op_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op Id"
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Revision"
+        },
+        "tier": {
+          "anyOf": [
+            {
+              "enum": [
+                "pinned",
+                "recall"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tier"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "MemoriesPinParams",
+      "type": "object"
+    },
+    "MemoriesUpdateParams": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "op_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op Id"
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Revision"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "text"
+      ],
+      "title": "MemoriesUpdateParams",
+      "type": "object"
+    },
+    "MemoryRecord": {
+      "additionalProperties": false,
+      "description": "One committed or staged memory.",
+      "properties": {
+        "bot_id": {
+          "title": "Bot Id",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "origin": {
+          "$ref": "#/$defs/Origin"
+        },
+        "revision": {
+          "title": "Revision",
+          "type": "integer"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "tier": {
+          "$ref": "#/$defs/Tier"
+        }
+      },
+      "required": [
+        "id",
+        "bot_id",
+        "text",
+        "tier",
+        "origin",
+        "revision"
+      ],
+      "title": "MemoryRecord",
+      "type": "object"
+    },
     "MessageRecord": {
       "additionalProperties": false,
       "description": "One UI message returned by ``messages.list``.",
@@ -1168,6 +1374,13 @@
       ],
       "title": "ModelsListResult",
       "type": "object"
+    },
+    "Origin": {
+      "enum": [
+        "user",
+        "bot"
+      ],
+      "type": "string"
     },
     "PendingAnswerParams": {
       "additionalProperties": false,
@@ -1516,6 +1729,13 @@
       "title": "Tick",
       "type": "object"
     },
+    "Tier": {
+      "enum": [
+        "pinned",
+        "recall"
+      ],
+      "type": "string"
+    },
     "TurnsCancelParams": {
       "additionalProperties": false,
       "properties": {
@@ -1725,6 +1945,26 @@
       "mutating": true,
       "params": "BotsUpdateParams",
       "result": "BotRecord"
+    },
+    "memories.delete": {
+      "mutating": true,
+      "params": "MemoriesDeleteParams",
+      "result": "MemoriesDeleteResult"
+    },
+    "memories.list": {
+      "mutating": false,
+      "params": "MemoriesListParams",
+      "result": "MemoriesListResult"
+    },
+    "memories.pin": {
+      "mutating": true,
+      "params": "MemoriesPinParams",
+      "result": "MemoryRecord"
+    },
+    "memories.update": {
+      "mutating": true,
+      "params": "MemoriesUpdateParams",
+      "result": "MemoryRecord"
     },
     "messages.list": {
       "mutating": false,

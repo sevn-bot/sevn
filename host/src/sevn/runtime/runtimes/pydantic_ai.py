@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from typing import cast
 
 from pydantic_ai import (
@@ -39,11 +39,13 @@ from pydantic_ai.usage import RunUsage
 from sevn.domain.agents import AgentRecord, sibling_block
 from sevn.domain.bots import BotRecord
 from sevn.log import logger
+from sevn.memory import MemoryContext
 from sevn.runtime.base import PendingAnswer, SessionRef, ToolDecision, TurnContext
 from sevn.runtime.errors import TurnError
 from sevn.runtime.events import ApprovalCall, RuntimeEvent
 from sevn.runtime.models import resolve_model
 from sevn.tools.core import shell, write_file
+from sevn.tools.registry import TurnDeps, toolsets_for
 
 os.environ.setdefault("PYDANTIC_AI_NO_BANNER", "1")
 
@@ -86,8 +88,17 @@ class PydanticAIRuntime:
             model=model,
             instructions=build_instructions(bot, siblings=siblings),
             output_type=[str, DeferredToolRequests],
-            capabilities=[_thinking(bot.effort)],
-            tools=[] if turn.ephemeral else _tools(bot.approval_policy),
+            capabilities=[
+                _thinking(bot.effort),
+                MemoryContext(
+                    bot_id=bot.id,
+                    agent_id=turn.agent.id,
+                    prior=bool(turn.message_history),
+                ),
+            ],
+            tools=[]
+            if turn.ephemeral
+            else _tools(bot, agent_id=turn.agent.id, turn_id=_turn_id(turn)),
             deps_type=None,
         )
         history = _history(turn.message_history)
@@ -134,13 +145,45 @@ class PydanticAIRuntime:
         _ = agent_id
 
 
-def _tools(policy: str) -> list[Tool[None]]:
-    """``ask`` defers shell and write. Other policies run them immediately."""
-    ask = policy == "ask"
-    return [
+def _turn_id(turn: TurnContext) -> str:
+    if turn.turn_id is None:
+        return ""
+    return turn.turn_id
+
+
+def _tools(bot: BotRecord, *, agent_id: str, turn_id: str) -> list[Tool[None]]:
+    """``ask`` defers shell and write. Memory tools come from the registry."""
+    ask = bot.approval_policy == "ask"
+    tools: list[Tool[None]] = [
         Tool(shell, takes_ctx=False, requires_approval=ask),
         Tool(write_file, name="write", takes_ctx=False, requires_approval=ask),
     ]
+    deps = TurnDeps(bot_id=bot.id, agent_id=agent_id, turn_id=turn_id)
+    for registered in toolsets_for(bot):
+        if registered.name == "core":
+            continue
+        for name, fn in _tool_fns(registered.factory(deps)):
+            tools.append(
+                Tool(
+                    fn,
+                    name=name,
+                    takes_ctx=False,
+                    defer_loading=name in registered.deferred,
+                )
+            )
+    return tools
+
+
+def _tool_fns(value: object) -> list[tuple[str, Callable[..., object]]]:
+    """Names and callables from a toolset factory result."""
+    if not isinstance(value, dict):
+        return []
+    found: list[tuple[str, Callable[..., object]]] = []
+    mapping = cast("Mapping[object, object]", value)
+    for key, item in mapping.items():
+        if isinstance(key, str) and callable(item):
+            found.append((key, item))
+    return found
 
 
 def _deferred(decisions: tuple[ToolDecision, ...] | None) -> DeferredToolResults | None:

@@ -23,6 +23,7 @@ from starlette.websockets import WebSocket
 
 import sevn.api.agents as agent_api
 import sevn.api.bots as bot_api
+import sevn.api.memories as memory_api
 import sevn.api.messages as message_api
 import sevn.api.models as model_api
 import sevn.api.pending as pending_api
@@ -61,6 +62,10 @@ _REGISTERED = (
     message_api.turns_cancel,
     pending_api.pending_list,
     pending_api.pending_answer,
+    memory_api.memories_list,
+    memory_api.memories_update,
+    memory_api.memories_delete,
+    memory_api.memories_pin,
 )
 
 CSP = (

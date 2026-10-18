@@ -10,7 +10,11 @@ from sevn.domain.bots import BotRecord
 
 @dataclass(frozen=True, slots=True)
 class TurnDeps:
-    """Dependencies passed to a toolset factory. Empty until later waves."""
+    """Identifiers a toolset factory closes over for one turn."""
+
+    bot_id: str = ""
+    agent_id: str = ""
+    turn_id: str = ""
 
 
 type ToolsetFactory = Callable[[TurnDeps], object]
@@ -25,6 +29,7 @@ class RegisteredToolset:
     factory: ToolsetFactory
     eager: set[str]
     condition: ToolsetCondition
+    deferred: set[str]
 
 
 def always(_bot: BotRecord) -> bool:
@@ -40,6 +45,8 @@ def register_toolset(
     factory: ToolsetFactory,
     eager: set[str],
     condition: ToolsetCondition = always,
+    *,
+    deferred: set[str] | None = None,
 ) -> None:
     """Register ``factory``. A second registration of ``name`` replaces the first."""
     _toolsets[name] = RegisteredToolset(
@@ -47,6 +54,7 @@ def register_toolset(
         factory=factory,
         eager=set(eager),
         condition=condition,
+        deferred=set() if deferred is None else set(deferred),
     )
 
 

@@ -53,6 +53,12 @@ class DecisionThresholds(BaseModel):
     busy: float = 0.60
 
 
+class MemorySettings(BaseModel):
+    """Pinned memories share one byte budget (D9). Absent config keeps 4 KB."""
+
+    pinned_budget: int = 4096
+
+
 class DecisionsSettings(BaseModel):
     """How the host answers decision points (spec §7, D4)."""
 
@@ -77,6 +83,7 @@ class Settings(BaseSettings):
     http: HttpSettings = Field(default_factory=HttpSettings)
     runtime: RuntimeSettings = Field(default_factory=RuntimeSettings)
     bots: BotsSettings = Field(default_factory=BotsSettings)
+    memory: MemorySettings = Field(default_factory=MemorySettings)
     decisions: DecisionsSettings = Field(default_factory=DecisionsSettings)
 
     @classmethod

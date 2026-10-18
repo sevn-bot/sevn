@@ -7,7 +7,7 @@ import os
 from collections.abc import Mapping
 from typing import Protocol, cast
 
-from typesafe_sdk import AsyncTypeSafeClient, Choice
+from typesafe_sdk import AsyncTypeSafeClient, Choice, Noul
 
 from sevn.config import Settings
 from sevn.decisions.base import Attempt, RouteDecision, object_dict, redact_text
@@ -43,6 +43,23 @@ class _Jev(Protocol):
         *,
         model: str | None = None,
     ) -> object: ...
+
+
+async def noul_score(name: str, instructions: str, state: str) -> float | None:
+    """Score one noul. ``None`` when jev is unavailable or the call fails."""
+    client = await _resolve_client()
+    if client is None:
+        return None
+    try:
+        response = await client.system_one(
+            redact_text(state),
+            {name: Noul(instructions=instructions)},
+            model=Settings.load().decisions.jev_model,
+        )
+    except Exception:  # noqa: BLE001 — jev offline leaves the caller with no score
+        logger.warning("jev noul failed")
+        return None
+    return _noul(response, name)
 
 
 def use_client(client: _Jev | None) -> None:
@@ -136,6 +153,19 @@ def _attempt(response: object, *, asked_target: bool, asked_busy: bool) -> Attem
         },
         confidences=confidences,
     )
+
+
+def _noul(response: object, name: str) -> float | None:
+    nouls = object_dict(getattr(response, "nouls", None))
+    if nouls is None:
+        return None
+    answer = nouls.get(name)
+    if answer is None:
+        return None
+    value = getattr(answer, "noul", None)
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    return float(value)
 
 
 def _choice(response: object, name: str) -> tuple[str, float] | None:

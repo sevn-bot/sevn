@@ -64,6 +64,15 @@ type ChatMessage = {
   created_at: string;
 };
 
+type Memory = {
+  id: string;
+  bot_id: string;
+  text: string;
+  tier: "pinned" | "recall";
+  origin: "user" | "bot";
+  revision: number;
+};
+
 type PendingItem = {
   id: string;
   turn_id: string;
@@ -130,6 +139,20 @@ export type MethodParams = {
     op_id?: string;
   };
   "messages.list": { bot_id: string; cursor?: string };
+  "memories.list": { bot_id: string };
+  "memories.update": {
+    id: string;
+    text: string;
+    revision?: number;
+    op_id?: string;
+  };
+  "memories.delete": { id: string; op_id?: string };
+  "memories.pin": {
+    id: string;
+    tier?: "pinned" | "recall";
+    revision?: number;
+    op_id?: string;
+  };
   "pending.list": Record<string, never>;
   "pending.answer": {
     pending_id: string;
@@ -161,6 +184,10 @@ export type MethodResult = {
   "messages.send": { job_id: string; agent_id: string };
   "messages.reroute": { job_id: string; agent_id: string };
   "messages.list": { messages: ChatMessage[]; next_cursor: string | null };
+  "memories.list": { memories: Memory[] };
+  "memories.update": Memory;
+  "memories.delete": { id: string };
+  "memories.pin": Memory;
   "pending.list": { pending: PendingItem[] };
   "pending.answer": { id: string; status: string };
   "turns.snapshot": { text: string; status: string };

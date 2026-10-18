@@ -57,11 +57,8 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["bot_id"], ["bots.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_table(
-        "memories_fts",
-        sa.Column("id", sa.String(), nullable=False),
-        sa.Column("text", sa.String(), nullable=False),
-        sa.PrimaryKeyConstraint("id"),
+    op.execute(
+        "CREATE VIRTUAL TABLE memories_fts USING fts5(id UNINDEXED, text, tokenize = 'unicode61')"
     )
     op.create_table(
         "messages_fts",
@@ -83,7 +80,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_table("agent_locks")
     op.drop_table("messages_fts")
-    op.drop_table("memories_fts")
+    op.execute("DROP TABLE IF EXISTS memories_fts")
     op.drop_table("memories")
     op.drop_table("route_decisions")
     op.drop_table("decision_log")

@@ -14,6 +14,8 @@ from sevn.domain.bots import BotRecord, BotService
 from sevn.domain.ids import new_id
 from sevn.domain.session import open_session
 from sevn.log import logger
+from sevn.memory.context import capture_after_turn
+from sevn.memory.store import MemoryStore
 from sevn.protocol.hub import Hub
 from sevn.runtime.base import Runtime, ToolDecision, TurnContext
 from sevn.runtime.errors import ModelError, TurnError
@@ -148,6 +150,7 @@ class TurnRunner:
         try:
             outcome = await self._drive(turn_id, agent, bot, job, history, decisions)
             if self._watch is not None and self._watch.cancelled(turn_id):
+                await MemoryStore().rollback(turn_id)
                 await self._persist_cancelled(turn_id, started, job, agent, bot, stored=stored)
             elif outcome.approvals:
                 await self._persist_waiting(
@@ -155,6 +158,9 @@ class TurnRunner:
                 )
             else:
                 await self._persist_done(turn_id, started, job, agent, bot, outcome, stored=stored)
+        except Exception:
+            await MemoryStore().rollback(turn_id)
+            raise
         finally:
             await self._runtime.close(agent.id)
 
@@ -228,7 +234,9 @@ class TurnRunner:
         finished_at = utcnow()
         async with open_session() as session:
             if await _is_cancelled(session, turn_id):
+                await MemoryStore().rollback(turn_id)
                 return
+            await MemoryStore().write(session, turn_id)
             await _bind_turn(
                 session,
                 stored=stored,
@@ -259,6 +267,7 @@ class TurnRunner:
             for event in events:
                 session.add(event)
             await session.commit()
+            await capture_after_turn(agent.id, job.text)
             for event in events:
                 await self._hub.relay(event)
 
