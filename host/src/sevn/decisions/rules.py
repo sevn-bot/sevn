@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 from sevn.decisions.base import RouteDecision
 from sevn.domain.routing import (
@@ -99,11 +99,18 @@ def _continue_id(text: str, agents: list[OpenAgent]) -> str | None:
     return matches[0]
 
 
+def _aware(value: datetime) -> datetime:
+    """SQLite returns naive timestamps. Comparisons need one timezone."""
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
 def _pending_target(message: RoutedMessage, pending: list[PendingQuestion]) -> str | None:
     if message.author != "user" or len(pending) != 1:
         return None
     question = pending[0]
-    delta = message.created_at - question.asked_at
+    delta = _aware(message.created_at) - _aware(question.asked_at)
     if delta < timedelta(0) or delta > _ANSWER_WINDOW:
         return None
     return question.agent_id
