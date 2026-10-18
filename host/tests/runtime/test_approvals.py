@@ -292,3 +292,104 @@ async def test_message_during_approval_stays_queued_until_answer(
         blob = json.dumps(payloads[-1]["messages"])
         assert "run it" in blob
         assert follow_up in blob
+
+
+async def test_cancel_persisted_waiting_approval_releases_agent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """turns.cancel of an already stored waiting approval ends that turn and frees the agent."""
+    follow_up = "after cancel"
+    load_modules("sevn.api.bots", "sevn.api.messages", "sevn.api.pending")
+    async with connected(tmp_path, monkeypatch) as (host, client):
+        await _arm(host)
+        bot = await _bot(client)
+        sent, _earlier = await request(
+            client,
+            "messages.send",
+            {"bot_id": bot["id"], "text": "run it", "op_id": mint_id("op_")},
+        )
+        first = ok(sent)
+        item = await _wait_pending(tmp_path, client)
+        waiting = fetch_all(tmp_path, "SELECT id, status FROM turns")
+        assert len(waiting) == 1 and waiting[0]["status"] == "waiting"
+        turn_id = str(waiting[0]["id"])
+        job_id = str(first["job_id"])
+        started = fetch_all(
+            tmp_path,
+            "SELECT status FROM jobs WHERE id = ?",
+            (job_id,),
+        )
+        assert started[0]["status"] == "started"
+        frame, _earlier = await request(
+            client,
+            "turns.cancel",
+            {"turn_id": turn_id, "op_id": mint_id("op_")},
+        )
+        reported_status = str(ok(frame)["status"])
+        assert reported_status == "cancelled"
+        later, _earlier = await request(
+            client,
+            "messages.send",
+            {"bot_id": bot["id"], "text": follow_up, "op_id": mint_id("op_")},
+        )
+        follow = ok(later)
+        deadline = asyncio.get_running_loop().time() + 2
+        turn_status = ""
+        pending_status = ""
+        job_status = ""
+        later_status = ""
+        while asyncio.get_running_loop().time() < deadline:
+            turn_rows = fetch_all(
+                tmp_path,
+                "SELECT status FROM turns WHERE id = ?",
+                (turn_id,),
+            )
+            pending_rows = fetch_all(
+                tmp_path,
+                "SELECT status FROM pending_requests WHERE id = ?",
+                (str(item["id"]),),
+            )
+            job_rows = fetch_all(
+                tmp_path,
+                "SELECT status FROM jobs WHERE id = ?",
+                (job_id,),
+            )
+            later_rows = fetch_all(
+                tmp_path,
+                "SELECT status FROM jobs WHERE id = ?",
+                (str(follow["job_id"]),),
+            )
+            turn_status = str(turn_rows[0]["status"])
+            pending_status = str(pending_rows[0]["status"])
+            job_status = str(job_rows[0]["status"])
+            later_status = str(later_rows[0]["status"])
+            if (
+                turn_status == "cancelled"
+                and pending_status != "waiting"
+                and job_status != "started"
+                and later_status == "done"
+            ):
+                break
+            await asyncio.sleep(0.02)
+        assert turn_status == "cancelled", (
+            reported_status,
+            turn_status,
+            pending_status,
+            job_status,
+            later_status,
+        )
+        assert pending_status != "waiting", pending_status
+        assert job_status != "started", job_status
+        assert later_status == "done", later_status
+        assert follow["agent_id"] == first["agent_id"]
+        agents = fetch_all(tmp_path, "SELECT id FROM agents")
+        assert len(agents) == 1
+        still = fetch_all(
+            tmp_path,
+            "SELECT status FROM turns WHERE id = ?",
+            (turn_id,),
+        )
+        assert still[0]["status"] == "cancelled"
+        payloads = model_request_payloads()
+        blob = json.dumps(payloads[-1]["messages"])
+        assert follow_up in blob
