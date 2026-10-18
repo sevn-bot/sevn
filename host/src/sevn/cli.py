@@ -1,4 +1,4 @@
-"""``sevn serve``, ``sevn probe``, and ``sevn doctor`` (D9, D13)."""
+"""``sevn serve``, ``sevn probe``, ``sevn doctor``, and ``sevn evals`` (D9, D13, D17)."""
 
 from __future__ import annotations
 
@@ -27,9 +27,11 @@ app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 probe_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 contracts_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 secret_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
+evals_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 app.add_typer(probe_app, name="probe")
 app.add_typer(contracts_app, name="contracts")
 app.add_typer(secret_app, name="secret")
+app.add_typer(evals_app, name="evals")
 
 _LOOPBACK = frozenset({"127.0.0.1", "localhost", "::1", "[::1]"})
 
@@ -174,6 +176,24 @@ def secret_rm(name: str) -> None:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1) from exc
     typer.echo(f"removed {name}")
+
+
+@evals_app.command("run")
+def evals_run(suite: str) -> None:
+    """Replay one synthetic suite. Nothing runs unless ``evals_on`` is set."""
+    if suite != "decisions":
+        typer.echo(f"unknown eval suite: {suite}", err=True)
+        raise typer.Exit(code=2)
+    from sevn.evals.decisions import run_decisions
+    from sevn.evals.errors import EvalsError
+
+    try:
+        outcome = run_decisions()
+    except EvalsError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    if outcome.disabled:
+        typer.echo("evals disabled")
 
 
 def _open_secrets() -> KeychainBackend | AgeFileBackend | EnvBackend:

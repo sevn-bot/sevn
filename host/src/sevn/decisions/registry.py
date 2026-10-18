@@ -44,15 +44,25 @@ def router_state(message: RoutedMessage, context: RouterContext) -> str:
     return "\n".join(parts)
 
 
-async def decide(message: RoutedMessage, context: RouterContext) -> RouteDecision:
-    """Rules, then jev, then the fallback chain. ``provider=rules`` stops after rules."""
+async def decide(
+    message: RoutedMessage,
+    context: RouterContext,
+    *,
+    record: bool = True,
+) -> RouteDecision:
+    """Rules, then jev, then the fallback chain.
+
+    ``provider=rules`` stops after rules. ``record`` appends the decision log.
+    Eval replay passes ``record=False`` so a suite does not export decision state.
+    """
     settings = Settings.load().decisions
     state = router_state(message, context)
     # An empty lane list is a rule when asked directly. The chain still asks jev
     # and the fallbacks, and the default step starts a task if they do not.
     ruled = await RuleDecider().decide(message, context, empty_is_new=False)
     if ruled is not None:
-        await record_attempt(state, attempt_for(ruled))
+        if record:
+            await record_attempt(state, attempt_for(ruled))
         return ruled
     if settings.provider == "rules":
         return RouteDecision(
@@ -62,20 +72,21 @@ async def decide(message: RoutedMessage, context: RouterContext) -> RouteDecisio
             path="rule",
         )
     if settings.provider != "llm":
-        chosen = await _keep(state, await JevDecider().attempt(context, state))
+        chosen = await _keep(state, await JevDecider().attempt(context, state), record=record)
         if chosen is not None:
             return chosen
-    chosen = await _keep(state, await LLMDecider().attempt(state))
+    chosen = await _keep(state, await LLMDecider().attempt(state), record=record)
     if chosen is not None:
         return chosen
-    chosen = await _keep(state, await OllamaDecider().attempt(state))
+    chosen = await _keep(state, await OllamaDecider().attempt(state), record=record)
     if chosen is not None:
         return chosen
-    chosen = await _keep(state, await CliOneShotDecider().attempt(context, state))
+    chosen = await _keep(state, await CliOneShotDecider().attempt(context, state), record=record)
     if chosen is not None:
         return chosen
     fallback = DefaultDecider().decide(context)
-    await record_attempt(state, attempt_for(fallback))
+    if record:
+        await record_attempt(state, attempt_for(fallback))
     return fallback
 
 
@@ -86,10 +97,16 @@ async def flag_injection(text: str, score: float) -> str:
     return text
 
 
-async def _keep(state: str, attempt: Attempt | None) -> RouteDecision | None:
+async def _keep(
+    state: str,
+    attempt: Attempt | None,
+    *,
+    record: bool,
+) -> RouteDecision | None:
     if attempt is None:
         return None
-    await record_attempt(state, attempt)
+    if record:
+        await record_attempt(state, attempt)
     if attempt.accepted:
         return attempt.decision
     return None
