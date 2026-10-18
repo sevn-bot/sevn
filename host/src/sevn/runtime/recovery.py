@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sevn.domain.ids import new_id
+from sevn.domain.pending import latest_response_tool_call_ids
 from sevn.domain.session import open_session
 from sevn.log import logger
 from sevn.runtime.base import ToolDecision
@@ -133,7 +134,7 @@ def _answered_turns(related: list[TurnRow], pendings: list[PendingRow]) -> list[
     for turn in related:
         if turn.status != "waiting":
             continue
-        decisions = _saved_decisions(turn.id, pendings)
+        decisions = _saved_decisions(turn.id, pendings, turn.model_messages)
         if len(decisions) == 0:
             continue
         ready.append(AnsweredTurn(agent_id=turn.agent_id, turn_id=turn.id, decisions=decisions))
@@ -144,10 +145,18 @@ def _open_pending(turn_id: str, pendings: list[PendingRow]) -> bool:
     return any(row.turn_id == turn_id and row.status == "waiting" for row in pendings)
 
 
-def _saved_decisions(turn_id: str, pendings: list[PendingRow]) -> tuple[ToolDecision, ...]:
+def _saved_decisions(
+    turn_id: str,
+    pendings: list[PendingRow],
+    messages: object,
+) -> tuple[ToolDecision, ...]:
+    """Resolved approvals that are tool calls on the latest model response."""
+    current = latest_response_tool_call_ids(messages)
     chosen: list[ToolDecision] = []
     for row in pendings:
         if row.turn_id != turn_id or row.tool_call_id is None or row.status != "resolved":
+            continue
+        if current is not None and row.tool_call_id not in current:
             continue
         approved = row.answer is not None and row.answer.get("decision") == "approve"
         chosen.append(ToolDecision(tool_call_id=row.tool_call_id, approved=approved))
