@@ -13,7 +13,7 @@ sevn serve --open
 
 Create a bot and send a message. The reply streams into the chat. `sevn secret list` prints names only. `sevn secret rm <name>` deletes one. The same commands take `provider/openai`, `provider/google`, and `provider/openrouter`. Ollama needs no key; set `SEVN_OLLAMA_URL` instead.
 
-Pydantic AI approvals stay waiting across a host restart, and answering one resumes the turn. A Claude turn waiting on approval does not: Claude holds that answer in memory, so a restart marks the turn interrupted and you send the message again.
+Pydantic AI approvals stay waiting across a host restart, and answering one resumes the turn. A Claude turn waiting on approval does not: Claude holds that answer in memory, so a restart marks the turn interrupted and you send the message again. Cancelling a turn is kept if the host stops before the model finishes, so that request is not sent again.
 
 ## Development
 
