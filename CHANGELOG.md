@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Database upgrades keep the initial tables as they shipped, so a later column can be added without colliding, including from a packaged install.
 - A crashed turn resumes on startup, a message sent during an approval waits, and a failed turn is reported.
 - Bots and agents with Pydantic AI and Claude runtimes; web chat with approvals.
 - Spike S3: A2UI v0.9.1 on React and SwiftUI with sevn custom components.

@@ -7,6 +7,7 @@ import sqlite3
 import subprocess
 from pathlib import Path
 
+import pytest
 from support.repo import repo_root
 
 
@@ -68,3 +69,47 @@ async def test_models_match_migrations(tmp_path: Path) -> None:
     finally:
         engine.dispose()
     assert diff == []
+
+
+def test_revisions_are_frozen_ddl() -> None:
+    versions = repo_root() / "host/src/sevn/store/migrations/versions"
+    for name in ("0001_initial.py", "0002_bots_agents.py"):
+        text = (versions / name).read_text()
+        assert "sevn.store.models" not in text
+        assert "__table__" not in text
+        assert "op.create_table" in text
+    agents = (versions / "0002_bots_agents.py").read_text()
+    assert 'sa.Column("isolation"' in agents
+
+
+def test_find_alembic_ini_is_not_tied_to_editable_depth(tmp_path: Path) -> None:
+    from sevn.store.db import _find_alembic_ini
+
+    start = tmp_path / "pkg" / "store" / "db.py"
+    start.parent.mkdir(parents=True)
+    ini = tmp_path / "alembic.ini"
+    ini.write_text("[alembic]\n")
+    assert _find_alembic_ini(start) == ini.resolve()
+
+
+def test_checkout_alembic_ini_is_beside_the_package() -> None:
+    import sevn.store.db as db
+    from sevn.store.db import _find_alembic_ini
+
+    assert _find_alembic_ini(Path(db.__file__)) == (repo_root() / "host" / "alembic.ini").resolve()
+
+
+async def test_upgrade_without_alembic_ini(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from sevn.store import db
+
+    monkeypatch.setattr(db, "_find_alembic_ini", lambda _start: None)
+    db_path = tmp_path / "sevn.db"
+    await db.upgrade(f"sqlite+aiosqlite:///{db_path}")
+    with sqlite3.connect(db_path) as connection:
+        tables = {
+            row[0]
+            for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+        }
+        isolation = connection.execute("PRAGMA table_info(agents)").fetchall()
+    assert "agents" in tables
+    assert "isolation" in {row[1] for row in isolation}

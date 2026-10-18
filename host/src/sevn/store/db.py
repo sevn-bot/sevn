@@ -5,11 +5,14 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Protocol, cast
+from typing import TYPE_CHECKING, Protocol, cast
 
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.pool import NullPool
+
+if TYPE_CHECKING:
+    from alembic.config import Config
 
 
 class _Cursor(Protocol):
@@ -55,12 +58,32 @@ async def upgrade(url: str) -> None:
 
 def _upgrade_sync(url: str) -> None:
     from alembic import command
-    from alembic.config import Config
 
-    cfg = Config(str(_alembic_ini()))
+    cfg = _alembic_config()
     cfg.set_main_option("sqlalchemy.url", sync_url(url).replace("%", "%%"))
     command.upgrade(cfg, "head")
 
 
-def _alembic_ini() -> Path:
-    return Path(__file__).resolve().parents[3] / "alembic.ini"
+def _alembic_config() -> Config:
+    from alembic.config import Config
+
+    ini = _find_alembic_ini(Path(__file__).resolve())
+    if ini is not None:
+        return Config(str(ini))
+    cfg = Config()
+    cfg.set_main_option("script_location", str(_migrations_dir()))
+    cfg.set_main_option("path_separator", "os")
+    return cfg
+
+
+def _migrations_dir() -> Path:
+    return Path(__file__).resolve().parent / "migrations"
+
+
+def _find_alembic_ini(start: Path) -> Path | None:
+    """Nearest alembic.ini above ``start``, or none in a wheel install."""
+    for parent in start.resolve().parents:
+        candidate = parent / "alembic.ini"
+        if candidate.is_file():
+            return candidate
+    return None

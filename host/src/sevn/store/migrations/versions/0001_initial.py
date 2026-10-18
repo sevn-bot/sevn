@@ -1,11 +1,12 @@
-"""Initial events outbox and op log."""
+"""Initial events outbox and op log.
+
+Frozen DDL. Later revisions add columns; these tables must not follow the live models.
+"""
 
 from __future__ import annotations
 
+import sqlalchemy as sa
 from alembic import op
-from sevn.store.models import Event, OpLogEntry
-from sqlalchemy import Table
-from sqlalchemy.orm import DeclarativeBase
 
 revision = "0001_initial"
 down_revision = None
@@ -14,21 +15,26 @@ depends_on = None
 
 
 def upgrade() -> None:
-    _apply(Event, drop=False)
-    _apply(OpLogEntry, drop=False)
+    op.create_table(
+        "events",
+        sa.Column("seq", sa.Integer(), autoincrement=True, nullable=False),
+        sa.Column("type", sa.String(), nullable=False),
+        sa.Column("entity", sa.String(), nullable=False),
+        sa.Column("payload", sa.JSON(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.PrimaryKeyConstraint("seq"),
+        sqlite_autoincrement=True,
+    )
+    op.create_table(
+        "op_log",
+        sa.Column("op_id", sa.String(), nullable=False),
+        sa.Column("method", sa.String(), nullable=False),
+        sa.Column("result", sa.JSON(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.PrimaryKeyConstraint("op_id"),
+    )
 
 
 def downgrade() -> None:
-    _apply(OpLogEntry, drop=True)
-    _apply(Event, drop=True)
-
-
-def _apply(model: type[DeclarativeBase], *, drop: bool) -> None:
-    table = model.__table__
-    if not isinstance(table, Table):
-        raise RuntimeError(f"{model.__name__} has no table")
-    bind = op.get_bind()
-    if drop:
-        table.drop(bind)
-    else:
-        table.create(bind)
+    op.drop_table("op_log")
+    op.drop_table("events")
