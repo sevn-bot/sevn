@@ -1,11 +1,13 @@
 /** Protocol failure carried on `res.e`. */
 export class ProtocolError extends Error {
   readonly code: string;
+  readonly data: Record<string, unknown> | undefined;
 
-  constructor(code: string, message: string) {
+  constructor(code: string, message: string, data?: Record<string, unknown>) {
     super(message);
     this.name = "ProtocolError";
     this.code = code;
+    this.data = data;
   }
 }
 

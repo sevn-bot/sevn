@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Awaitable, Callable
 from typing import Protocol, cast
 
@@ -22,6 +24,12 @@ class Ctx(Protocol):
     hub: Hub
 
     def deliver(self, frame: str) -> None: ...
+
+    def hold_live(self) -> None: ...
+
+    def replay(self, frame: str) -> None: ...
+
+    def release_live(self, high_water: int) -> None: ...
 
 
 class BoundMethod:
@@ -80,6 +88,7 @@ async def dispatch(ctx: Ctx, req: Req) -> Res:
             body = await ctx.hub.claim_op(
                 op_id,
                 bound.spec.name,
+                _params_hash(params),
                 lambda: _invoke(bound, ctx, params),
             )
             return Res(t="res", id=req.id, r=_object(body))
@@ -103,6 +112,12 @@ async def _invoke(bound: BoundMethod, ctx: Ctx, params: BaseModel) -> JsonObject
     produced = await bound.handler(ctx, params)
     dumped = produced.model_dump(mode="json")
     return _object(dumped)
+
+
+def _params_hash(params: BaseModel) -> str:
+    raw = params.model_dump(mode="json")
+    blob = json.dumps(raw, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(blob.encode()).hexdigest()
 
 
 def _op_id(params: BaseModel) -> str | None:

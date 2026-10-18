@@ -188,7 +188,9 @@ async def _interrupt_claude(
     agent = await session.get(AgentRow, agent_id)
     if agent is None or agent.runtime != "claude":
         return False
-    stalled = [turn for turn in related if turn.status == "waiting" or turn.id in waiting_ids]
+    stalled = [
+        turn for turn in related if turn.status in {"waiting", "running"} or turn.id in waiting_ids
+    ]
     if len(stalled) == 0:
         return False
     now = utcnow()
@@ -198,14 +200,43 @@ async def _interrupt_claude(
         message = _resend_message(turn, job.to_bot_id, now)
         session.add(message)
         session.add(_message_event(message, now))
+        session.add(
+            _status_event(
+                "turn.finished",
+                turn.id,
+                {"turn_id": turn.id, "agent_id": agent_id, "status": "interrupted"},
+                now,
+            )
+        )
         for pending in pendings:
             if pending.turn_id != turn.id or pending.status != "waiting":
                 continue
             pending.status = "resolved"
             pending.answer = {"decision": "interrupted"}
             pending.resolved_at = now
+            session.add(
+                _status_event(
+                    "pending.resolved",
+                    pending.id,
+                    {
+                        "pending_id": pending.id,
+                        "turn_id": pending.turn_id,
+                        "agent_id": pending.agent_id,
+                        "status": "resolved",
+                    },
+                    now,
+                )
+            )
     job.status = "cancelled"
     job.finished_at = now
+    session.add(
+        _status_event(
+            "job.done",
+            job.id,
+            {"job_id": job.id, "agent_id": agent_id, "status": "cancelled"},
+            now,
+        )
+    )
     agent.status = "idle"
     agent.last_activity_at = now
     return True
@@ -223,6 +254,15 @@ def _resend_message(turn: TurnRow, bot_id: str, now: datetime) -> Message:
         parts=parts,
         created_at=now,
     )
+
+
+def _status_event(
+    event_type: str,
+    entity: str,
+    payload: dict[str, object],
+    now: datetime,
+) -> Event:
+    return Event(type=event_type, entity=entity, payload=payload, created_at=now)
 
 
 def _message_event(message: Message, now: datetime) -> Event:

@@ -120,6 +120,43 @@ def test_contextualize_binds_ids(captured_log: tuple[list[object], Path]) -> Non
     assert extra["agent_id"] == "agent_2"
 
 
+def test_exception_text_is_redacted(captured_log: tuple[list[object], Path]) -> None:
+    from sevn.log import logger
+    from sevn.secrets.registry import register
+
+    _found, log_path = captured_log
+    value = secrets.token_urlsafe(24)
+    register("opencode/api_key", value)
+    try:
+        raise RuntimeError(value)
+    except RuntimeError:
+        logger.exception("boom {secret}", secret=value)
+    logger.complete()
+    text = log_path.read_text(encoding="utf-8")
+    assert value not in text
+    assert "«redacted:opencode/api_key»" in text
+    payload = json.loads(text.splitlines()[-1])
+    assert "exception" in payload
+    assert value not in payload["exception"]
+
+
+def test_nested_extra_is_redacted(captured_log: tuple[list[object], Path]) -> None:
+    from sevn.log import logger
+    from sevn.secrets.registry import register
+
+    found, log_path = captured_log
+    value = secrets.token_urlsafe(24)
+    register("opencode/api_key", value)
+    logger.bind(nested={"token": value}).warning("nested")
+    logger.complete()
+    text = log_path.read_text(encoding="utf-8")
+    extra = str(found[-1].record["extra"])  # type: ignore[attr-defined]
+    assert value not in text
+    assert value not in extra
+    assert "«redacted:opencode/api_key»" in text
+    assert "«redacted:opencode/api_key»" in extra
+
+
 def test_json_file_lines(captured_log: tuple[list[object], Path]) -> None:
     from sevn.log import logger
 

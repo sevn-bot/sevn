@@ -25,10 +25,10 @@ def _default_home() -> Path:
     return _user_home() / ".local" / "share" / "sevn"
 
 
-def _logs_dir(home: Path) -> Path:
-    if _darwin():
-        return _user_home() / "Library" / "Logs" / "sevn"
-    return home / "logs"
+def _logs_dir(home: Path, *, honor_home: bool) -> Path:
+    if honor_home or not _darwin():
+        return home / "logs"
+    return _user_home() / "Library" / "Logs" / "sevn"
 
 
 def _workspaces_dir(home: Path) -> Path:
@@ -53,12 +53,12 @@ class Paths:
     workspaces: Path
 
     @classmethod
-    def _build(cls, home: Path) -> Paths:
+    def _build(cls, home: Path, *, honor_home: bool) -> Paths:
         return cls(
             home=home,
             db=home / "sevn.db",
             run=home / "run",
-            logs=_logs_dir(home),
+            logs=_logs_dir(home, honor_home=honor_home),
             secrets_file=home / "secrets.age",
             keys=home / "keys",
             workspaces=_workspaces_dir(home),
@@ -67,11 +67,12 @@ class Paths:
     @classmethod
     def default(cls) -> Paths:
         """Platform defaults. ``SEVN_HOME`` is not consulted."""
-        return cls._build(_default_home())
+        return cls._build(_default_home(), honor_home=False)
 
     @classmethod
     def from_env(cls) -> Paths:
         """Platform defaults with ``SEVN_HOME`` applied when it is set."""
         raw = os.environ.get("SEVN_HOME")
-        home = Path(raw).expanduser() if raw else _default_home()
-        return cls._build(home)
+        if raw:
+            return cls._build(Path(raw).expanduser(), honor_home=True)
+        return cls._build(_default_home(), honor_home=False)

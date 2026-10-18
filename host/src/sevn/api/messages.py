@@ -90,7 +90,7 @@ async def turns_cancel(_ctx: Ctx, params: TurnsCancelParams) -> TurnsCancelResul
     if worker is None:
         raise_protocol(DomainError("not_found", "turn not found"))
     try:
-        await worker.cancel(params.turn_id)
+        status = await worker.cancel(params.turn_id)
     except DomainError as exc:
         raise_protocol(exc)
-    return TurnsCancelResult(turn_id=params.turn_id, status="cancelled")
+    return TurnsCancelResult(turn_id=params.turn_id, status=status)

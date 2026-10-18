@@ -1,10 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { type Connection, connect } from "../client/index.ts";
+import { type Connection, cancelConnect, connect } from "../client/index.ts";
 import { BotList } from "./bots/BotList.tsx";
 import { Chat } from "./chat/Chat.tsx";
 import { botIdFromPath } from "./routes.ts";
 
-type Status = "connecting" | "connected" | "reconnecting";
+type Status =
+  | "connecting"
+  | "connected"
+  | "reconnecting"
+  | "unauthorized"
+  | "incompatible";
 
 type ShownEvent = {
   seq: number;
@@ -85,6 +90,7 @@ export default function App() {
     return () => {
       alive = false;
       current?.close();
+      cancelConnect();
       connectionRef.current = null;
     };
   }, []);

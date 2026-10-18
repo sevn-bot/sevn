@@ -264,7 +264,7 @@ test("reconnect calls sync.since with the last seen seq", async () => {
       const frame = frameOf(data);
       if (frame.t === "hello") {
         hellos.push(frame);
-        socket.send(welcome(0));
+        socket.send(welcome(current === 1 ? 0 : 5));
       }
       if (frame.t === "auth" && current === 1) {
         for (const seq of [1, 2, 3, 4, 5]) {

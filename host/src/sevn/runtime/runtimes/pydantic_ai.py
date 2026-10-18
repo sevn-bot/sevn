@@ -51,6 +51,7 @@ class PydanticAIRuntime:
 
     def __init__(self, model: Model | None = None) -> None:
         self._model = model
+        self._tasks: dict[str, asyncio.Task[object]] = {}
 
     async def open(self, agent: AgentRecord) -> SessionRef:
         return SessionRef(agent_id=agent.id)
@@ -72,6 +73,9 @@ class PydanticAIRuntime:
         )
         history = _history(turn.message_history)
         deferred = _deferred(turn.approvals)
+        task = asyncio.current_task()
+        if task is not None:
+            self._tasks[turn.agent.id] = task
         if deferred is None:
             stream = agent.run_stream_events(turn.text, message_history=history)
         else:
@@ -80,17 +84,22 @@ class PydanticAIRuntime:
                 message_history=history,
                 deferred_tool_results=deferred,
             )
-        async with stream as events:
-            async for event in events:
-                mapped = _map(event)
-                if mapped is not None:
-                    yield mapped
+        try:
+            async with stream as events:
+                async for event in events:
+                    mapped = _map(event)
+                    if mapped is not None:
+                        yield mapped
+        finally:
+            self._tasks.pop(turn.agent.id, None)
 
     async def answer(self, pending_id: str, answer: PendingAnswer) -> None:
         _ = (pending_id, answer)
 
     async def interrupt(self, agent_id: str) -> None:
-        _ = agent_id
+        task = self._tasks.get(agent_id)
+        if task is not None and task is not asyncio.current_task():
+            task.cancel()
 
     async def close(self, agent_id: str) -> None:
         _ = agent_id
@@ -99,13 +108,13 @@ class PydanticAIRuntime:
 def shell(command: str) -> str:
     """Accept a shell command. Execution waits for the sandbox."""
     _ = command
-    return "ok"
+    return "not available yet"
 
 
 def write_file(path: str, content: str) -> str:
     """Accept a file write. Execution waits for the sandbox."""
-    _ = content
-    return path
+    _ = (path, content)
+    return "not available yet"
 
 
 def _tools(policy: str) -> list[Tool[None]]:

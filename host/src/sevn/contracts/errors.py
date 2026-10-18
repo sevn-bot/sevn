@@ -14,6 +14,8 @@ type ErrorCode = Literal[
     "invalid_params",
     "not_found",
     "op_id_required",
+    "op_in_progress",
+    "op_mismatch",
     "pending_resolved",
     "resync_required",
     "internal",

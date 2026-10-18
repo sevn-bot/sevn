@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Event replay is paged so a reconnect cannot overflow the session, an approval no longer blocks other calls, and exception text is redacted in logs.
 - A crashed turn resumes on startup, a message sent during an approval waits, and a failed turn is reported.
 - Bots and agents with Pydantic AI and Claude runtimes; web chat with approvals.
 - Spike S3: A2UI v0.9.1 on React and SwiftUI with sevn custom components.

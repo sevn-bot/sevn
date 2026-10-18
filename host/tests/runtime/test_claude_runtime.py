@@ -717,16 +717,12 @@ async def test_claude_turn_presents_bot_instructions(
 
 
 @pytest.mark.parametrize("policy", ["auto", "allow_all"])
-async def test_claude_non_ask_policy_finishes_without_a_permission_wait(
+async def test_claude_non_ask_policy_waits_for_permission(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     policy: str,
 ) -> None:
-    """Bot policies auto and allow_all allow the tool without the can_use_tool wait.
-
-    ApprovalPolicy is ask, auto, or allow_all. ask still waits in
-    test_can_use_tool_creates_pending_and_blocks_until_answer.
-    """
+    """Bot policies auto and allow_all wait for a tool answer, the same as ask."""
     from sevn.runtime.runtimes.claude import use_client
     from sevn.runtime.worker import bind
 
@@ -781,17 +777,33 @@ async def test_claude_non_ask_policy_finishes_without_a_permission_wait(
                     ]
                     status = str(jobs[0]["status"]) if jobs else ""
                     results = list(fake.permission_results)
-                    if status == "done" and waiting == [] and results == ["approve"]:
+                    if waiting and results == []:
                         break
                     await asyncio.sleep(0.02)
             finally:
                 await worker.aclose()
     finally:
         use_client(None)
-    assert status == "done" and waiting == [] and results == ["approve"], (
+    assert waiting and results == [] and status != "done", (
         policy,
         status,
         waiting,
         results,
         fake.permission_started.is_set(),
     )
+
+
+def test_blanked_env_keeps_path_and_blanks_secrets(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PATH", "/usr/bin")
+    monkeypatch.setenv("HOME", "/Users/sevn")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-secretvalue")
+    monkeypatch.setenv("SEVN_SECRET_TOKEN", "supersecretvalue")
+    from sevn.runtime.runtimes.claude import blanked_env
+
+    env = blanked_env()
+    assert env["PATH"] == "/usr/bin"
+    assert env["HOME"] == "/Users/sevn"
+    assert env["ANTHROPIC_API_KEY"] == ""
+    assert env["SEVN_SECRET_TOKEN"] == ""
+    assert "sk-ant-secretvalue" not in env.values()
+    assert "supersecretvalue" not in env.values()
