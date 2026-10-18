@@ -27,6 +27,7 @@ import sevn.api.memories as memory_api
 import sevn.api.messages as message_api
 import sevn.api.models as model_api
 import sevn.api.pending as pending_api
+import sevn.sandbox.policy as sandbox_policy
 import sevn.system as system
 from sevn import __version__
 from sevn.config import Settings
@@ -47,6 +48,7 @@ _REGISTERED = (
     system.system_info,
     system.system_ping,
     system.sync_since,
+    sandbox_policy.set_sandbox_mode,
     bot_api.bots_create,
     bot_api.bots_list,
     bot_api.bots_get,

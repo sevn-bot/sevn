@@ -10,6 +10,7 @@ type ErrorCode = Literal[
     "protocol_error",
     "unauthorized",
     "forbidden",
+    "confirm_required",
     "method_not_found",
     "invalid_params",
     "not_found",

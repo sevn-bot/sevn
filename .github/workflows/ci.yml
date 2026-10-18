@@ -40,5 +40,8 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm --dir web exec playwright install --with-deps chromium
 
+      - name: Install bubblewrap
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap
+
       - name: CI
         run: make ci

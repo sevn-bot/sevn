@@ -19,13 +19,21 @@ class SystemInfoParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class SystemCaps(BaseModel):
+    """Capabilities ``system.info`` reports to every client (D14)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    allow_all: bool
+
+
 class SystemInfoResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     host_id: str
     version: str
     proto: int
-    caps: list[str]
+    caps: SystemCaps
     host_pubkey_fp: str
 
 
@@ -56,6 +64,22 @@ class SyncSinceResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     host_seq: int
+
+
+class SandboxModeParams(BaseModel):
+    """Owner confirm phrase for ``host.set_sandbox_mode`` (D14)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal["allow_all", "enforced"]
+    confirm: str
+    op_id: str | None = None
+
+
+class SandboxModeResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal["allow_all", "enforced"]
 
 
 class BotsCreateParams(BaseModel):
@@ -326,6 +350,7 @@ METHODS: dict[str, MethodSpec] = {
     for spec in (
         _spec("system.info", SystemInfoParams, SystemInfoResult, mutating=False),
         _spec("system.ping", SystemPingParams, SystemPingResult, mutating=True),
+        _spec("host.set_sandbox_mode", SandboxModeParams, SandboxModeResult, mutating=True),
         _spec("sync.since", SyncSinceParams, SyncSinceResult, mutating=False),
         _spec("bots.create", BotsCreateParams, BotRecord, mutating=True),
         _spec("bots.list", BotsListParams, BotsListResult, mutating=False),

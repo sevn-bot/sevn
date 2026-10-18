@@ -88,6 +88,11 @@ export type MethodParams = {
   "system.info": Record<string, never>;
   "system.ping": { note: string; op_id?: string };
   "sync.since": { seq: number };
+  "host.set_sandbox_mode": {
+    mode: "allow_all" | "enforced";
+    confirm: string;
+    op_id?: string;
+  };
   "bots.create": {
     name: string;
     title?: string;
@@ -168,11 +173,12 @@ export type MethodResult = {
     host_id: string;
     version: string;
     proto: number;
-    caps: string[];
+    caps: { allow_all: boolean };
     host_pubkey_fp: string;
   };
   "system.ping": { seq: number };
   "sync.since": { host_seq: number };
+  "host.set_sandbox_mode": { mode: "allow_all" | "enforced" };
   "bots.create": Bot;
   "bots.list": { bots: Bot[] };
   "bots.get": Bot;

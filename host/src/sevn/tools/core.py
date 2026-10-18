@@ -6,7 +6,7 @@ from sevn.tools.registry import TurnDeps, register_toolset
 
 
 def shell(command: str) -> str:
-    """Accept a shell command. Execution waits for the sandbox."""
+    """Accept a shell command. The pydantic runtime still wraps this function."""
     _ = command
     return "ok"
 
@@ -21,4 +21,4 @@ def _core_tools(_deps: TurnDeps) -> dict[str, object]:
     return {"shell": shell, "write": write_file}
 
 
-register_toolset("core", _core_tools, {"shell", "write"})
+register_toolset("core", _core_tools, {"write"})

@@ -79,6 +79,13 @@ async def decide(message: RoutedMessage, context: RouterContext) -> RouteDecisio
     return fallback
 
 
+async def flag_injection(text: str, score: float) -> str:
+    """Wrap external content when the inbound.injection noul reaches 0.7 (D11)."""
+    if score >= 0.7:
+        return f'<untrusted_content flagged="injection">{text}</untrusted_content>'
+    return text
+
+
 async def _keep(state: str, attempt: Attempt | None) -> RouteDecision | None:
     if attempt is None:
         return None

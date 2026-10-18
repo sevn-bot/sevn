@@ -1593,6 +1593,60 @@
       ],
       "type": "string"
     },
+    "SandboxModeParams": {
+      "additionalProperties": false,
+      "description": "Owner confirm phrase for ``host.set_sandbox_mode`` (D14).",
+      "properties": {
+        "confirm": {
+          "title": "Confirm",
+          "type": "string"
+        },
+        "mode": {
+          "enum": [
+            "allow_all",
+            "enforced"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "op_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op Id"
+        }
+      },
+      "required": [
+        "mode",
+        "confirm"
+      ],
+      "title": "SandboxModeParams",
+      "type": "object"
+    },
+    "SandboxModeResult": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": [
+            "allow_all",
+            "enforced"
+          ],
+          "title": "Mode",
+          "type": "string"
+        }
+      },
+      "required": [
+        "mode"
+      ],
+      "title": "SandboxModeResult",
+      "type": "object"
+    },
     "SyncSinceParams": {
       "additionalProperties": false,
       "properties": {
@@ -1622,6 +1676,21 @@
       "title": "SyncSinceResult",
       "type": "object"
     },
+    "SystemCaps": {
+      "additionalProperties": false,
+      "description": "Capabilities ``system.info`` reports to every client (D14).",
+      "properties": {
+        "allow_all": {
+          "title": "Allow All",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "allow_all"
+      ],
+      "title": "SystemCaps",
+      "type": "object"
+    },
     "SystemInfoParams": {
       "additionalProperties": false,
       "properties": {},
@@ -1632,11 +1701,7 @@
       "additionalProperties": false,
       "properties": {
         "caps": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Caps",
-          "type": "array"
+          "$ref": "#/$defs/SystemCaps"
         },
         "host_id": {
           "title": "Host Id",
@@ -1945,6 +2010,11 @@
       "mutating": true,
       "params": "BotsUpdateParams",
       "result": "BotRecord"
+    },
+    "host.set_sandbox_mode": {
+      "mutating": true,
+      "params": "SandboxModeParams",
+      "result": "SandboxModeResult"
     },
     "memories.delete": {
       "mutating": true,

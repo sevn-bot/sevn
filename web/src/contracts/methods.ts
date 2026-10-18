@@ -36,6 +36,11 @@ export const methods = {
     params: "BotsUpdateParams",
     result: "BotRecord",
   },
+  "host.set_sandbox_mode": {
+    mutating: true,
+    params: "SandboxModeParams",
+    result: "SandboxModeResult",
+  },
   "memories.delete": {
     mutating: true,
     params: "MemoriesDeleteParams",
