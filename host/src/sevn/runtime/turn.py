@@ -310,12 +310,16 @@ class TurnRunner:
                 model_messages=None,
                 finished_at=finished_at,
             )
+            events: list[Event] = []
+            if not await _has_user_message(session, turn_id):
+                user = _user_message(turn_id, started, job, agent)
+                session.add(user)
+                events.append(_message_event(user))
             await _finish_job(session, job.id, "cancelled", finished_at)
             await _set_agent(session, agent.id, "idle", finished_at)
-            events: list[Event] = [
-                _turn_event("turn.finished", turn_id, agent.id, "cancelled"),
-                _agent_event(agent.id, "idle"),
-            ]
+            events.append(_turn_event("turn.finished", turn_id, agent.id, "cancelled"))
+            events.append(_job_event("job.done", job.id, agent.id, "cancelled"))
+            events.append(_agent_event(agent.id, "idle"))
             events.extend(await _resolve_open_pendings(session, turn, finished_at))
             for event in events:
                 session.add(event)
@@ -765,8 +769,11 @@ async def cancel_persisted_waiting(hub: Hub, turn_id: str) -> bool:
         await _set_agent(session, turn.agent_id, "idle", finished_at)
         events: list[Event] = [
             _turn_event("turn.finished", turn.id, turn.agent_id, "cancelled"),
-            _agent_event(turn.agent_id, "idle"),
         ]
+        events.extend(
+            _job_event("job.done", job_id, turn.agent_id, "cancelled") for job_id in turn.job_ids
+        )
+        events.append(_agent_event(turn.agent_id, "idle"))
         events.extend(await _resolve_open_pendings(session, turn, finished_at))
         for event in events:
             session.add(event)

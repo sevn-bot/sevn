@@ -102,10 +102,11 @@ async def bots_delete(ctx: Ctx, params: BotsDeleteParams) -> BotsDeleteResult:
 
 
 def _reject_unknown_model(model: str | None) -> None:
-    if model is None or model_allowed(model):
+    if model is None or (model != "" and model_allowed(model)):
         return
     loc: list[JsonValue] = ["model"]
-    error: dict[str, JsonValue] = {"loc": loc, "msg": "unknown model"}
+    message = "empty model" if model == "" else "unknown model"
+    error: dict[str, JsonValue] = {"loc": loc, "msg": message}
     errors: list[JsonValue] = [error]
     data: JsonObject = {"errors": errors}
     raise ProtocolError("invalid_params", "invalid params", data)

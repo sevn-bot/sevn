@@ -171,7 +171,7 @@ function ChatView({ botId }: { botId: string }) {
         {messages.map((message) => (
           <p key={message.id}>{messageText(message.parts)}</p>
         ))}
-        {groupedTicks(ticks).map(([turnId, text]) =>
+        {groupedTicks(botTicks(ticks, agentIds)).map(([turnId, text]) =>
           persisted.has(turnId) ? null : <p key={turnId}>{text}</p>,
         )}
       </div>
@@ -222,6 +222,16 @@ function chronological(rows: ListedMessage[]): ListedMessage[] {
 
 function messageText(parts: Record<string, string>[]): string {
   return parts.map((part) => part.text ?? "").join("");
+}
+
+function botTicks(
+  ticks: Record<string, unknown>[],
+  agentIds: ReadonlySet<string>,
+): Record<string, unknown>[] {
+  return ticks.filter((tick) => {
+    const agentId = tick.agent_id;
+    return typeof agentId === "string" && agentIds.has(agentId);
+  });
 }
 
 function groupedTicks(
