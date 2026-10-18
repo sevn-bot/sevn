@@ -27,6 +27,10 @@ from sevn.secrets.backends import open_backend
 from sevn.secrets.errors import SecretNotFound
 
 ECHO_ID = "echo"
+# Long enough that two sequential turns miss the lane e2e window, short enough
+# that two overlapping turns still finish inside it. A real sleep: freezing the
+# clock and then awaiting this hangs.
+_ECHO_TURN_DELAY_S = 2.0
 
 _SECRET_NAMES = {
     "anthropic": "provider/anthropic",
@@ -247,10 +251,14 @@ def _object_list(value: object) -> list[object] | None:
 
 
 def _echo_model() -> FunctionModel:
+    """Echo the user text after a wall-clock pause of ``_ECHO_TURN_DELAY_S``."""
+
     async def respond(messages: list[ModelMessage], _info: AgentInfo) -> ModelResponse:
+        await asyncio.sleep(_ECHO_TURN_DELAY_S)
         return ModelResponse(parts=[TextPart(content=_echo_text(messages))])
 
     async def stream(messages: list[ModelMessage], _info: AgentInfo) -> AsyncIterator[str]:
+        await asyncio.sleep(_ECHO_TURN_DELAY_S)
         yield _echo_text(messages)
 
     return FunctionModel(respond, stream_function=stream, model_name=ECHO_ID)
