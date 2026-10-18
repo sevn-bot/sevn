@@ -83,13 +83,29 @@ def test_revisions_are_frozen_ddl() -> None:
 
 
 def test_find_alembic_ini_is_not_tied_to_editable_depth(tmp_path: Path) -> None:
-    from sevn.store.db import _find_alembic_ini
+    from sevn.store.db import _find_alembic_ini, _migrations_dir
 
     start = tmp_path / "pkg" / "store" / "db.py"
     start.parent.mkdir(parents=True)
     ini = tmp_path / "alembic.ini"
-    ini.write_text("[alembic]\n")
+    location = _migrations_dir().resolve().as_posix()
+    ini.write_text(f"[alembic]\nscript_location = {location}\n")
     assert _find_alembic_ini(start) == ini.resolve()
+
+
+def test_foreign_ancestor_alembic_ini_uses_packaged_fallback(tmp_path: Path) -> None:
+    from sevn.store.db import _alembic_config, _migrations_dir
+
+    start = tmp_path / "proj" / ".venv" / "lib" / "sevn" / "store" / "db.py"
+    start.parent.mkdir(parents=True)
+    (tmp_path / "proj" / "other").mkdir()
+    (tmp_path / "proj" / "alembic.ini").write_text("[alembic]\nscript_location = %(here)s/other\n")
+
+    cfg = _alembic_config(start)
+    script_location = cfg.get_main_option("script_location")
+    assert cfg.config_file_name is None
+    assert script_location is not None
+    assert Path(script_location).resolve() == _migrations_dir().resolve()
 
 
 def test_checkout_alembic_ini_is_beside_the_package() -> None:
