@@ -59,6 +59,7 @@ class _Loaded:
     bot: BotRecord
     history: list[object]
     started: datetime
+    status: str
 
 
 class TurnRunner:
@@ -97,7 +98,11 @@ class TurnRunner:
             logger.info("turn finished")
 
     async def resume(self, turn_id: str, decisions: tuple[ToolDecision, ...]) -> None:
+        if self._watch is not None and self._watch.cancelled(turn_id):
+            return
         loaded = await _load_resume(turn_id)
+        if loaded.status == "cancelled":
+            return
         if self._watch is not None:
             self._watch.open_turn(turn_id, loaded.agent.id)
         with logger.contextualize(
@@ -292,7 +297,7 @@ class TurnRunner:
     ) -> None:
         finished_at = utcnow()
         async with open_session() as session:
-            await _bind_turn(
+            turn = await _bind_turn(
                 session,
                 stored=stored,
                 turn_id=turn_id,
@@ -307,10 +312,11 @@ class TurnRunner:
             )
             await _finish_job(session, job.id, "cancelled", finished_at)
             await _set_agent(session, agent.id, "idle", finished_at)
-            events = (
+            events: list[Event] = [
                 _turn_event("turn.finished", turn_id, agent.id, "cancelled"),
                 _agent_event(agent.id, "idle"),
-            )
+            ]
+            events.extend(await _resolve_open_pendings(session, turn, finished_at))
             for event in events:
                 session.add(event)
             await session.commit()
@@ -492,12 +498,14 @@ async def _load_resume(turn_id: str) -> _Loaded:
         agent_id = turn.agent_id
         bot_id = job_row.to_bot_id
         started = turn.started_at
+        status = turn.status
     return _Loaded(
         job=job,
         agent=await AgentService().get(agent_id),
         bot=await BotService().get(bot_id),
         history=history,
         started=started,
+        status=status,
     )
 
 
