@@ -48,7 +48,10 @@ function ChatView({ botId }: { botId: string }) {
   const page = messagesQuery.data?.messages ?? [];
   const messages = [...older, ...chronological(page)];
   const agents = agentsQuery.data?.agents ?? [];
-  const pending = pendingQuery.data?.pending ?? [];
+  const agentIds = new Set(agents.map((agent) => agent.id));
+  const pending = (pendingQuery.data?.pending ?? []).filter((item) =>
+    agentIds.has(item.agent_id),
+  );
   const botName = botQuery.data?.name ?? "";
   const model = botQuery.data?.model ?? "";
   const persisted = new Set(

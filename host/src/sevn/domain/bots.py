@@ -214,7 +214,7 @@ def _apply(
     if "model" in fields and model is not None:
         row.model = model
         applied["model"] = model
-    if "effort" in fields and effort is not None:
+    if "effort" in fields:
         row.effort = effort
         applied["effort"] = effort
     if "access" in fields and access is not None:
@@ -223,7 +223,7 @@ def _apply(
     if "approval_policy" in fields and approval_policy is not None:
         row.approval_policy = approval_policy
         applied["approval_policy"] = approval_policy
-    if "folder_id" in fields and folder_id is not None:
+    if "folder_id" in fields:
         row.folder_id = folder_id
         applied["folder_id"] = folder_id
     if "paused" in fields and paused is not None:

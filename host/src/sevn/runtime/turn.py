@@ -177,6 +177,8 @@ class TurnRunner:
             elif event.kind == "turn_finished":
                 finished = event
         if finished is None or finished.model_messages is None:
+            if self._watch is not None and self._watch.cancelled(turn_id):
+                return _Outcome(text="", usage={}, model_messages=[], approvals=())
             raise TurnError("turn produced no result")
         text = "".join(parts)
         if text == "" and finished.text:
