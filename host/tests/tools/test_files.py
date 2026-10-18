@@ -56,6 +56,31 @@ async def test_write_then_read_roundtrip(tmp_path: Path, monkeypatch: pytest.Mon
     assert stored.read_text(encoding="utf-8") == "hello"
 
 
+async def test_edit_file_does_not_persist_injection_wrapper(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D11 wraps what the model sees. edit_file must not write that wrapper into the file."""
+    from fakes.fake_jev import FakeJev
+    from sevn.decisions.jev import use_client
+    from sevn.tools.files import edit_file, read_file, write_file
+
+    wrapped = '<untrusted_content flagged="injection">{text}</untrusted_content>'
+    bot, agent = await _pair(tmp_path, monkeypatch)
+    await write_file(bot.id, agent.id, "note.txt", "hello world")
+    use_client(FakeJev(answers={"inbound.injection": 0.91}))
+    try:
+        seen = await read_file(bot.id, agent.id, "note.txt")
+        assert seen == wrapped.format(text="hello world")
+        await edit_file(bot.id, agent.id, "note.txt", "hello", "goodbye")
+        stored = (Path(str(bot.workspace_path)) / "note.txt").read_text(encoding="utf-8")
+        assert stored == "goodbye world"
+        assert "untrusted_content" not in stored
+        seen_after = await read_file(bot.id, agent.id, "note.txt")
+        assert seen_after == wrapped.format(text="goodbye world")
+    finally:
+        use_client(None)
+
+
 async def test_user_ask_creates_question_pending_and_waits(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
