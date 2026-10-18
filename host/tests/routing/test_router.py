@@ -1,4 +1,4 @@
-"""Router actions, parallel agents, lifecycle, and reroute (green after W3)."""
+"""Router actions, parallel agents, lifecycle, and reroute."""
 
 from __future__ import annotations
 
@@ -20,11 +20,6 @@ from support.chat import (
     ok,
     poll_rows,
     request,
-)
-
-pytestmark = pytest.mark.xfail(
-    reason="green after W3: jev router and parallel agents",
-    strict=False,
 )
 
 
