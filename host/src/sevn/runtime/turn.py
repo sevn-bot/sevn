@@ -169,6 +169,7 @@ class TurnRunner:
         )
         parts: list[str] = []
         finished: RuntimeEvent | None = None
+        error_code: str | None = None
         async for event in self._runtime.run_turn(context):
             if event.kind == "text_delta" and event.text:
                 parts.append(event.text)
@@ -181,9 +182,15 @@ class TurnRunner:
                 )
             elif event.kind == "turn_finished":
                 finished = event
+            elif event.kind == "error" and error_code is None:
+                error_code = event.code if event.code else "error"
         if finished is None or finished.model_messages is None:
             if self._watch is not None and self._watch.cancelled(turn_id):
                 return _Outcome(text="", usage={}, model_messages=[], approvals=())
+            if error_code is not None:
+                # ``message`` can echo the prompt. Keep the code, store fixed text.
+                logger.warning("runtime error {code}", code=error_code)
+                raise TurnError(_failure_text("".join(parts)))
             raise TurnError("turn produced no result")
         text = "".join(parts)
         if text == "" and finished.text:
@@ -210,6 +217,8 @@ class TurnRunner:
     ) -> None:
         finished_at = utcnow()
         async with open_session() as session:
+            if await _is_cancelled(session, turn_id):
+                return
             await _bind_turn(
                 session,
                 stored=stored,
@@ -254,6 +263,8 @@ class TurnRunner:
         stored: bool,
     ) -> None:
         async with open_session() as session:
+            if await _is_cancelled(session, turn_id):
+                return
             await _bind_turn(
                 session,
                 stored=stored,
@@ -297,6 +308,8 @@ class TurnRunner:
     ) -> None:
         finished_at = utcnow()
         async with open_session() as session:
+            if await _is_cancelled(session, turn_id):
+                return
             turn = await _bind_turn(
                 session,
                 stored=stored,
@@ -554,6 +567,11 @@ async def _bind_turn(
     return row
 
 
+async def _is_cancelled(session: AsyncSession, turn_id: str) -> bool:
+    status = await session.scalar(select(TurnRow.status).where(TurnRow.id == turn_id))
+    return status == "cancelled"
+
+
 async def _has_user_message(session: AsyncSession, turn_id: str) -> bool:
     found = await session.scalar(
         select(Message.id).where(Message.turn_id == turn_id, Message.role == "user").limit(1)
@@ -579,6 +597,13 @@ async def _set_agent(session: AsyncSession, agent_id: str, status: str, when: da
 
 _TERMINAL = frozenset({"done", "cancelled", "failed", "interrupted"})
 _FAILED = "This turn failed."
+
+
+def _failure_text(partial: str) -> str:
+    """Chat text for a runtime error. Streamed text stays; the notice is fixed."""
+    if partial == "":
+        return _FAILED
+    return f"{partial}\n{_FAILED}"
 
 
 async def record_turn_failure(
@@ -746,6 +771,56 @@ async def _resolve_open_pendings(
             Event(type="pending.resolved", entity=row.id, payload=payload, created_at=now)
         )
     return events
+
+
+async def persist_running_cancel(hub: Hub, turn_id: str) -> bool:
+    """Store cancel for a turn whose model stream is still open.
+
+    The in-memory flag is lost if the host stops. Recovery would otherwise
+    mark the running turn failed and queue the same request again.
+    Returns true when this call wrote ``cancelled``.
+    """
+    finished_at = utcnow()
+    async with open_session() as session:
+        turn = await session.get(TurnRow, turn_id)
+        if turn is None or turn.status != "running":
+            return False
+        job_id = turn.job_ids[0] if len(turn.job_ids) > 0 else None
+        job = await session.get(JobRow, job_id) if job_id is not None else None
+        turn.status = "cancelled"
+        turn.finished_at = finished_at
+        turn.usage = {}
+        turn.model_messages = None
+        events: list[Event] = []
+        if job is not None and not await _has_user_message(session, turn.id):
+            user = Message(
+                id=new_id("msg_"),
+                thread_id=turn.thread_id,
+                turn_id=turn.id,
+                agent_id=turn.agent_id,
+                role="user",
+                author="user",
+                parts=_text_parts(job.text),
+                created_at=turn.started_at,
+            )
+            session.add(user)
+            events.append(_message_event(user))
+        for owned_id in turn.job_ids:
+            await _finish_job(session, owned_id, "cancelled", finished_at)
+        await _set_agent(session, turn.agent_id, "idle", finished_at)
+        events.append(_turn_event("turn.finished", turn.id, turn.agent_id, "cancelled"))
+        events.extend(
+            _job_event("job.done", owned_id, turn.agent_id, "cancelled")
+            for owned_id in turn.job_ids
+        )
+        events.append(_agent_event(turn.agent_id, "idle"))
+        events.extend(await _resolve_open_pendings(session, turn, finished_at))
+        for event in events:
+            session.add(event)
+        await session.commit()
+        for event in events:
+            await hub.relay(event)
+    return True
 
 
 async def cancel_persisted_waiting(hub: Hub, turn_id: str) -> bool:

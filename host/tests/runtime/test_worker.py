@@ -169,6 +169,40 @@ async def test_restart_requeues_started_jobs(
         )
 
 
+async def test_recover_does_not_requeue_a_cancelled_turn(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A started job whose turn is already cancelled is not sent again."""
+    from sevn.domain.agents import AgentService
+    from sevn.runtime.recovery import recover
+
+    load_modules("sevn.api.bots")
+    async with connected(tmp_path, monkeypatch) as (_host, client):
+        bot = await _create_bot(client)
+        agent = await AgentService().spawn(bot_id=str(bot["id"]))
+        job_id = await insert_job(
+            tmp_path,
+            bot_id=str(bot["id"]),
+            agent_id=agent.id,
+            text="do-not-resend",
+            status="started",
+        )
+        turn_id = await insert_turn(
+            tmp_path,
+            agent_id=agent.id,
+            thread_id=agent.thread_id,
+            job_id=job_id,
+            status="cancelled",
+            model_messages=None,
+        )
+        await AgentService().set_status(agent.id, "running")
+        await recover()
+        jobs = fetch_all(tmp_path, "SELECT id, status FROM jobs")
+        turns = fetch_all(tmp_path, "SELECT id, status FROM turns")
+        assert [dict(row) for row in jobs] == [{"id": job_id, "status": "cancelled"}]
+        assert [dict(row) for row in turns] == [{"id": turn_id, "status": "cancelled"}]
+
+
 async def test_turns_snapshot_returns_partial_text(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -363,6 +397,92 @@ async def test_cancel_running_pydantic_turn_emits_job_done(
             f"{','.join(types)}"
         )
         assert done == ["cancelled"], proof
+
+
+async def test_cancel_running_turn_is_not_sent_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Cancel is stored while the model call is open, and recovery does not requeue it."""
+    from sevn.runtime.models import use_model
+    from sevn.runtime.recovery import recover
+    from sevn.runtime.turn import TurnRunner
+    from sevn.runtime.worker import bind
+
+    prompt = "do-not-resend-this"
+    pause = asyncio.Event()
+    stream_done = asyncio.Event()
+    original = TurnRunner._persist_cancelled
+
+    async def _spy(self: TurnRunner, *args: object, **kwargs: object) -> None:
+        try:
+            await original(self, *args, **kwargs)
+        finally:
+            stream_done.set()
+
+    monkeypatch.setattr(TurnRunner, "_persist_cancelled", _spy)
+    use_model(function_model([{"kind": "text", "text": "partial"}], pause=pause))
+    load_modules("sevn.api.bots", "sevn.api.messages")
+    try:
+        async with connected(tmp_path, monkeypatch) as (host, client):
+            bind(host.hub)
+            bot = await _create_bot(client)
+            sent = await _send(client, bot["id"], prompt)
+            job_id = str(sent["job_id"])
+            turns = await poll_rows(
+                tmp_path,
+                "SELECT id FROM turns",
+                (),
+                lambda rows: bool(rows),
+            )
+            turn_id = str(turns[0]["id"])
+            await _wait_running_partial(client, turn_id)
+            frame, _earlier = await request(
+                client,
+                "turns.cancel",
+                {"turn_id": turn_id, "op_id": mint_id("op_")},
+            )
+            ok(frame)
+            held = fetch_all(
+                tmp_path,
+                "SELECT status FROM jobs WHERE id = ?",
+                (job_id,),
+            )
+            held_turn = fetch_all(
+                tmp_path,
+                "SELECT status FROM turns WHERE id = ?",
+                (turn_id,),
+            )
+            assert held[0]["status"] == "cancelled"
+            assert held_turn[0]["status"] == "cancelled"
+            await recover()
+            still = fetch_all(tmp_path, "SELECT id, status FROM jobs")
+            assert [dict(row) for row in still] == [{"id": job_id, "status": "cancelled"}]
+            pause.set()
+            await asyncio.wait_for(stream_done.wait(), timeout=2)
+            finished = fetch_all(tmp_path, "SELECT id, status FROM jobs")
+            turn_rows = fetch_all(
+                tmp_path,
+                "SELECT status, model_messages FROM turns WHERE id = ?",
+                (turn_id,),
+            )
+            messages = fetch_all(
+                tmp_path,
+                "SELECT role FROM messages WHERE turn_id = ?",
+                (turn_id,),
+            )
+            stored = await host.outbox.since(0)
+            raw_messages = turn_rows[0]["model_messages"]
+            parsed: object = None if raw_messages is None else json.loads(str(raw_messages))
+            assert [dict(row) for row in finished] == [{"id": job_id, "status": "cancelled"}]
+            assert turn_rows[0]["status"] == "cancelled"
+            assert parsed is None
+            assert [row["role"] for row in messages] == ["user"]
+            assert job_done_statuses(stored, job_id) == ["cancelled"]
+            listed, _listed_earlier = await request(client, "messages.list", {"bot_id": bot["id"]})
+            assert prompt in _user_prompt_texts(ok(listed)["messages"])
+    finally:
+        pause.set()
+        use_model(None)
 
 
 _PROVIDER_CANARY = "provider-echo-CANARY-9f3a"

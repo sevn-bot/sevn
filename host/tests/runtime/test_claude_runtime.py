@@ -447,6 +447,109 @@ async def test_cancelled_claude_abort_ends_cancelled(
         use_client(None)
 
 
+_PARTIAL = "kept partial"
+_PROVIDER_ECHO = "provider-echo-CANARY-4c1e"
+
+
+async def test_runtime_error_keeps_streamed_text_and_hides_provider_text(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A Claude error keeps streamed text, stores a fixed notice, and logs the code."""
+    from sevn.log import logger
+    from sevn.runtime.runtimes.claude import use_client
+    from sevn.runtime.worker import bind
+
+    fake = FakeClaudeClient(
+        script=[
+            {
+                "type": "stream_event",
+                "event": {
+                    "type": "content_block_delta",
+                    "delta": {"type": "text_delta", "text": _PARTIAL},
+                },
+            },
+            {
+                "type": "result",
+                "is_error": True,
+                "subtype": "rate_limit",
+                "errors": [_PROVIDER_ECHO],
+                "result": _PROVIDER_ECHO,
+                "usage": {},
+            },
+        ]
+    )
+    use_client(fake)
+    load_modules("sevn.api.bots", "sevn.api.messages")
+    logged: list[str] = []
+    sink_id = logger.add(lambda message: logged.append(str(message)))
+    try:
+        async with connected(tmp_path, monkeypatch) as (_host, client):
+            worker = bind(_host.hub)
+            try:
+                created = ok(
+                    (
+                        await request(
+                            client,
+                            "bots.create",
+                            {
+                                "name": "Claude",
+                                "runtime": "claude",
+                                "op_id": mint_id("op_"),
+                            },
+                        )
+                    )[0]
+                )
+                await request(
+                    client,
+                    "messages.send",
+                    {
+                        "bot_id": created["id"],
+                        "text": "explain the tide",
+                        "op_id": mint_id("op_"),
+                    },
+                )
+                await poll_rows(
+                    tmp_path,
+                    "SELECT status FROM turns",
+                    (),
+                    lambda rows: bool(rows) and rows[0]["status"] == "failed",
+                )
+                turns = fetch_all(tmp_path, "SELECT status, model_messages FROM turns")
+                jobs = fetch_all(tmp_path, "SELECT status FROM jobs")
+                events = fetch_all(tmp_path, "SELECT type, payload FROM events")
+                listed, _earlier = await request(
+                    client,
+                    "messages.list",
+                    {"bot_id": created["id"]},
+                )
+                assistant = _assistant_text(ok(listed))
+                stored = json.dumps(
+                    {
+                        "turns": [dict(row) for row in turns],
+                        "jobs": [dict(row) for row in jobs],
+                        "events": [dict(row) for row in events],
+                        "messages": ok(listed),
+                    },
+                    default=str,
+                )
+                log_text = "\n".join(logged)
+                raw_messages = turns[0]["model_messages"]
+                parsed: object = None if raw_messages is None else json.loads(str(raw_messages))
+                assert turns[0]["status"] == "failed"
+                assert parsed is None
+                assert jobs[0]["status"] == "failed"
+                assert assistant == f"{_PARTIAL}\nThis turn failed."
+                assert "turn produced no result" not in stored
+                assert _PROVIDER_ECHO not in stored
+                assert _PROVIDER_ECHO not in log_text
+                assert "rate_limit" in log_text
+            finally:
+                await worker.aclose()
+    finally:
+        logger.remove(sink_id)
+        use_client(None)
+
+
 async def test_cancelled_claude_turn_closes_open_permission(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
