@@ -1,0 +1,189 @@
+"""Per-agent scratch dirs, shared locks, and git worktrees (green after W5)."""
+
+from __future__ import annotations
+
+import os
+import sqlite3
+import subprocess
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+
+import pytest
+from support.botcore import arm_configured, upgrade_home
+from support.chat import fetch_all
+
+pytestmark = pytest.mark.xfail(
+    reason="green after W5: workspace tools and isolation",
+    strict=False,
+)
+
+
+async def _pair(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[object, object]:
+    from sevn.domain.agents import AgentService
+    from sevn.domain.bots import BotService
+
+    arm_configured(monkeypatch, tmp_path)
+    await upgrade_home(tmp_path)
+    bot = await BotService().create("Nimbus")
+    agent = await AgentService().spawn(bot.id)
+    return bot, agent
+
+
+def _title(home: Path, agent_id: str, title: str) -> None:
+    with sqlite3.connect(home / "sevn.db") as connection:
+        connection.execute("UPDATE agents SET title = ? WHERE id = ?", (title, agent_id))
+        connection.commit()
+
+
+def _git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    env = {
+        **os.environ,
+        "GIT_AUTHOR_NAME": "Sevn Test",
+        "GIT_AUTHOR_EMAIL": "sevn-test@example.com",
+        "GIT_COMMITTER_NAME": "Sevn Test",
+        "GIT_COMMITTER_EMAIL": "sevn-test@example.com",
+    }
+    return subprocess.run(  # noqa: S603
+        ["git", *args],  # noqa: S607
+        cwd=repo,
+        check=False,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+
+async def test_each_agent_has_scratch_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from sevn.domain.agents import AgentService
+
+    bot, _agent = await _pair(tmp_path, monkeypatch)
+    second = await AgentService().spawn(bot.id)
+    scratch = Path(str(bot.workspace_path)) / "tasks" / second.id
+    assert scratch.is_dir()
+
+
+async def test_shared_path_write_takes_lock_and_second_agent_gets_path_locked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sevn.domain.agents import AgentService
+    from sevn.domain.errors import DomainError
+    from sevn.tools.files import write_file
+
+    bot, holder = await _pair(tmp_path, monkeypatch)
+    other = await AgentService().spawn(bot.id)
+    _title(tmp_path, holder.id, "Invoice fix")
+    shared = Path(os.environ["SEVN_WORKSPACES"]).parent / "Shared" / "board.txt"
+    await write_file(bot.id, holder.id, str(shared), "one")
+    assert shared.read_text(encoding="utf-8") == "one"
+    with pytest.raises(DomainError) as exc:
+        await write_file(bot.id, other.id, str(shared), "two")
+    assert exc.value.code == "path_locked"
+    assert "locked" in exc.value.message
+    assert exc.value.data["holder_agent_id"] == holder.id
+    assert exc.value.data["holder_title"] == "Invoice fix"
+    assert shared.read_text(encoding="utf-8") == "one"
+
+
+async def test_lock_released_on_turn_end_and_expired_after_ttl(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sevn.domain.agents import AgentService
+    from sevn.domain.workspace import release_turn
+    from sevn.tools.files import write_file
+
+    bot, holder = await _pair(tmp_path, monkeypatch)
+    other = await AgentService().spawn(bot.id)
+    shared = Path(os.environ["SEVN_WORKSPACES"]).parent / "Shared" / "board.txt"
+    await write_file(bot.id, holder.id, str(shared), "held")
+    rows = fetch_all(
+        tmp_path,
+        "SELECT acquired_at, expires_at FROM agent_locks WHERE agent_id = ?",
+        (holder.id,),
+    )
+    assert rows
+    acquired = datetime.fromisoformat(str(rows[0]["acquired_at"]))
+    expires = datetime.fromisoformat(str(rows[0]["expires_at"]))
+    assert timedelta(minutes=9) <= (expires - acquired) <= timedelta(minutes=11)
+    await release_turn(holder.id)
+    await write_file(bot.id, other.id, str(shared), "released")
+    assert shared.read_text(encoding="utf-8") == "released"
+
+    await write_file(bot.id, holder.id, str(shared), "again")
+    past = (datetime.now(UTC) - timedelta(minutes=1)).isoformat()
+    with sqlite3.connect(tmp_path / "sevn.db") as connection:
+        connection.execute(
+            "UPDATE agent_locks SET expires_at = ? WHERE agent_id = ?",
+            (past, holder.id),
+        )
+        connection.commit()
+    await write_file(bot.id, other.id, str(shared), "expired")
+    assert shared.read_text(encoding="utf-8") == "expired"
+
+
+async def test_own_scratch_dir_needs_no_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sevn.domain.agents import AgentService
+    from sevn.tools.files import read_file, write_file
+
+    bot, first = await _pair(tmp_path, monkeypatch)
+    second = await AgentService().spawn(bot.id)
+    await write_file(bot.id, first.id, f"tasks/{first.id}/a.txt", "alpha")
+    await write_file(bot.id, second.id, f"tasks/{second.id}/b.txt", "beta")
+    assert await read_file(bot.id, first.id, f"tasks/{first.id}/a.txt") == "alpha"
+    assert await read_file(bot.id, second.id, f"tasks/{second.id}/b.txt") == "beta"
+
+
+async def test_worktree_isolation_in_git_repo(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sevn.domain.workspace import ensure
+    from sevn.tools.files import write_file
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    assert _git(repo, "init", "-b", "main").returncode == 0
+    (repo / "README").write_text("base\n", encoding="utf-8")
+    assert _git(repo, "add", "README").returncode == 0
+    assert _git(repo, "commit", "-m", "init").returncode == 0
+    bot, agent = await _pair(tmp_path, monkeypatch)
+    with sqlite3.connect(tmp_path / "sevn.db") as connection:
+        connection.execute(
+            "UPDATE bots SET workspace_path = ? WHERE id = ?",
+            (str(repo), bot.id),
+        )
+        connection.execute(
+            "UPDATE agents SET isolation = 'worktree' WHERE id = ?",
+            (agent.id,),
+        )
+        connection.commit()
+    note = await ensure(agent.id)
+    assert note == ""
+    await write_file(bot.id, agent.id, "f.txt", "from-agent")
+    assert not (repo / "f.txt").exists()
+    worktree = repo / ".sevn" / "worktrees" / agent.id / "f.txt"
+    assert worktree.read_text(encoding="utf-8") == "from-agent"
+    branch = _git(repo, "rev-parse", "--verify", f"sevn/{agent.id}")
+    assert branch.returncode == 0, branch.stderr
+    status = _git(repo, "status", "--porcelain")
+    assert status.returncode == 0, status.stderr
+    assert "f.txt" not in status.stdout
+
+
+async def test_worktree_isolation_ignored_outside_git(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sevn.domain.workspace import ensure
+
+    bot, agent = await _pair(tmp_path, monkeypatch)
+    with sqlite3.connect(tmp_path / "sevn.db") as connection:
+        connection.execute(
+            "UPDATE agents SET isolation = 'worktree' WHERE id = ?",
+            (agent.id,),
+        )
+        connection.commit()
+    note = await ensure(agent.id)
+    assert note == "worktree ignored: workspace is not a git repo"
+    scratch = Path(str(bot.workspace_path)) / "tasks" / agent.id
+    assert scratch.is_dir()
+    assert not (Path(str(bot.workspace_path)) / ".sevn" / "worktrees" / agent.id).exists()
