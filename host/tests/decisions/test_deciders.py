@@ -1,4 +1,4 @@
-"""Decider framework, fallback chain, decision log, and K-REG (green after W2)."""
+"""Decider framework, fallback chain, decision log, and K-REG."""
 
 from __future__ import annotations
 
@@ -25,11 +25,6 @@ from support.botcore import (
 )
 from support.canary import canary
 from support.repo import repo_root
-
-pytestmark = pytest.mark.xfail(
-    reason="green after W2: decider framework and registration apis",
-    strict=False,
-)
 
 _FEATURE_PREFIXES = (
     "sevn.memory",
