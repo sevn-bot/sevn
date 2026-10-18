@@ -16,7 +16,7 @@ from sevn.protocol.hub import Hub
 from sevn.runtime.base import Runtime, ToolDecision
 from sevn.runtime.runtimes.claude import ClaudeRuntime, installed_client
 from sevn.runtime.runtimes.pydantic_ai import PydanticAIRuntime
-from sevn.runtime.turn import TurnRunner, record_turn_failure
+from sevn.runtime.turn import TurnRunner, cancel_persisted_waiting, record_turn_failure
 from sevn.store.models import Job as JobRow
 from sevn.store.models import Turn as TurnRow
 
@@ -117,6 +117,9 @@ class Worker:
         agent_id = self._board.agent_id(turn_id)
         if agent_id is None:
             agent_id = await _agent_for_turn(turn_id)
+        if await cancel_persisted_waiting(self.hub, turn_id):
+            self.kick(agent_id)
+            return
         runtime = await self._choose(agent_id)
         await runtime.interrupt(agent_id)
 

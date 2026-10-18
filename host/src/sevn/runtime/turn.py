@@ -744,6 +744,38 @@ async def _resolve_open_pendings(
     return events
 
 
+async def cancel_persisted_waiting(hub: Hub, turn_id: str) -> bool:
+    """Cancel a turn already stored as waiting.
+
+    The stream that produced the approval has finished, so the in-memory
+    cancel flag and ``Runtime.interrupt`` never reach it. Returns true when
+    this call wrote ``cancelled``.
+    """
+    finished_at = utcnow()
+    async with open_session() as session:
+        turn = await session.get(TurnRow, turn_id)
+        if turn is None or turn.status != "waiting":
+            return False
+        turn.status = "cancelled"
+        turn.finished_at = finished_at
+        turn.usage = {}
+        turn.model_messages = None
+        for job_id in turn.job_ids:
+            await _finish_job(session, job_id, "cancelled", finished_at)
+        await _set_agent(session, turn.agent_id, "idle", finished_at)
+        events: list[Event] = [
+            _turn_event("turn.finished", turn.id, turn.agent_id, "cancelled"),
+            _agent_event(turn.agent_id, "idle"),
+        ]
+        events.extend(await _resolve_open_pendings(session, turn, finished_at))
+        for event in events:
+            session.add(event)
+        await session.commit()
+        for event in events:
+            await hub.relay(event)
+    return True
+
+
 async def _sync_agent_status(
     session: AsyncSession,
     agent_id: str,
