@@ -5,11 +5,14 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Protocol, cast
+from typing import TYPE_CHECKING, Protocol, cast
 
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.pool import NullPool
+
+if TYPE_CHECKING:
+    from alembic.config import Config
 
 
 class _Cursor(Protocol):
@@ -55,12 +58,52 @@ async def upgrade(url: str) -> None:
 
 def _upgrade_sync(url: str) -> None:
     from alembic import command
-    from alembic.config import Config
 
-    cfg = Config(str(_alembic_ini()))
+    cfg = _alembic_config()
     cfg.set_main_option("sqlalchemy.url", sync_url(url).replace("%", "%%"))
     command.upgrade(cfg, "head")
 
 
-def _alembic_ini() -> Path:
-    return Path(__file__).resolve().parents[3] / "alembic.ini"
+def _alembic_config(start: Path | None = None) -> Config:
+    from alembic.config import Config
+
+    origin = Path(__file__).resolve() if start is None else start
+    ini = _find_alembic_ini(origin)
+    if ini is not None:
+        return Config(str(ini))
+    cfg = Config()
+    cfg.set_main_option("script_location", str(_migrations_dir()))
+    cfg.set_main_option("path_separator", "os")
+    return cfg
+
+
+def _migrations_dir() -> Path:
+    return Path(__file__).resolve().parent / "migrations"
+
+
+def _find_alembic_ini(start: Path) -> Path | None:
+    """Nearest sevn alembic.ini above ``start``, or none when no owned ini exists."""
+    migrations = _migrations_dir().resolve()
+    for parent in start.resolve().parents:
+        candidate = parent / "alembic.ini"
+        if not candidate.is_file():
+            continue
+        if _resolved_script_location(candidate) == migrations:
+            return candidate
+    return None
+
+
+def _resolved_script_location(ini: Path) -> Path | None:
+    """Resolved ``script_location``, or none when the ini cannot be read as sevn's."""
+    import configparser
+
+    from alembic.config import Config
+    from alembic.util.exc import CommandError
+
+    try:
+        location = Config(str(ini)).get_main_option("script_location")
+    except (configparser.Error, CommandError, OSError, UnicodeError, ValueError):
+        return None
+    if location is None:
+        return None
+    return Path(location).resolve()

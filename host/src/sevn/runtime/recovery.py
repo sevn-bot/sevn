@@ -52,8 +52,10 @@ async def recover() -> Recovery:
     turn ``interrupted`` and asks the user to resend.
 
     The crashed attempt's running turn is marked ``failed`` so the retry is
-    not a second running turn for the same job. ``kick`` lists agents that
-    own a queued job; the caller starts a pump for each of them.
+    not a second running turn for the same job. A turn already stored as
+    ``cancelled`` is left cancelled and its job is not queued again. ``kick``
+    lists agents that own a queued job; the caller starts a pump for each of
+    them.
     """
     answered: list[AnsweredTurn] = []
     async with open_session() as session:
@@ -72,6 +74,12 @@ async def recover() -> Recovery:
                     answered.extend(ready)
                     continue
                 if any(turn.status == "waiting" for turn in related):
+                    continue
+                if len(related) > 0 and all(turn.status == "cancelled" for turn in related):
+                    job.status = "cancelled"
+                    job.finished_at = now
+                    await _idle_crashed_agent(session, turns, job.agent_id, now)
+                    logger.info("kept cancelled job {job_id}", job_id=job.id)
                     continue
                 if any(turn.model_messages is not None for turn in related):
                     continue
