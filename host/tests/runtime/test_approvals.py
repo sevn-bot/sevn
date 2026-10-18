@@ -436,3 +436,35 @@ async def test_cancel_persisted_waiting_emits_job_done(
             f"{','.join(types)}"
         )
         assert done == ["cancelled"], proof
+
+
+def _stored_object(value: object) -> dict[str, object]:
+    loaded: object = json.loads(value if isinstance(value, str) else json.dumps(value))
+    if not isinstance(loaded, dict):
+        raise AssertionError(value)
+    return {str(key): item for key, item in loaded.items()}
+
+
+async def test_pending_list_returns_deferred_tool_name_and_args(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """pending.list returns the tool name and arguments stored on the pending row."""
+    load_modules("sevn.api.bots", "sevn.api.messages", "sevn.api.pending")
+    async with connected(tmp_path, monkeypatch) as (host, client):
+        await _arm(host)
+        bot = await _bot(client)
+        await request(
+            client,
+            "messages.send",
+            {"bot_id": bot["id"], "text": "run it", "op_id": mint_id("op_")},
+        )
+        item = await _wait_pending(tmp_path, client)
+        rows = fetch_all(
+            tmp_path,
+            "SELECT payload FROM pending_requests WHERE id = ?",
+            (item["id"],),
+        )
+        payload = _stored_object(rows[0]["payload"])
+        listed = {"name": item.get("name"), "args": item.get("args")}
+        stored = {"name": payload.get("name"), "args": payload.get("args")}
+        assert listed == stored == {"name": "shell", "args": {"command": "echo hi"}}, item

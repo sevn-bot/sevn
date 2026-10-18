@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import json
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
@@ -575,3 +576,222 @@ async def test_live_claude_turn(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
         assert "".join(texts).strip()
     finally:
         await _close(created)
+
+
+def _stored_object(value: object) -> dict[str, object]:
+    loaded: object = json.loads(value if isinstance(value, str) else json.dumps(value))
+    if not isinstance(loaded, dict):
+        raise AssertionError(value)
+    return {str(key): item for key, item in loaded.items()}
+
+
+async def test_pending_list_returns_claude_permission_name_and_args(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """pending.list returns the tool name and arguments stored for a Claude permission."""
+    from sevn.runtime.runtimes.claude import use_client
+    from sevn.runtime.worker import bind
+
+    fake = FakeClaudeClient(
+        script=[
+            {
+                "kind": "permission",
+                "tool": "Bash",
+                "args": {"command": "ls"},
+                "request_id": "req_1",
+            },
+            {"type": "result", "usage": {}},
+        ]
+    )
+    use_client(fake)
+    load_modules("sevn.api.bots", "sevn.api.messages", "sevn.api.pending")
+    listed: dict[str, object] = {}
+    stored: dict[str, object] = {}
+    item: dict[str, Any] = {}
+    try:
+        async with connected(tmp_path, monkeypatch) as (host, client):
+            worker = bind(host.hub)
+            try:
+                created = ok(
+                    (
+                        await request(
+                            client,
+                            "bots.create",
+                            {
+                                "name": "Claude",
+                                "runtime": "claude",
+                                "op_id": mint_id("op_"),
+                            },
+                        )
+                    )[0]
+                )
+                await request(
+                    client,
+                    "messages.send",
+                    {"bot_id": created["id"], "text": "ls", "op_id": mint_id("op_")},
+                )
+                await asyncio.wait_for(fake.permission_started.wait(), timeout=2)
+                rows = await poll_rows(
+                    tmp_path,
+                    "SELECT id, payload FROM pending_requests WHERE status = 'waiting'",
+                    (),
+                    lambda found: bool(found),
+                )
+                frame, _earlier = await request(client, "pending.list", {})
+                pending = ok(frame)["pending"]
+                raw_item = pending[0]
+                if isinstance(raw_item, dict):
+                    item = raw_item
+                stored = _stored_object(rows[0]["payload"])
+                listed = {"name": item.get("name"), "args": item.get("args")}
+            finally:
+                await worker.aclose()
+    finally:
+        use_client(None)
+    assert (
+        listed
+        == {"name": stored.get("name"), "args": stored.get("args")}
+        == {
+            "name": "Bash",
+            "args": {"command": "ls"},
+        }
+    ), item
+
+
+async def test_claude_turn_presents_bot_instructions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A Claude turn presents the bot's instructions on connect or in the prompt.
+
+    The pydantic_ai A.2.5 layout stays as it is. This test only requires the
+    instruction text to reach FakeClaudeClient.
+    """
+    from sevn.runtime.runtimes.claude import use_client
+    from sevn.runtime.worker import bind
+
+    instructions = "Count purple urchins before you answer."
+    fake = FakeClaudeClient(script=[{"type": "result", "usage": {}}])
+    use_client(fake)
+    load_modules("sevn.api.bots", "sevn.api.messages")
+    try:
+        async with connected(tmp_path, monkeypatch) as (host, client):
+            worker = bind(host.hub)
+            try:
+                created = ok(
+                    (
+                        await request(
+                            client,
+                            "bots.create",
+                            {
+                                "name": "Claude",
+                                "title": "Tide guide",
+                                "scope": "Rocky shore",
+                                "instructions": instructions,
+                                "runtime": "claude",
+                                "op_id": mint_id("op_"),
+                            },
+                        )
+                    )[0]
+                )
+                await request(
+                    client,
+                    "messages.send",
+                    {
+                        "bot_id": created["id"],
+                        "text": "hello from the shore",
+                        "op_id": mint_id("op_"),
+                    },
+                )
+                await poll_rows(
+                    tmp_path,
+                    "SELECT status FROM jobs",
+                    (),
+                    lambda rows: bool(rows) and rows[0]["status"] == "done",
+                )
+            finally:
+                await worker.aclose()
+    finally:
+        use_client(None)
+    recorded = {"connects": fake.connects, "queries": list(fake.queries)}
+    assert instructions in json.dumps(recorded, default=str), recorded
+
+
+@pytest.mark.parametrize("policy", ["auto", "allow_all"])
+async def test_claude_non_ask_policy_finishes_without_a_permission_wait(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    policy: str,
+) -> None:
+    """Bot policies auto and allow_all allow the tool without the can_use_tool wait.
+
+    ApprovalPolicy is ask, auto, or allow_all. ask still waits in
+    test_can_use_tool_creates_pending_and_blocks_until_answer.
+    """
+    from sevn.runtime.runtimes.claude import use_client
+    from sevn.runtime.worker import bind
+
+    fake = FakeClaudeClient(
+        script=[
+            {
+                "kind": "permission",
+                "tool": "Bash",
+                "args": {"command": "ls"},
+                "request_id": "req_1",
+            },
+            {"type": "result", "usage": {}},
+        ]
+    )
+    use_client(fake)
+    load_modules("sevn.api.bots", "sevn.api.messages", "sevn.api.pending")
+    status = ""
+    waiting: list[dict[str, object]] = []
+    results: list[object] = []
+    try:
+        async with connected(tmp_path, monkeypatch) as (host, client):
+            worker = bind(host.hub)
+            try:
+                created = ok(
+                    (
+                        await request(
+                            client,
+                            "bots.create",
+                            {
+                                "name": "Claude",
+                                "runtime": "claude",
+                                "approval_policy": policy,
+                                "op_id": mint_id("op_"),
+                            },
+                        )
+                    )[0]
+                )
+                await request(
+                    client,
+                    "messages.send",
+                    {"bot_id": created["id"], "text": "ls", "op_id": mint_id("op_")},
+                )
+                deadline = asyncio.get_running_loop().time() + 2
+                while asyncio.get_running_loop().time() < deadline:
+                    jobs = [dict(row) for row in fetch_all(tmp_path, "SELECT status FROM jobs")]
+                    waiting = [
+                        dict(row)
+                        for row in fetch_all(
+                            tmp_path,
+                            "SELECT id, status FROM pending_requests WHERE status = 'waiting'",
+                        )
+                    ]
+                    status = str(jobs[0]["status"]) if jobs else ""
+                    results = list(fake.permission_results)
+                    if status == "done" and waiting == [] and results == ["approve"]:
+                        break
+                    await asyncio.sleep(0.02)
+            finally:
+                await worker.aclose()
+    finally:
+        use_client(None)
+    assert status == "done" and waiting == [] and results == ["approve"], (
+        policy,
+        status,
+        waiting,
+        results,
+        fake.permission_started.is_set(),
+    )

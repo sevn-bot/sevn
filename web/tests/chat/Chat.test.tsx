@@ -328,3 +328,47 @@ test("does not show another bot's streaming tick", async () => {
     harness.stop();
   }
 });
+
+test("shows the tool name and arguments on the approval card", async () => {
+  const harness = await startHarness({
+    "messages.list": { messages: [], next_cursor: null },
+    "agents.list": {
+      agents: [{ id: "agent_1", title: "Nimbus", status: "waiting" }],
+    },
+    "pending.list": {
+      pending: [
+        {
+          id: "pend_1",
+          turn_id: "turn_1",
+          agent_id: "agent_1",
+          kind: "approval",
+          tool_call_id: "call_0",
+          status: "waiting",
+          name: "shell",
+          args: { command: "echo hi" },
+        },
+      ],
+    },
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Chat = await loadChat();
+    testing.render(createElement(Chat, { botId }));
+    const approve = await testing.screen.findByRole("button", {
+      name: "Approve",
+    });
+    const text = approve.closest("div")?.textContent ?? "";
+    expect({
+      tool: text.includes("shell"),
+      args: text.includes("echo hi"),
+      text,
+    }).toEqual({
+      tool: true,
+      args: true,
+      text,
+    });
+  } finally {
+    testing.cleanup();
+    harness.stop();
+  }
+});
