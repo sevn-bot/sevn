@@ -53,6 +53,11 @@ class _Board:
     def agent_id(self, turn_id: str) -> str | None:
         return self._agent.get(turn_id)
 
+    def forget(self, turn_id: str) -> None:
+        self._text.pop(turn_id, None)
+        self._agent.pop(turn_id, None)
+        self._cancelled.discard(turn_id)
+
 
 class Worker:
     """Run queued jobs one turn at a time per agent, up to the host cap."""
@@ -65,6 +70,7 @@ class Worker:
         self._slots = asyncio.Semaphore(_max_running_turns())
         self._locks: dict[str, asyncio.Lock] = {}
         self._tasks: dict[str, asyncio.Task[None]] = {}
+        self._resumes: set[asyncio.Task[None]] = set()
         self._again: set[str] = set()
         self._board = _Board()
         self._closed = False
@@ -84,16 +90,28 @@ class Worker:
             started.add_done_callback(_log_task)
             self._tasks[agent_id] = started
 
+    def start_resume(
+        self,
+        agent_id: str,
+        turn_id: str,
+        decisions: tuple[ToolDecision, ...],
+    ) -> None:
+        """Continue an approved turn without holding the request that answered it."""
+        task = asyncio.create_task(self.resume(agent_id, turn_id, decisions))
+        self._resumes.add(task)
+        task.add_done_callback(self._resumes.discard)
+
     async def aclose(self) -> None:
         """Stop pumps. Does not close the hub."""
         self._closed = True
-        tasks = [task for task in self._tasks.values() if not task.done()]
+        tasks = [task for task in (*self._tasks.values(), *self._resumes) if not task.done()]
         for task in tasks:
             task.cancel()
         for task in tasks:
             with suppress(asyncio.CancelledError):
                 await task
         self._tasks.clear()
+        self._resumes.clear()
 
     async def resume(
         self,
@@ -117,17 +135,23 @@ class Worker:
         finally:
             self.kick(agent_id)
 
-    async def cancel(self, turn_id: str) -> None:
+    async def cancel(self, turn_id: str) -> str:
+        """Cancel a live or waiting turn. A finished turn keeps its stored status."""
+        live = self._board.agent_id(turn_id)
         self._board.cancel(turn_id)
-        agent_id = self._board.agent_id(turn_id)
-        if agent_id is None:
-            agent_id = await _agent_for_turn(turn_id)
         if await cancel_persisted_waiting(self.hub, turn_id):
+            agent_id = live if live is not None else await _agent_for_turn(turn_id)
             self.kick(agent_id)
-            return
+            return "cancelled"
+        if live is None:
+            if await persist_running_cancel(self.hub, turn_id):
+                return "cancelled"
+            return await _turn_status(turn_id)
         await persist_running_cancel(self.hub, turn_id)
-        runtime = await self._choose(agent_id)
-        await runtime.interrupt(agent_id)
+        runtime = await self._choose(live)
+        await runtime.interrupt(live)
+        self.kick(live)
+        return "cancelled"
 
     async def snapshot(self, turn_id: str) -> tuple[str, str]:
         status = await _turn_status(turn_id)

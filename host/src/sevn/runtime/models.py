@@ -68,10 +68,10 @@ def echo_enabled() -> bool:
 
 
 def model_allowed(model_id: str) -> bool:
-    """Reject the echo id unless the dev flags are on. Other ids stay selectable."""
+    """Catalog ids are selectable. Echo is selectable only behind the dev flags."""
     if model_id == ECHO_ID:
         return echo_enabled()
-    return True
+    return any(item.id == model_id for item in _CATALOG)
 
 
 _override: Model | None = None

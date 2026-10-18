@@ -10,6 +10,7 @@ import webbrowser
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
+from datetime import timedelta
 from pathlib import Path
 from typing import cast
 
@@ -160,15 +161,18 @@ def create_app(settings: Settings) -> ASGIApp:
 async def _lifespan(app: ASGIApp) -> AsyncGenerator[None]:
     state = _state(app)
     paths = Paths.from_env()
+    await asyncio.to_thread(_ensure_home, paths.home)
     url = f"sqlite+aiosqlite:///{paths.db}"
     await upgrade(url)
     outbox = Outbox(url)
     oplog = OpLog(url)
     state.outbox = outbox
     state.oplog = oplog
+    await _retain(outbox, oplog)
     browser: asyncio.Task[None] | None = None
     worker: Worker | None = None
     resumes: list[asyncio.Task[None]] = []
+    retention = asyncio.create_task(_retain_loop(outbox, oplog))
     try:
         state.hub = Hub(outbox, oplog)
         recovered = await recover()
@@ -192,6 +196,9 @@ async def _lifespan(app: ASGIApp) -> AsyncGenerator[None]:
             browser = asyncio.create_task(_open_browser(state))
         yield
     finally:
+        retention.cancel()
+        with suppress(asyncio.CancelledError):
+            await retention
         for task in resumes:
             if not task.done():
                 task.cancel()
@@ -275,7 +282,8 @@ def refusal(headers: Headers, port: int, *, server: object = None) -> str | None
     if origin is None or origin.strip() == "":
         return None
     origin = origin.strip()
-    allowed = {f"http://{item}" for item in _allowed_hosts(port)}
+    names = _allowed_hosts(port)
+    allowed = {f"http://{item}" for item in names} | {f"https://{item}" for item in names}
     if os.environ.get("SEVN_DEV") == "1":
         allowed.add(_DEV_ORIGIN)
     if origin not in allowed:
@@ -318,6 +326,29 @@ def _testclient_socket(host: str, server: object) -> bool:
 
 def _guarded(path: str) -> bool:
     return path == "/ws" or path == "/auth" or path.startswith("/auth/")
+
+
+_OUTBOX_AGE = timedelta(days=7)
+_OUTBOX_ROWS = 100_000
+_RETAIN_EVERY_S = 3600
+
+
+def _ensure_home(home: Path) -> None:
+    home.mkdir(parents=True, exist_ok=True, mode=0o700)
+
+
+async def _retain(outbox: Outbox, oplog: OpLog) -> None:
+    await outbox.prune(_OUTBOX_AGE, _OUTBOX_ROWS)
+    await oplog.prune()
+
+
+async def _retain_loop(outbox: Outbox, oplog: OpLog) -> None:
+    while True:
+        await asyncio.sleep(_RETAIN_EVERY_S)
+        try:
+            await _retain(outbox, oplog)
+        except Exception:  # noqa: BLE001 — retention must not kill the host
+            logger.exception("retention failed")
 
 
 def _require_hub(state: AppState) -> Hub:

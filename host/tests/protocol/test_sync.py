@@ -85,3 +85,29 @@ async def test_resync_required_when_pruned(tmp_path: Path, monkeypatch: pytest.M
         assert response["e"]["code"] == "resync_required"
         assert isinstance(response["e"]["data"]["min_seq"], int)
         assert response["e"]["data"]["min_seq"] >= 1
+
+
+async def test_sync_since_pages_and_reports_the_real_head(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async with memory_host(tmp_path, monkeypatch) as host:
+        client, _session = host.open()
+        await handshake(client, host.token)
+        for index in range(3):
+            await host.hub.emit("system.ping", "system", {"i": index})
+            assert (await recv_frame(client))["t"] == "evt"
+        await send_req(client, "page", "sync.since", {"seq": 0, "limit": 1})
+        response = await recv_frame(client)
+        assert response["r"]["more"] is True
+        assert response["r"]["next_seq"] == 1
+        assert response["r"]["host_seq"] == 3
+        event = await recv_frame(client)
+        assert event["s"] == 1
+        await send_req(client, "ahead", "sync.since", {"seq": 99})
+        ahead = await recv_frame(client)
+        assert ahead["r"]["host_seq"] == 3
+        assert ahead["r"]["next_seq"] == 3
+        assert ahead["r"]["more"] is False
+        await send_req(client, "huge", "sync.since", {"seq": 2**70})
+        invalid = await recv_frame(client)
+        assert invalid["e"]["code"] == "invalid_params"

@@ -34,6 +34,11 @@ async def pending_answer(ctx: Ctx, params: PendingAnswerParams) -> PendingAnswer
         record = await PendingService().resolve(params.pending_id, params.answer)
     except DomainError as exc:
         raise_protocol(exc)
+    claude = await release_permission(record.id, params.answer)
+    waiting = False if claude else await PendingService().has_waiting(record.turn_id)
+    worker = current()
+    if not claude and not waiting and worker is None:
+        raise_protocol(DomainError("not_found", "pending request not found"))
     await ctx.hub.emit(
         "pending.resolved",
         record.id,
@@ -44,14 +49,9 @@ async def pending_answer(ctx: Ctx, params: PendingAnswerParams) -> PendingAnswer
             "status": "resolved",
         },
     )
-    if await release_permission(record.id, params.answer):
+    if claude or waiting or worker is None:
         return PendingAnswerResult(id=record.id, status=record.status)
-    if await PendingService().has_waiting(record.turn_id):
-        return PendingAnswerResult(id=record.id, status=record.status)
-    worker = current()
-    if worker is None:
-        raise_protocol(DomainError("not_found", "pending request not found"))
     pairs = await PendingService().decisions(record.turn_id)
     decisions = tuple(ToolDecision(tool_call_id=call_id, approved=ok) for call_id, ok in pairs)
-    await worker.resume(record.agent_id, record.turn_id, decisions)
+    worker.start_resume(record.agent_id, record.turn_id, decisions)
     return PendingAnswerResult(id=record.id, status=record.status)

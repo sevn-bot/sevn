@@ -6,12 +6,13 @@ import asyncio
 from collections.abc import Mapping
 from datetime import timedelta
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, text
+from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from sevn.contracts.errors import ProtocolError
 from sevn.store.db import async_engine, utcnow
-from sevn.store.models import Event
+from sevn.store.models import Event, OpLogEntry
 
 
 class ResyncRequired(ProtocolError):
@@ -32,7 +33,14 @@ class Outbox:
         self._sessions = async_sessionmaker(self._engine, expire_on_commit=False)
         self._write = asyncio.Lock()
 
-    async def append(self, type: str, entity: str, payload: Mapping[str, object]) -> Event:
+    async def append(
+        self,
+        type: str,
+        entity: str,
+        payload: Mapping[str, object],
+        *,
+        op: tuple[str, str] | None = None,
+    ) -> Event:
         async with self._write:
             async with self._sessions() as session:
                 event = Event(
@@ -42,21 +50,51 @@ class Outbox:
                     created_at=utcnow(),
                 )
                 session.add(event)
+                await session.flush()
+                if op is not None:
+                    op_id, method = op
+                    existing = await session.get(OpLogEntry, op_id)
+                    if existing is None:
+                        session.add(
+                            OpLogEntry(
+                                op_id=op_id,
+                                method=method,
+                                result={"_pending": True},
+                                created_at=utcnow(),
+                            )
+                        )
                 await session.commit()
                 session.expunge(event)
                 return event
 
-    async def since(self, seq: int) -> list[Event]:
+    async def since(self, seq: int, *, limit: int | None = None) -> list[Event]:
         async with self._sessions() as session:
             retained = await _min_seq(session)
             if retained is not None and seq < retained - 1:
                 raise ResyncRequired(retained)
-            rows = list(
-                await session.scalars(select(Event).where(Event.seq > seq).order_by(Event.seq))
-            )
+            stmt = select(Event).where(Event.seq > seq).order_by(Event.seq)
+            if limit is not None:
+                stmt = stmt.limit(limit)
+            rows = list(await session.scalars(stmt))
             for row in rows:
                 session.expunge(row)
             return rows
+
+    async def head(self) -> int:
+        """Highest allocated event seq, including rows removed by a full prune."""
+        async with self._sessions() as session:
+            value = await session.scalar(select(func.max(Event.seq)))
+            if value is not None:
+                return int(value)
+            try:
+                allocated = await session.scalar(
+                    text("SELECT seq FROM sqlite_sequence WHERE name = 'events'")
+                )
+            except (OperationalError, ProgrammingError):
+                return 0
+            if allocated is None:
+                return 0
+            return int(allocated)
 
     async def prune(self, max_age: timedelta, max_rows: int) -> None:
         cutoff = utcnow() - max_age

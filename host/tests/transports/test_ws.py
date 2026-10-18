@@ -146,6 +146,17 @@ def test_allowed_hosts_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
         assert allowed.status_code == 401
 
 
+def test_https_origin_is_allowed_for_an_allowed_host(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SEVN_ALLOWED_HOSTS", "sevn.example")
+    from sevn.http import refusal
+    from starlette.datastructures import Headers
+
+    allowed = Headers({"host": "sevn.example", "origin": "https://sevn.example"})
+    assert refusal(allowed, 8787) is None
+    denied = Headers({"host": "sevn.example", "origin": "https://evil.example"})
+    assert refusal(denied, 8787) == "forbidden origin"
+
+
 def test_login_sets_cookie_and_redirects(host_app: tuple[object, str, object]) -> None:
     _app, token, client = host_app
     response = client.get(f"/auth/login?token={token}")  # type: ignore[attr-defined]

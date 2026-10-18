@@ -1321,7 +1321,16 @@
     "SyncSinceParams": {
       "additionalProperties": false,
       "properties": {
+        "limit": {
+          "default": 200,
+          "maximum": 500,
+          "minimum": 1,
+          "title": "Limit",
+          "type": "integer"
+        },
         "seq": {
+          "maximum": 9223372036854775807,
+          "minimum": 0,
           "title": "Seq",
           "type": "integer"
         }
@@ -1334,15 +1343,25 @@
     },
     "SyncSinceResult": {
       "additionalProperties": false,
-      "description": "Cursor after durable events have been replayed as `evt` frames.",
+      "description": "Head of the log, plus the cursor for the next page of `evt` frames.",
       "properties": {
         "host_seq": {
           "title": "Host Seq",
           "type": "integer"
+        },
+        "more": {
+          "title": "More",
+          "type": "boolean"
+        },
+        "next_seq": {
+          "title": "Next Seq",
+          "type": "integer"
         }
       },
       "required": [
-        "host_seq"
+        "host_seq",
+        "next_seq",
+        "more"
       ],
       "title": "SyncSinceResult",
       "type": "object"
