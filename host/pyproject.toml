@@ -18,6 +18,7 @@ dependencies = [
     "pyrage>=1.4.0",
     "sqlalchemy[asyncio]>=2.0",
     "typer>=0.27.3",
+    "typesafe-sdk==0.7.5",
     "uvicorn[standard]>=0.54.0",
     # google-genai (the pydantic-ai google extra) requires websockets<17.
     "websockets>=13,<17",
