@@ -8,11 +8,7 @@ from sevn.config import Settings
 from sevn.decisions.base import Attempt, ModelRoute, attempt_from_model, model_prompt
 from sevn.decisions.thresholds import step_accepts
 from sevn.log import logger
-from sevn.runtime.models import (
-    cheapest_configured_model,
-    model_override_active,
-    resolve_model,
-)
+from sevn.runtime.models import cheapest_configured_model, resolve_model
 
 _INSTRUCTIONS = "Choose a route. Reply with the structured route and a confidence from 0 to 1."
 
@@ -51,7 +47,6 @@ def _model_name() -> str:
 
 
 async def _ready() -> bool:
-    if model_override_active():
-        return True
+    """A provider key is required. The turn's test model is not a router model."""
     found = await asyncio.to_thread(cheapest_configured_model)
     return found is not None

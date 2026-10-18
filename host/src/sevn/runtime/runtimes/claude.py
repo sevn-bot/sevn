@@ -30,7 +30,7 @@ from claude_agent_sdk import (
 )
 from claude_agent_sdk.types import ContentBlock, ConversationResetMessage, RateLimitEvent
 
-from sevn.domain.agents import AgentRecord
+from sevn.domain.agents import AgentRecord, sibling_block
 from sevn.domain.bots import BotService
 from sevn.domain.ids import new_id
 from sevn.domain.session import open_session
@@ -211,11 +211,12 @@ class ClaudeRuntime:
         async def _can_use_tool(tool: str, args: object, request_id: object) -> str:
             return await self._ask(agent.id, tool, args, request_id)
 
+        siblings = await sibling_block(agent.bot_id, agent.id)
         await client.connect(
             cwd=bot.workspace_path,
             resume=agent.runtime_session_ref,
             can_use_tool=_can_use_tool,
-            system_prompt=build_instructions(bot),
+            system_prompt=build_instructions(bot, siblings=siblings),
         )
         return SessionRef(agent_id=agent.id, session_ref=agent.runtime_session_ref)
 

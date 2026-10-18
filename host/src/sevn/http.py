@@ -55,6 +55,7 @@ _REGISTERED = (
     agent_api.agents_get,
     model_api.models_list,
     message_api.messages_send,
+    message_api.messages_reroute,
     message_api.messages_list,
     message_api.turns_snapshot,
     message_api.turns_cancel,

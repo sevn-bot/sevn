@@ -123,6 +123,12 @@ export type MethodParams = {
     new_agent?: boolean;
     op_id?: string;
   };
+  "messages.reroute": {
+    message_id: string;
+    agent_id?: string;
+    new?: boolean;
+    op_id?: string;
+  };
   "messages.list": { bot_id: string; cursor?: string };
   "pending.list": Record<string, never>;
   "pending.answer": {
@@ -153,6 +159,7 @@ export type MethodResult = {
   "agents.get": Agent;
   "models.list": { models: ModelInfo[] };
   "messages.send": { job_id: string; agent_id: string };
+  "messages.reroute": { job_id: string; agent_id: string };
   "messages.list": { messages: ChatMessage[]; next_cursor: string | null };
   "pending.list": { pending: PendingItem[] };
   "pending.answer": { id: string; status: string };

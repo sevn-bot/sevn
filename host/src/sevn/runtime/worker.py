@@ -8,8 +8,9 @@ from contextlib import suppress
 from sqlalchemy import select
 
 from sevn.config import Settings
-from sevn.domain.agents import AgentService
+from sevn.domain.agents import AgentService, occupying, queued_agent_ids
 from sevn.domain.errors import DomainError
+from sevn.domain.jobs import park_job
 from sevn.domain.session import open_session
 from sevn.log import logger
 from sevn.protocol.hub import Hub
@@ -73,6 +74,23 @@ class Worker:
     def closed(self) -> bool:
         return self._closed
 
+    async def steer(self, agent_id: str, text: str) -> bool:
+        """Inject ``text`` into a running pydantic turn. Claude queues instead."""
+        if self._override is not None:
+            return False
+        agent = await AgentService().get(agent_id)
+        if agent.runtime != "pydantic_ai":
+            logger.info("steer queued; this runtime has no live enqueue")
+            return False
+        return self._pydantic.enqueue(agent_id, text)
+
+    async def interrupt_and_requeue(self, job_id: str, agent_id: str) -> None:
+        """Cancel a running turn for ``job_id`` and leave that job queued on ``agent_id``."""
+        turn_id = await _running_turn_for_job(job_id)
+        if turn_id is not None:
+            await self.cancel(turn_id)
+        await park_job(job_id, agent_id)
+
     def kick(self, agent_id: str) -> None:
         """Wake the agent's pump. Safe to call again while a turn is running."""
         if self._closed:
@@ -83,6 +101,16 @@ class Worker:
             started = asyncio.create_task(self._pump(agent_id))
             started.add_done_callback(_log_task)
             self._tasks[agent_id] = started
+
+    async def settle(self, agent_id: str) -> None:
+        """Let a kicked pump run until it finishes or blocks on the model."""
+        task = self._tasks.get(agent_id)
+        if task is None:
+            return
+        for _ in range(_SETTLE_TURNS):
+            if task.done():
+                return
+            await _cede()
 
     async def aclose(self) -> None:
         """Stop pumps. Does not close the hub."""
@@ -161,6 +189,7 @@ class Worker:
                 if stuck:
                     logger.error("job stayed queued after its turn")
                     return
+                await self._open_slots(agent_id)
 
     async def _run(self, job_id: str) -> bool:
         """Run one job. True means it is still queued and must not be retried in a loop."""
@@ -174,6 +203,20 @@ class Worker:
             return await _job_queued(job_id)
         return False
 
+    async def _open_slots(self, agent_id: str) -> None:
+        """Start queued agents when a finished turn frees a per-bot slot."""
+        agent = await AgentService().get(agent_id)
+        limit = Settings.load().bots.max_parallel_agents
+        active = await occupying(agent.bot_id)
+        slots = limit - active
+        if slots <= 0:
+            return
+        for other in await queued_agent_ids(agent.bot_id):
+            if other == agent_id or slots <= 0:
+                continue
+            self.kick(other)
+            slots -= 1
+
     async def _choose(self, agent_id: str | None) -> Runtime:
         if self._override is not None:
             return self._override
@@ -185,7 +228,16 @@ class Worker:
         return self._pydantic
 
 
+_SETTLE_TURNS = 2000
 _current: Worker | None = None
+
+
+async def _cede() -> None:
+    """Yield once without ``asyncio.sleep``, which hangs under a frozen clock."""
+    loop = asyncio.get_running_loop()
+    ready: asyncio.Future[None] = loop.create_future()
+    loop.call_soon(ready.set_result, None)
+    await ready
 
 
 def bind(hub: Hub) -> Worker:
@@ -258,6 +310,15 @@ async def _agent_id_for_job(job_id: str) -> str | None:
         if row is None:
             return None
         return row.agent_id
+
+
+async def _running_turn_for_job(job_id: str) -> str | None:
+    async with open_session() as session:
+        rows = list(await session.scalars(select(TurnRow).where(TurnRow.status == "running")))
+        for row in rows:
+            if job_id in row.job_ids:
+                return row.id
+    return None
 
 
 async def _agent_for_turn(turn_id: str) -> str:

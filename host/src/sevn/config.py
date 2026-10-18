@@ -39,6 +39,12 @@ class RuntimeSettings(BaseModel):
     max_running_turns: int = 3
 
 
+class BotsSettings(BaseModel):
+    """Per-bot limits from spec §5.1. Absent config keeps the defaults."""
+
+    max_parallel_agents: int = 3
+
+
 class DecisionThresholds(BaseModel):
     """Confidence gates for the jev router questions (D4)."""
 
@@ -70,6 +76,7 @@ class Settings(BaseSettings):
     secrets: SecretsSettings = Field(default_factory=SecretsSettings)
     http: HttpSettings = Field(default_factory=HttpSettings)
     runtime: RuntimeSettings = Field(default_factory=RuntimeSettings)
+    bots: BotsSettings = Field(default_factory=BotsSettings)
     decisions: DecisionsSettings = Field(default_factory=DecisionsSettings)
 
     @classmethod

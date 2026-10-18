@@ -104,8 +104,9 @@ def _attempt(response: object, *, asked_target: bool, asked_busy: bool) -> Attem
     busy_confidence: float | None = None
     if asked_busy:
         busy = _choice(response, "busy.policy")
-        if busy is None:
-            busy_label, busy_confidence = "queue", 0.0
+        # An unscripted question comes back at 0. It must not veto a confident intent.
+        if busy is None or busy[1] == 0.0:
+            busy_label, busy_confidence = None, None
         else:
             busy_label, busy_confidence = busy
     target_id = None if target_label in (None, "none") else target_label

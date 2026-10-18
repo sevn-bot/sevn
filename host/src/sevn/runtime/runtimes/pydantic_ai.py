@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import cast
 
 from pydantic_ai import (
@@ -36,8 +36,9 @@ from pydantic_ai.messages import (
 from pydantic_ai.models import Model
 from pydantic_ai.usage import RunUsage
 
-from sevn.domain.agents import AgentRecord
+from sevn.domain.agents import AgentRecord, sibling_block
 from sevn.domain.bots import BotRecord
+from sevn.log import logger
 from sevn.runtime.base import PendingAnswer, SessionRef, ToolDecision, TurnContext
 from sevn.runtime.errors import TurnError
 from sevn.runtime.events import ApprovalCall, RuntimeEvent
@@ -45,6 +46,8 @@ from sevn.runtime.models import resolve_model
 from sevn.tools.core import shell, write_file
 
 os.environ.setdefault("PYDANTIC_AI_NO_BANNER", "1")
+
+_live_runs: dict[str, object] = {}
 
 
 class PydanticAIRuntime:
@@ -56,6 +59,21 @@ class PydanticAIRuntime:
     async def open(self, agent: AgentRecord) -> SessionRef:
         return SessionRef(agent_id=agent.id)
 
+    def enqueue(self, agent_id: str, text: str) -> bool:
+        """Inject ``text`` into the live ``AgentRun`` for ``agent_id``."""
+        run = _live_runs.get(agent_id)
+        if run is None:
+            return False
+        method = getattr(run, "enqueue", None)
+        if not callable(method):
+            return False
+        try:
+            method(text, priority="asap")
+        except Exception:  # noqa: BLE001 — a finished run falls back to the queue
+            logger.warning("steer enqueue failed")
+            return False
+        return True
+
     async def run_turn(self, turn: TurnContext) -> AsyncIterator[RuntimeEvent]:
         bot = turn.bot
         if bot is None:
@@ -63,16 +81,31 @@ class PydanticAIRuntime:
         model = self._model
         if model is None:
             model = await asyncio.to_thread(resolve_model, bot.model)
+        siblings = await sibling_block(bot.id, turn.agent.id)
         agent: Agent[None, str | DeferredToolRequests] = Agent(
             model=model,
-            instructions=build_instructions(bot),
+            instructions=build_instructions(bot, siblings=siblings),
             output_type=[str, DeferredToolRequests],
             capabilities=[_thinking(bot.effort)],
-            tools=_tools(bot.approval_policy),
+            tools=[] if turn.ephemeral else _tools(bot.approval_policy),
             deps_type=None,
         )
         history = _history(turn.message_history)
         deferred = _deferred(turn.approvals)
+        if getattr(model, "stream_function", "stream") is None and deferred is None:
+            result = await agent.run(turn.text, message_history=history)
+            output = result.output
+            text = output if isinstance(output, str) else None
+            if text:
+                yield RuntimeEvent(kind="text_delta", text=text)
+            yield RuntimeEvent(
+                kind="turn_finished",
+                text=text,
+                usage=_usage(result.usage),
+                model_messages=_dump_messages(result.all_messages()),
+                approvals=_approval_calls(output),
+            )
+            return
         if deferred is None:
             stream = agent.run_stream_events(turn.text, message_history=history)
         else:
@@ -82,10 +115,14 @@ class PydanticAIRuntime:
                 deferred_tool_results=deferred,
             )
         async with stream as events:
-            async for event in events:
-                mapped = _map(event)
-                if mapped is not None:
-                    yield mapped
+            await _publish_run(turn.agent.id, events)
+            try:
+                async for event in events:
+                    mapped = _map(event)
+                    if mapped is not None:
+                        yield mapped
+            finally:
+                _live_runs.pop(turn.agent.id, None)
 
     async def answer(self, pending_id: str, answer: PendingAnswer) -> None:
         _ = (pending_id, answer)
@@ -118,7 +155,30 @@ def _deferred(decisions: tuple[ToolDecision, ...] | None) -> DeferredToolResults
     return results
 
 
-def build_instructions(bot: BotRecord) -> str:
+async def _cede() -> None:
+    """Yield once without ``asyncio.sleep``, which hangs under a frozen clock."""
+    loop = asyncio.get_running_loop()
+    ready: asyncio.Future[None] = loop.create_future()
+    loop.call_soon(ready.set_result, None)
+    await ready
+
+
+async def _publish_run(agent_id: str, events: object) -> None:
+    """Capture the live ``AgentRun`` before the model request blocks."""
+    ensure = getattr(events, "_ensure_started", None)
+    if callable(ensure):
+        starter = cast("Callable[[], Awaitable[object]]", ensure)
+        await starter()
+    for _ in range(100):
+        binding = getattr(events, "_binding", None)
+        run = getattr(binding, "agent_run", None) if binding is not None else None
+        if run is not None:
+            _live_runs[agent_id] = run
+            return
+        await _cede()
+
+
+def build_instructions(bot: BotRecord, *, siblings: str = "") -> str:
     """Stable rules, then the bot profile, then workspace facts. No memory block."""
     rules = "\n".join(
         (
@@ -137,7 +197,10 @@ def build_instructions(bot: BotRecord) -> str:
         )
     )
     workspace = f"Workspace: {bot.workspace_path}"
-    return f"{rules}\n\n{profile}\n\n{workspace}\n"
+    body = f"{rules}\n\n{profile}\n\n{workspace}\n"
+    if siblings == "":
+        return body
+    return f"{body}\n{siblings}\n"
 
 
 def _thinking(effort: str | None) -> Thinking:

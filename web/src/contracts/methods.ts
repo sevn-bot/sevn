@@ -41,6 +41,11 @@ export const methods = {
     params: "MessagesListParams",
     result: "MessagesListResult",
   },
+  "messages.reroute": {
+    mutating: true,
+    params: "MessagesRerouteParams",
+    result: "MessagesRerouteResult",
+  },
   "messages.send": {
     mutating: true,
     params: "MessagesSendParams",

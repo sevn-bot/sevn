@@ -2,14 +2,52 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, TypeDecorator
+from sqlalchemy.engine.interfaces import Dialect
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 class Base(DeclarativeBase):
     pass
+
+
+class _IsoDateTime(TypeDecorator[datetime]):
+    """DateTime column whose SQLite text keeps the UTC offset."""
+
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def bind_processor(self, dialect: Dialect) -> Any:
+        _ = dialect
+
+        def process(value: datetime | None) -> Any:
+            if value is None:
+                return None
+            if value.tzinfo is None:
+                value = value.replace(tzinfo=UTC)
+            return value.isoformat()
+
+        return process
+
+    def result_processor(self, dialect: Dialect, coltype: Any) -> Any:
+        _ = (dialect, coltype)
+
+        def process(value: Any) -> datetime | None:
+            if value is None:
+                return None
+            if isinstance(value, datetime):
+                if value.tzinfo is None:
+                    return value.replace(tzinfo=UTC)
+                return value
+            parsed = datetime.fromisoformat(str(value))
+            if parsed.tzinfo is None:
+                return parsed.replace(tzinfo=UTC)
+            return parsed
+
+        return process
 
 
 class Event(Base):
@@ -178,8 +216,8 @@ class Job(Base):
     hop: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(_IsoDateTime, nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(_IsoDateTime, nullable=True)
 
 
 class PendingRequest(Base):

@@ -993,6 +993,68 @@
       "title": "MessagesListResult",
       "type": "object"
     },
+    "MessagesRerouteParams": {
+      "additionalProperties": false,
+      "properties": {
+        "agent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Agent Id"
+        },
+        "message_id": {
+          "title": "Message Id",
+          "type": "string"
+        },
+        "new": {
+          "default": false,
+          "title": "New",
+          "type": "boolean"
+        },
+        "op_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op Id"
+        }
+      },
+      "required": [
+        "message_id"
+      ],
+      "title": "MessagesRerouteParams",
+      "type": "object"
+    },
+    "MessagesRerouteResult": {
+      "additionalProperties": false,
+      "properties": {
+        "agent_id": {
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "job_id": {
+          "title": "Job Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "job_id",
+        "agent_id"
+      ],
+      "title": "MessagesRerouteResult",
+      "type": "object"
+    },
     "MessagesSendParams": {
       "additionalProperties": false,
       "properties": {
@@ -1597,6 +1659,12 @@
     "pending.resolved": {
       "durable": true
     },
+    "route.corrected": {
+      "durable": true
+    },
+    "route.decided": {
+      "durable": true
+    },
     "routine.run": {
       "durable": true
     },
@@ -1662,6 +1730,11 @@
       "mutating": false,
       "params": "MessagesListParams",
       "result": "MessagesListResult"
+    },
+    "messages.reroute": {
+      "mutating": true,
+      "params": "MessagesRerouteParams",
+      "result": "MessagesRerouteResult"
     },
     "messages.send": {
       "mutating": true,

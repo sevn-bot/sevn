@@ -6,6 +6,8 @@ from sevn.api.errors import raise_protocol
 from sevn.contracts.methods import (
     MessagesListParams,
     MessagesListResult,
+    MessagesRerouteParams,
+    MessagesRerouteResult,
     MessagesSendParams,
     MessagesSendResult,
     TurnsCancelParams,
@@ -15,10 +17,11 @@ from sevn.contracts.methods import (
 )
 from sevn.domain.errors import DomainError
 from sevn.domain.ids import new_id
-from sevn.domain.jobs import JobService, page_messages
-from sevn.domain.routing import route_placeholder
+from sevn.domain.jobs import page_messages
+from sevn.domain.routing import RoutedMessage, deliver, reroute
 from sevn.protocol.registry import Ctx, method
 from sevn.runtime.worker import current
+from sevn.store.db import utcnow
 
 
 @method(
@@ -30,31 +33,42 @@ from sevn.runtime.worker import current
 )
 async def messages_send(ctx: Ctx, params: MessagesSendParams) -> MessagesSendResult:
     job_id = new_id("job_")
+    message = RoutedMessage(
+        text=params.text,
+        author="user",
+        created_at=utcnow(),
+        source="user",
+        new_agent=params.new_agent,
+        reply_to=None,
+        reply_to_agent_id=None,
+        agent_id=params.agent_id,
+        bot_id=params.bot_id,
+    )
     try:
-        agent = await route_placeholder(
-            params.bot_id,
-            text=params.text,
-            agent_id=params.agent_id,
-            new_agent=params.new_agent,
-            origin_job_id=job_id,
-        )
-        job = await JobService().enqueue(job_id, params.bot_id, agent.id, params.text)
+        stored_job, agent_id = await deliver(message, "user", job_id=job_id, hub=ctx.hub)
     except DomainError as exc:
         raise_protocol(exc)
-    await ctx.hub.emit(
-        "job.queued",
-        job.id,
-        {
-            "job_id": job.id,
-            "agent_id": job.agent_id,
-            "bot_id": job.bot_id,
-            "status": "queued",
-        },
-    )
-    worker = current()
-    if worker is not None:
-        worker.kick(job.agent_id)
-    return MessagesSendResult(job_id=job.id, agent_id=job.agent_id)
+    return MessagesSendResult(job_id=stored_job, agent_id=agent_id)
+
+
+@method(
+    "messages.reroute",
+    params=MessagesRerouteParams,
+    result=MessagesRerouteResult,
+    mutating=True,
+    scope="owner",
+)
+async def messages_reroute(ctx: Ctx, params: MessagesRerouteParams) -> MessagesRerouteResult:
+    try:
+        job_id, agent_id = await reroute(
+            params.message_id,
+            agent_id=params.agent_id,
+            start_new=params.new,
+            hub=ctx.hub,
+        )
+    except DomainError as exc:
+        raise_protocol(exc)
+    return MessagesRerouteResult(job_id=job_id, agent_id=agent_id)
 
 
 @method("messages.list", params=MessagesListParams, result=MessagesListResult, mutating=False)

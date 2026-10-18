@@ -63,7 +63,10 @@ def _runtime_for(name: str) -> object | None:
     if name == "claude":
         from sevn.runtime.runtimes.claude import ClaudeRuntime, installed_client
 
-        return ClaudeRuntime(client=installed_client())
+        # The installed client belongs to live turns. A one-shot must not consume it.
+        if installed_client() is not None:
+            return None
+        return ClaudeRuntime()
     return None
 
 

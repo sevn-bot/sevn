@@ -42,6 +42,7 @@ class _Job:
     bot_id: str
     agent_id: str
     text: str
+    origin: str = "user"
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,13 +81,21 @@ class TurnRunner:
         agent = await AgentService().get(job.agent_id)
         bot = await BotService().get(job.bot_id)
         history = await _previous_messages(agent.id)
-        turn_id = new_id("turn_")
         started = utcnow()
         stored = False
-        if self._watch is not None:
-            await _insert_open_turn(turn_id, started, job, agent, bot)
-            self._watch.open_turn(turn_id, agent.id)
-            stored = True
+        existing = await _queued_turn_id(job.id)
+        if existing is not None:
+            turn_id = existing
+            if self._watch is not None:
+                await _promote_turn(turn_id, started, agent, bot)
+                self._watch.open_turn(turn_id, agent.id)
+                stored = True
+        else:
+            turn_id = new_id("turn_")
+            if self._watch is not None:
+                await _insert_open_turn(turn_id, started, job, agent, bot)
+                self._watch.open_turn(turn_id, agent.id)
+                stored = True
         await self._hub.emit(
             "turn.started",
             turn_id,
@@ -166,6 +175,7 @@ class TurnRunner:
             turn_id=turn_id,
             message_history=history,
             approvals=decisions,
+            ephemeral=job.origin == "chit_chat",
         )
         parts: list[str] = []
         finished: RuntimeEvent | None = None
@@ -241,10 +251,11 @@ class TurnRunner:
             session.add(assistant)
             events.append(_message_event(assistant))
             await _finish_job(session, job.id, "done", finished_at)
-            await _set_agent(session, agent.id, "idle", finished_at)
+            agent_status = "done" if job.origin == "chit_chat" else "idle"
+            await _set_agent(session, agent.id, agent_status, finished_at)
             events.append(_turn_event("turn.finished", turn_id, agent.id, "done"))
             events.append(_job_event("job.done", job.id, agent.id, "done"))
-            events.append(_agent_event(agent.id, "idle"))
+            events.append(_agent_event(agent.id, agent_status))
             for event in events:
                 session.add(event)
             await session.commit()
@@ -452,7 +463,13 @@ async def _mark_started(job_id: str) -> _Job:
         if row.started_at is None:
             row.started_at = utcnow()
         await session.commit()
-        return _Job(id=row.id, bot_id=row.to_bot_id, agent_id=agent_id, text=row.text)
+        return _Job(
+            id=row.id,
+            bot_id=row.to_bot_id,
+            agent_id=agent_id,
+            text=row.text,
+            origin=row.origin,
+        )
 
 
 async def _previous_messages(agent_id: str) -> list[object] | None:
@@ -511,6 +528,7 @@ async def _load_resume(turn_id: str) -> _Loaded:
             bot_id=job_row.to_bot_id,
             agent_id=job_row.agent_id,
             text=job_row.text,
+            origin=job_row.origin,
         )
         agent_id = turn.agent_id
         bot_id = job_row.to_bot_id
@@ -587,12 +605,47 @@ async def _finish_job(session: AsyncSession, job_id: str, status: str, when: dat
     row.finished_at = when
 
 
+async def _queued_turn_id(job_id: str) -> str | None:
+    async with open_session() as session:
+        rows = list(await session.scalars(select(TurnRow).where(TurnRow.status == "queued")))
+        for row in rows:
+            if job_id in row.job_ids:
+                return row.id
+    return None
+
+
+async def _promote_turn(
+    turn_id: str,
+    started: datetime,
+    agent: AgentRecord,
+    bot: BotRecord,
+) -> None:
+    async with open_session() as session:
+        row = await session.get(TurnRow, turn_id)
+        if row is None:
+            raise TurnError("turn not found")
+        row.status = "running"
+        row.agent_id = agent.id
+        row.thread_id = agent.thread_id
+        row.model = bot.model
+        row.started_at = started
+        messages = list(await session.scalars(select(Message).where(Message.turn_id == turn_id)))
+        for message in messages:
+            message.agent_id = agent.id
+            message.thread_id = agent.thread_id
+        await _set_agent(session, agent.id, "running", started)
+        await session.commit()
+
+
 async def _set_agent(session: AsyncSession, agent_id: str, status: str, when: datetime) -> None:
+    from sevn.domain.agents import apply_lifecycle
+
     row = await session.get(AgentRow, agent_id)
     if row is None:
         return
     row.status = status
     row.last_activity_at = when
+    apply_lifecycle(row, status, when)
 
 
 _TERMINAL = frozenset({"done", "cancelled", "failed", "interrupted"})

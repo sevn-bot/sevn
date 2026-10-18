@@ -177,6 +177,22 @@ class MessagesSendResult(BaseModel):
     agent_id: str
 
 
+class MessagesRerouteParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    message_id: str
+    agent_id: str | None = None
+    new: bool = False
+    op_id: str | None = None
+
+
+class MessagesRerouteResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    job_id: str
+    agent_id: str
+
+
 class MessagesListParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -276,6 +292,7 @@ METHODS: dict[str, MethodSpec] = {
         _spec("agents.get", AgentsGetParams, AgentRecord, mutating=False),
         _spec("models.list", ModelsListParams, ModelsListResult, mutating=False),
         _spec("messages.send", MessagesSendParams, MessagesSendResult, mutating=True),
+        _spec("messages.reroute", MessagesRerouteParams, MessagesRerouteResult, mutating=True),
         _spec("messages.list", MessagesListParams, MessagesListResult, mutating=False),
         _spec("pending.list", PendingListParams, PendingListResult, mutating=False),
         _spec("pending.answer", PendingAnswerParams, PendingAnswerResult, mutating=True),
