@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 
@@ -271,6 +272,131 @@ async def test_interrupt_calls_client_interrupt(
             task.cancel()
             await asyncio.gather(task, return_exceptions=True)
         await _close(created)
+
+
+class _AbortOnInterrupt(FakeClaudeClient):
+    """Yield one aborted result after ``interrupt``, and nothing before it."""
+
+    def __init__(self, terminal_reason: str) -> None:
+        super().__init__()
+        self.terminal_reason = terminal_reason
+        self.started = asyncio.Event()
+        self._release = asyncio.Event()
+
+    async def interrupt(self) -> None:
+        await super().interrupt()
+        self._release.set()
+
+    async def receive_response(self) -> AsyncIterator[dict[str, object]]:
+        self.started.set()
+        await self._release.wait()
+        yield {
+            "type": "result",
+            "terminal_reason": self.terminal_reason,
+            "usage": {},
+        }
+
+
+def _assistant_text(body: dict[str, Any]) -> str:
+    messages = body["messages"]
+    assert isinstance(messages, list)
+    parts: list[str] = []
+    for message in messages:
+        if not isinstance(message, dict) or message.get("role") != "assistant":
+            continue
+        raw_parts = message.get("parts")
+        if not isinstance(raw_parts, list):
+            continue
+        for part in raw_parts:
+            if isinstance(part, dict):
+                text = part.get("text")
+                if isinstance(text, str):
+                    parts.append(text)
+    return "\n".join(parts)
+
+
+_CANCEL_NOTICES = ("turn produced no result", "This turn failed.")
+
+
+@pytest.mark.parametrize("terminal_reason", ["aborted_streaming", "aborted_tools"])
+async def test_cancelled_claude_abort_ends_cancelled(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    terminal_reason: str,
+) -> None:
+    """turns.cancel stores an aborted Claude result as cancelled, not failed."""
+    from sevn.runtime.runtimes.claude import use_client
+    from sevn.runtime.worker import bind
+
+    fake = _AbortOnInterrupt(terminal_reason)
+    use_client(fake)
+    load_modules("sevn.api.bots", "sevn.api.messages")
+    try:
+        async with connected(tmp_path, monkeypatch) as (host, client):
+            worker = bind(host.hub)
+            try:
+                created = ok(
+                    (
+                        await request(
+                            client,
+                            "bots.create",
+                            {
+                                "name": "Claude",
+                                "runtime": "claude",
+                                "op_id": mint_id("op_"),
+                            },
+                        )
+                    )[0]
+                )
+                await request(
+                    client,
+                    "messages.send",
+                    {
+                        "bot_id": created["id"],
+                        "text": "stop this",
+                        "op_id": mint_id("op_"),
+                    },
+                )
+                await asyncio.wait_for(fake.started.wait(), timeout=2)
+                turns = await poll_rows(
+                    tmp_path,
+                    "SELECT id FROM turns",
+                    (),
+                    lambda rows: bool(rows),
+                )
+                turn_id = str(turns[0]["id"])
+                frame, _earlier = await request(
+                    client,
+                    "turns.cancel",
+                    {"turn_id": turn_id, "op_id": mint_id("op_")},
+                )
+                ok(frame)
+                rows = await poll_rows(
+                    tmp_path,
+                    "SELECT status FROM turns WHERE id = ?",
+                    (turn_id,),
+                    lambda found: (
+                        bool(found)
+                        and found[0]["status"] in {"cancelled", "failed", "done", "interrupted"}
+                    ),
+                )
+                listed, _listed_earlier = await request(
+                    client,
+                    "messages.list",
+                    {"bot_id": created["id"]},
+                )
+                assistant = _assistant_text(ok(listed))
+                status = str(rows[0]["status"])
+                leaked = any(notice in assistant for notice in _CANCEL_NOTICES)
+                assert status == "cancelled" and not leaked, (
+                    terminal_reason,
+                    status,
+                    assistant,
+                )
+            finally:
+                await worker.aclose()
+    finally:
+        use_client(None)
 
 
 async def test_cwd_is_bot_workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

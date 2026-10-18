@@ -50,9 +50,18 @@ test("streams ticks into the current assistant bubble", async () => {
 test("shows approval card and sends approve", async () => {
   const harness = await startHarness({
     "messages.list": { messages: [], next_cursor: null },
-    "agents.list": { agents: [] },
+    "agents.list": {
+      agents: [{ id: "agent_1", title: "Nimbus", status: "waiting" }],
+    },
     "pending.list": {
-      pending: [{ id: "pend_1", kind: "approval", tool: "shell" }],
+      pending: [
+        {
+          id: "pend_1",
+          kind: "approval",
+          tool: "shell",
+          agent_id: "agent_1",
+        },
+      ],
     },
     "pending.answer": {},
   });
@@ -231,6 +240,51 @@ test("keeps the latest line in view until the user scrolls up", async () => {
     });
     await testing.screen.findByText("tail more", { exact: false });
     expect(log.scrollTop).toBe(10);
+  } finally {
+    testing.cleanup();
+    harness.stop();
+  }
+});
+
+test("does not show or answer another bot's approval", async () => {
+  const harness = await startHarness({
+    "messages.list": { messages: [], next_cursor: null },
+    "agents.list": {
+      agents: [{ id: "agent_nimbus", title: "Nimbus lane", status: "waiting" }],
+    },
+    "pending.list": {
+      pending: [
+        { id: "pend_own", kind: "own-shell", agent_id: "agent_nimbus" },
+        { id: "pend_other", kind: "other-bot", agent_id: "agent_other" },
+      ],
+    },
+    "pending.answer": {},
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Chat = await loadChat();
+    testing.render(createElement(Chat, { botId }));
+    await testing.screen.findByText("Nimbus lane");
+    await testing.screen.findByText("own-shell");
+    const buttons = testing.screen.getAllByRole("button", { name: "Approve" });
+    for (const button of buttons) {
+      button.click();
+    }
+    await testing.waitFor(() => {
+      expect(requestParams(harness.requests, "pending.answer")).toHaveLength(
+        buttons.length,
+      );
+    });
+    const answered = requestParams(harness.requests, "pending.answer").map(
+      (params) => params.pending_id,
+    );
+    expect({
+      otherBotVisible: testing.screen.queryByText("other-bot") !== null,
+      answered,
+    }).toEqual({
+      otherBotVisible: false,
+      answered: ["pend_own"],
+    });
   } finally {
     testing.cleanup();
     harness.stop();

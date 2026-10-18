@@ -79,6 +79,103 @@ async def test_create_requires_name(tmp_path: Path, monkeypatch: pytest.MonkeyPa
         assert errors[0]["loc"] == ["name"]
 
 
+async def test_update_null_clears_effort_and_folder_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Explicit null clears effort and folder_id. Omitting those keys leaves them."""
+    load_modules("sevn.api.bots")
+    async with connected(tmp_path, monkeypatch) as (_host, client):
+        created = await _create(client, "alpha", effort="high", folder_id="folder_kept")
+        assert created["effort"] == "high"
+        assert created["folder_id"] == "folder_kept"
+        frame, _earlier = await request(
+            client,
+            "bots.update",
+            {
+                "bot_id": created["id"],
+                "effort": None,
+                "folder_id": None,
+                "op_id": mint_id("op_"),
+            },
+        )
+        cleared = ok(frame)
+        stored = fetch_all(
+            tmp_path,
+            "SELECT name, model, runtime, effort, folder_id FROM bots WHERE id = ?",
+            (created["id"],),
+        )
+        row = stored[0]
+        assert (
+            cleared["name"],
+            cleared["model"],
+            cleared["runtime"],
+            cleared["effort"],
+            cleared["folder_id"],
+            row["name"],
+            row["model"],
+            row["runtime"],
+            row["effort"],
+            row["folder_id"],
+        ) == (
+            created["name"],
+            created["model"],
+            created["runtime"],
+            None,
+            None,
+            created["name"],
+            created["model"],
+            created["runtime"],
+            None,
+            None,
+        )
+        frame, _earlier = await request(
+            client,
+            "bots.update",
+            {
+                "bot_id": created["id"],
+                "effort": "low",
+                "folder_id": "folder_again",
+                "op_id": mint_id("op_"),
+            },
+        )
+        ok(frame)
+        frame, _earlier = await request(
+            client,
+            "bots.update",
+            {"bot_id": created["id"], "title": "Still", "op_id": mint_id("op_")},
+        )
+        omitted = ok(frame)
+        kept = fetch_all(
+            tmp_path,
+            "SELECT name, model, runtime, effort, folder_id FROM bots WHERE id = ?",
+            (created["id"],),
+        )[0]
+        assert omitted["title"] == "Still"
+        assert (
+            omitted["name"],
+            omitted["model"],
+            omitted["runtime"],
+            omitted["effort"],
+            omitted["folder_id"],
+            kept["name"],
+            kept["model"],
+            kept["runtime"],
+            kept["effort"],
+            kept["folder_id"],
+        ) == (
+            created["name"],
+            created["model"],
+            created["runtime"],
+            "low",
+            "folder_again",
+            created["name"],
+            created["model"],
+            created["runtime"],
+            "low",
+            "folder_again",
+        )
+
+
 async def test_update_bot_emits_event(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     load_modules("sevn.api.bots")
     async with connected(tmp_path, monkeypatch) as (host, client):
