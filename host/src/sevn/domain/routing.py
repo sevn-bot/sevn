@@ -1,9 +1,18 @@
-"""Placeholder routing (D6). Plan 0020 replaces ``route_placeholder``."""
+"""Placeholder routing (D6) and source-rule registration (D19).
+
+Plan 0020 W3 replaces ``route_placeholder``. Plugins add rules here and do not
+edit this module's rule list.
+"""
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import datetime
+
 from sqlalchemy import select
 
+from sevn.decisions.base import RouteDecision
 from sevn.domain.agents import AgentRecord, AgentService
 from sevn.domain.errors import DomainError
 from sevn.domain.session import open_session
@@ -57,3 +66,80 @@ async def _latest_open(bot_id: str) -> AgentRecord | None:
     if agent_id is None:
         return None
     return await AgentService().get(agent_id)
+
+
+@dataclass(frozen=True, slots=True)
+class RoutedMessage:
+    """One message the decider chain can see. Persistence is a later wave."""
+
+    text: str
+    author: str
+    created_at: datetime
+    source: str
+    new_agent: bool
+    reply_to: str | None
+    reply_to_agent_id: str | None
+    agent_id: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class OpenAgent:
+    """An agent the router may target."""
+
+    id: str
+    title: str
+    summary: str
+    status: str
+
+
+@dataclass(frozen=True, slots=True)
+class PendingQuestion:
+    """A question still waiting on one agent."""
+
+    agent_id: str
+    asked_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class RouterContext:
+    """Open lanes and recent user text for one routing decision."""
+
+    bot_id: str
+    open_agents: list[OpenAgent]
+    pending_questions: list[PendingQuestion]
+    recent_user_messages: dict[str, list[str]]
+    runtime: str
+
+
+type SourceRule = Callable[[RoutedMessage, RouterContext], RouteDecision | None]
+
+
+@dataclass(frozen=True, slots=True)
+class _RegisteredRule:
+    source: str
+    order: int
+    seq: int
+    rule: SourceRule
+
+
+_rules: list[_RegisteredRule] = []
+_seq = 0
+
+
+def register_source_rule(source: str, rule: SourceRule, order: int) -> None:
+    """Register a plugin rule for ``source``. Lower ``order`` runs first."""
+    global _seq
+    _seq += 1
+    _rules.append(_RegisteredRule(source=source, order=order, seq=_seq, rule=rule))
+
+
+def clear_source_rules() -> None:
+    """Drop plugin rules. Tests use this so cases do not leak."""
+    _rules.clear()
+
+
+def source_rules(source: str) -> list[SourceRule]:
+    """Plugin rules for ``source``, in order. Built-in rules are not included."""
+    chosen = [item for item in _rules if item.source == source]
+    chosen.sort(key=lambda item: (item.order, item.seq))
+    return [item.rule for item in chosen]

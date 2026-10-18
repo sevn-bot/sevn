@@ -53,6 +53,12 @@ class Bot(Base):
     created_by: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    network: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        default="off",
+        server_default="off",
+    )
 
 
 class Agent(Base):
@@ -76,6 +82,8 @@ class Agent(Base):
     isolation: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     last_activity_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    idle_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class Thread(Base):
@@ -195,3 +203,82 @@ class PendingRequest(Base):
     status: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class DecisionLog(Base):
+    """One step of a decision, with the redacted state that was scored (D6)."""
+
+    __tablename__ = "decision_log"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    point: Mapped[str] = mapped_column(String, nullable=False)
+    input_hash: Mapped[str] = mapped_column(String, nullable=False)
+    state_redacted: Mapped[str] = mapped_column(String, nullable=False)
+    answers: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    confidences: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    path: Mapped[str] = mapped_column(String, nullable=False)
+    outcome: Mapped[str] = mapped_column(String, nullable=False)
+    corrected_to: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class RouteDecisionRow(Base):
+    """Links a stored message to the decision log (D6)."""
+
+    __tablename__ = "route_decisions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    message_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class Memory(Base):
+    """One bot memory. Later waves of this plan fill the table (D9)."""
+
+    __tablename__ = "memories"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    bot_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("bots.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    text: Mapped[str] = mapped_column(String, nullable=False)
+    tier: Mapped[str] = mapped_column(String, nullable=False)
+    origin: Mapped[str] = mapped_column(String, nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class MemoryFts(Base):
+    """Recall index for memories. Amended to FTS5 with the memory wave."""
+
+    __tablename__ = "memories_fts"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    text: Mapped[str] = mapped_column(String, nullable=False)
+
+
+class MessageFts(Base):
+    """Search index for UI messages. Amended with the history wave."""
+
+    __tablename__ = "messages_fts"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    text: Mapped[str] = mapped_column(String, nullable=False)
+
+
+class AgentLock(Base):
+    """Advisory lock on a shared workspace path (D20)."""
+
+    __tablename__ = "agent_locks"
+
+    path: Mapped[str] = mapped_column(String, primary_key=True)
+    agent_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("agents.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    acquired_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

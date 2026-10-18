@@ -93,6 +93,7 @@ class BotService:
             created_by=created_by,
             created_at=now,
             updated_at=now,
+            network="off",
         )
         await asyncio.to_thread(_make_workspace, workspace)
         try:

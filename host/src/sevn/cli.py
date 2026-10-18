@@ -116,10 +116,11 @@ def contracts_export(
 def doctor(
     as_json: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
-    """Print host paths, the secret backend, the version, and Claude login."""
+    """Print host paths, the secret backend, decision routing, and Claude login."""
     settings = _settings()
     paths = Paths.from_env()
     claude_present, claude_login = _run(_claude_login())
+    decisions = settings.decisions
     payload = {
         "home": str(paths.home.resolve()),
         "db": str(paths.db),
@@ -128,6 +129,10 @@ def doctor(
         "version": __version__,
         "claude_present": claude_present,
         "claude_login": claude_login,
+        "jev_key": _jev_key(settings, paths),
+        "ollama": _ollama_reachable(),
+        "allow_cli_fallback": decisions.allow_cli_fallback,
+        "decisions_provider": decisions.provider,
     }
     if as_json:
         typer.echo(json.dumps(payload))
@@ -214,6 +219,33 @@ async def _claude_login() -> tuple[bool, int | None]:
         await process.wait()
         return True, None
     return True, code
+
+
+def _jev_key(settings: Settings, paths: Paths) -> str:
+    """``yes`` when a TypeSafe key is configured. The value is not printed."""
+    if os.environ.get("TYPESAFE_API_KEY", "").strip() != "":
+        return "yes"
+    try:
+        open_backend(settings, paths).get("provider/typesafe")
+    except SecretNotFound:
+        return "no"
+    return "yes"
+
+
+def _ollama_reachable() -> str:
+    """``yes`` when ``SEVN_OLLAMA_URL`` answers. A missing or dead URL is ``no``."""
+    url = os.environ.get("SEVN_OLLAMA_URL", "").strip()
+    if url == "":
+        return "no"
+    import httpx
+
+    try:
+        response = httpx.get(url, timeout=2.0)
+    except (httpx.HTTPError, OSError):
+        return "no"
+    if response.status_code >= 400:
+        return "no"
+    return "yes"
 
 
 def _secrets_backend(settings: Settings) -> str:

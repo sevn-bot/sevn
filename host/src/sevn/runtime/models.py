@@ -129,6 +129,28 @@ async def list_models() -> list[CatalogModel]:
     return found
 
 
+_CHEAPEST: tuple[tuple[str, str], ...] = (
+    ("anthropic", "anthropic:claude-haiku-4-5"),
+    ("openai", "openai:gpt-5-mini"),
+    ("google", "google:gemini-2.5-flash"),
+    ("openrouter", "openrouter:anthropic/claude-sonnet-4.5"),
+)
+
+
+def model_override_active() -> bool:
+    """True when tests have installed a model with ``use_model``."""
+    return _override is not None
+
+
+def cheapest_configured_model() -> str | None:
+    """The cheapest catalog id among providers that have a key, or none."""
+    configured = _configured_providers()
+    for provider, model_id in _CHEAPEST:
+        if provider in configured:
+            return model_id
+    return None
+
+
 def _configured_providers() -> set[str]:
     backend = open_backend(Settings.load(), Paths.from_env())
     found: set[str] = set()

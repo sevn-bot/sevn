@@ -42,6 +42,7 @@ from sevn.runtime.base import PendingAnswer, SessionRef, ToolDecision, TurnConte
 from sevn.runtime.errors import TurnError
 from sevn.runtime.events import ApprovalCall, RuntimeEvent
 from sevn.runtime.models import resolve_model
+from sevn.tools.core import shell, write_file
 
 os.environ.setdefault("PYDANTIC_AI_NO_BANNER", "1")
 
@@ -94,18 +95,6 @@ class PydanticAIRuntime:
 
     async def close(self, agent_id: str) -> None:
         _ = agent_id
-
-
-def shell(command: str) -> str:
-    """Accept a shell command. Execution waits for the sandbox."""
-    _ = command
-    return "ok"
-
-
-def write_file(path: str, content: str) -> str:
-    """Accept a file write. Execution waits for the sandbox."""
-    _ = content
-    return path
 
 
 def _tools(policy: str) -> list[Tool[None]]:
