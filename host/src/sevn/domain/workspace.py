@@ -13,12 +13,14 @@ from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sevn.domain.errors import DomainError
+from sevn.domain.ids import new_id
 from sevn.domain.session import open_session
 from sevn.log import logger
 from sevn.store.db import utcnow
 from sevn.store.models import Agent as AgentRow
-from sevn.store.models import AgentLock
+from sevn.store.models import AgentLock, Message
 from sevn.store.models import Bot as BotRow
+from sevn.store.models import Turn as TurnRow
 
 _LOCK_TTL = timedelta(minutes=10)
 _IGNORED = "worktree ignored: workspace is not a git repo"
@@ -88,31 +90,83 @@ async def drop_locks(session: AsyncSession, agent_id: str) -> None:
 async def acquire_write(agent_id: str, path: str) -> None:
     """Hold ``path`` for ten minutes, or refresh it. Another holder raises ``path_locked``."""
     now = utcnow()
+    conflict: tuple[str, str] | None = None
     async with open_session() as session:
         row = await session.get(AgentLock, path)
         if row is not None and row.agent_id != agent_id and _alive(row.expires_at, now):
             holder = await session.get(AgentRow, row.agent_id)
             title = "" if holder is None else holder.title
-            raise DomainError(
-                "path_locked",
-                "path is locked",
-                {"holder_agent_id": row.agent_id, "holder_title": title},
-            )
-        expires = now + _LOCK_TTL
-        if row is None:
-            session.add(
-                AgentLock(
-                    path=path,
-                    agent_id=agent_id,
-                    acquired_at=now,
-                    expires_at=expires,
-                )
-            )
+            conflict = (row.agent_id, title)
         else:
-            if row.agent_id != agent_id or not _alive(row.expires_at, now):
-                row.agent_id = agent_id
-                row.acquired_at = now
-            row.expires_at = expires
+            expires = now + _LOCK_TTL
+            if row is None:
+                session.add(
+                    AgentLock(
+                        path=path,
+                        agent_id=agent_id,
+                        acquired_at=now,
+                        expires_at=expires,
+                    )
+                )
+            else:
+                if row.agent_id != agent_id or not _alive(row.expires_at, now):
+                    row.agent_id = agent_id
+                    row.acquired_at = now
+                row.expires_at = expires
+            await session.commit()
+    if conflict is None:
+        return
+    holder_id, holder_title = conflict
+    await _store_lock_notice(agent_id, holder_id, holder_title)
+    raise DomainError(
+        "path_locked",
+        "path is locked",
+        {"holder_agent_id": holder_id, "holder_title": holder_title},
+    )
+
+
+async def _store_lock_notice(agent_id: str, holder_id: str, holder_title: str) -> None:
+    """Persist the lock refusal so the chat can show who holds the path."""
+    now = utcnow()
+    async with open_session() as session:
+        agent = await session.get(AgentRow, agent_id)
+        if agent is None:
+            return
+        turn_id = new_id("turn_")
+        session.add(
+            TurnRow(
+                id=turn_id,
+                agent_id=agent_id,
+                thread_id=agent.thread_id,
+                job_ids=[],
+                status="done",
+                model="",
+                usage={},
+                model_messages=None,
+                started_at=now,
+                finished_at=now,
+            )
+        )
+        await session.flush()
+        session.add(
+            Message(
+                id=new_id("msg_"),
+                thread_id=agent.thread_id,
+                turn_id=turn_id,
+                agent_id=agent_id,
+                role="assistant",
+                author="system",
+                parts=[
+                    {
+                        "type": "error",
+                        "code": "path_locked",
+                        "holder_title": holder_title,
+                        "holder_agent_id": holder_id,
+                    }
+                ],
+                created_at=now,
+            )
+        )
         await session.commit()
 
 

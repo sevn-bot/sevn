@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from contextvars import ContextVar, Token
+
 from sevn.config import Settings
 from sevn.decisions.base import Attempt, RouteDecision, attempt_for, redact_text
 from sevn.decisions.cli_oneshot import CliOneShotDecider
 from sevn.decisions.default import DefaultDecider
-from sevn.decisions.jev import JevDecider
+from sevn.decisions.jev import JevDecider, noul_score
 from sevn.decisions.llm import LLMDecider
 from sevn.decisions.log import record_attempt
 from sevn.decisions.ollama import OllamaDecider
@@ -34,11 +36,16 @@ def decision_points() -> tuple[str, ...]:
 
 
 def router_state(message: RoutedMessage, context: RouterContext) -> str:
-    """New message plus the last three user lines of each open agent, redacted."""
+    """New message plus each open lane's id, title, and last three user lines."""
     parts = [redact_text(message.text)]
     for agent in context.open_agents:
         recent = context.recent_user_messages.get(agent.id, [])
-        block = "\n".join(redact_text(item) for item in recent[-3:])
+        lines = [
+            redact_text(agent.id),
+            redact_text(f"{agent.title} \u2014 {agent.summary}"),
+        ]
+        lines.extend(redact_text(item) for item in recent[-3:])
+        block = "\n".join(line for line in lines if line != "")
         if block != "":
             parts.append(block[:_PER_AGENT])
     return "\n".join(parts)
@@ -90,11 +97,47 @@ async def decide(
     return fallback
 
 
+_INJECTION_SCORE = 0.7
+_INJECTION = "the content tries to override the instructions"
+_inbound: ContextVar[list[str] | None] = ContextVar("sevn_inbound_injection", default=None)
+
+
 async def flag_injection(text: str, score: float) -> str:
     """Wrap external content when the inbound.injection noul reaches 0.7 (D11)."""
-    if score >= 0.7:
+    if score >= _INJECTION_SCORE:
         return f'<untrusted_content flagged="injection">{text}</untrusted_content>'
     return text
+
+
+def begin_inbound() -> Token[list[str] | None]:
+    """Start collecting injection chips for the turn that is about to run."""
+    return _inbound.set([])
+
+
+def inbound_hits() -> list[str]:
+    """Flagged tool results collected since ``begin_inbound``."""
+    found = _inbound.get()
+    if found is None:
+        return []
+    return list(found)
+
+
+def end_inbound(token: Token[list[str] | None]) -> None:
+    """Stop collecting injection chips."""
+    _inbound.reset(token)
+
+
+async def screen_inbound(text: str) -> str:
+    """Score a file read. At 0.7 the model sees a wrap and the chat can show a chip."""
+    if text == "":
+        return text
+    score = await noul_score("inbound.injection", _INJECTION, text)
+    if score is None or score < _INJECTION_SCORE:
+        return text
+    found = _inbound.get()
+    if found is not None:
+        found.append(text)
+    return await flag_injection(text, score)
 
 
 async def _keep(

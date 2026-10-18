@@ -9,6 +9,7 @@ from typing import Protocol
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sevn.decisions.registry import begin_inbound, end_inbound, inbound_hits
 from sevn.domain.agents import AgentRecord, AgentService
 from sevn.domain.bots import BotRecord, BotService
 from sevn.domain.ids import new_id
@@ -148,23 +149,37 @@ class TurnRunner:
         *,
         stored: bool,
     ) -> None:
-        await self._runtime.open(agent)
+        token = begin_inbound()
         try:
-            outcome = await self._drive(turn_id, agent, bot, job, history, decisions)
-            if self._watch is not None and self._watch.cancelled(turn_id):
+            await self._runtime.open(agent)
+            try:
+                outcome = await self._drive(turn_id, agent, bot, job, history, decisions)
+                noted = inbound_hits()
+                if self._watch is not None and self._watch.cancelled(turn_id):
+                    await MemoryStore().rollback(turn_id)
+                    await self._persist_cancelled(turn_id, started, job, agent, bot, stored=stored)
+                elif outcome.approvals or await PendingService().has_waiting(turn_id):
+                    await self._persist_waiting(
+                        turn_id, started, job, agent, bot, outcome, stored=stored
+                    )
+                else:
+                    await self._persist_done(
+                        turn_id,
+                        started,
+                        job,
+                        agent,
+                        bot,
+                        outcome,
+                        stored=stored,
+                        noted=noted,
+                    )
+            except Exception:
                 await MemoryStore().rollback(turn_id)
-                await self._persist_cancelled(turn_id, started, job, agent, bot, stored=stored)
-            elif outcome.approvals or await PendingService().has_waiting(turn_id):
-                await self._persist_waiting(
-                    turn_id, started, job, agent, bot, outcome, stored=stored
-                )
-            else:
-                await self._persist_done(turn_id, started, job, agent, bot, outcome, stored=stored)
-        except Exception:
-            await MemoryStore().rollback(turn_id)
-            raise
+                raise
+            finally:
+                await self._runtime.close(agent.id)
         finally:
-            await self._runtime.close(agent.id)
+            end_inbound(token)
 
     async def _drive(
         self,
@@ -232,6 +247,7 @@ class TurnRunner:
         outcome: _Outcome,
         *,
         stored: bool,
+        noted: list[str] | None = None,
     ) -> None:
         finished_at = utcnow()
         async with open_session() as session:
@@ -257,7 +273,15 @@ class TurnRunner:
                 user = _user_message(turn_id, started, job, agent)
                 session.add(user)
                 events.append(_message_event(user))
-            assistant = _assistant_message(turn_id, finished_at, agent, bot, outcome.text)
+            extra = [{"type": "injection", "text": item} for item in noted or []]
+            assistant = _assistant_message(
+                turn_id,
+                finished_at,
+                agent,
+                bot,
+                outcome.text,
+                extra=extra or None,
+            )
             session.add(assistant)
             events.append(_message_event(assistant))
             await _finish_job(session, job.id, "done", finished_at)
@@ -389,7 +413,11 @@ def _assistant_message(
     agent: AgentRecord,
     bot: BotRecord,
     text: str,
+    extra: list[dict[str, str]] | None = None,
 ) -> Message:
+    parts = _text_parts(text)
+    if extra:
+        parts.extend(extra)
     return Message(
         id=new_id("msg_"),
         thread_id=agent.thread_id,
@@ -397,7 +425,7 @@ def _assistant_message(
         agent_id=agent.id,
         role="assistant",
         author=bot.id,
-        parts=_text_parts(text),
+        parts=parts,
         created_at=finished_at,
     )
 

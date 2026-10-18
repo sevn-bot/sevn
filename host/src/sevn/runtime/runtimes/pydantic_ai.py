@@ -46,8 +46,7 @@ from sevn.runtime.compaction import Compaction
 from sevn.runtime.errors import TurnError
 from sevn.runtime.events import ApprovalCall, RuntimeEvent
 from sevn.runtime.models import resolve_model
-from sevn.tools.core import shell, write_file
-from sevn.tools.registry import TurnDeps, toolsets_for
+from sevn.tools.registry import TurnDeps, register_toolset, toolsets_for
 
 os.environ.setdefault("PYDANTIC_AI_NO_BANNER", "1")
 
@@ -155,23 +154,23 @@ def _turn_id(turn: TurnContext) -> str:
 
 
 def _tools(bot: BotRecord, *, agent_id: str, turn_id: str) -> list[Tool[None]]:
-    """``ask`` defers shell and write. Memory tools come from the registry."""
+    """Shell and write come from the registered toolsets. ``ask`` pauses shell."""
     ask = bot.approval_policy == "ask"
-    tools: list[Tool[None]] = [
-        Tool(shell, takes_ctx=False, requires_approval=ask),
-        Tool(write_file, name="write", takes_ctx=False, requires_approval=ask),
-    ]
     deps = TurnDeps(bot_id=bot.id, agent_id=agent_id, turn_id=turn_id)
+    tools: list[Tool[None]] = []
     for registered in toolsets_for(bot):
         if registered.name == "core":
             continue
         for name, fn in _tool_fns(registered.factory(deps)):
+            # Shell stays visible: approval is the gate, and a hidden tool cannot be approved.
+            visible_shell = name == "shell"
             tools.append(
                 Tool(
                     fn,
                     name=name,
                     takes_ctx=False,
-                    defer_loading=name in registered.deferred,
+                    requires_approval=ask and visible_shell,
+                    defer_loading=name in registered.deferred and not visible_shell,
                 )
             )
     return tools
@@ -406,8 +405,12 @@ def _register_feature_tools() -> None:
         "sevn.tools.user",
         "sevn.tools.agents",
         "sevn.tools.history",
+        "sevn.tools.shell",
     ):
         importlib.import_module(module)
+    from sevn.tools.shell import shell_toolset
+
+    register_toolset("shell", shell_toolset, set(), deferred={"shell"})
 
 
 _register_feature_tools()

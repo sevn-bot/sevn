@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sevn.config import Settings
 from sevn.decisions.base import RouteDecision
 from sevn.decisions.log import last_decision_id, mark_corrected
-from sevn.domain.agents import AgentRecord, AgentService, apply_lifecycle, occupying
+from sevn.domain.agents import AgentRecord, AgentService, apply_lifecycle, lane_text, occupying
 from sevn.domain.bots import BotRecord, BotService
 from sevn.domain.errors import DomainError
 from sevn.domain.ids import new_id
@@ -157,7 +157,7 @@ async def deliver(
         origin=origin,
         route_decision_id=decision_id,
     )
-    message_id = await _attach_user_message(job_id, agent, bot, message.text)
+    message_id = await _attach_user_message(job_id, agent, bot, message.text, decision)
     payload: dict[str, object] = {
         "job_id": job_id,
         "agent_id": agent.id,
@@ -218,10 +218,10 @@ async def _act(
     if decision.ask_user:
         agent = await _first_open(message.bot_id)
         if agent is None:
-            agent = await AgentService().spawn(message.bot_id, origin_job_id=job_id)
+            agent = await _spawn(message, job_id)
         return agent, "user"
     if decision.intent in _FRESH or decision.target_agent_id is None:
-        agent = await AgentService().spawn(message.bot_id, origin_job_id=job_id)
+        agent = await _spawn(message, job_id)
         origin = "chit_chat" if decision.intent == "chit_chat" else "user"
         return agent, origin
     agent = await _agent_on_bot(message.bot_id, decision.target_agent_id)
@@ -396,7 +396,23 @@ async def _recent(session: AsyncSession, agent_ids: list[str]) -> dict[str, list
     return recent
 
 
-async def _attach_user_message(job_id: str, agent: AgentRecord, bot: BotRecord, text: str) -> str:
+async def _spawn(message: RoutedMessage, job_id: str) -> AgentRecord:
+    title, summary = lane_text(message.text)
+    return await AgentService().spawn(
+        message.bot_id,
+        origin_job_id=job_id,
+        title=title,
+        summary=summary,
+    )
+
+
+async def _attach_user_message(
+    job_id: str,
+    agent: AgentRecord,
+    bot: BotRecord,
+    text: str,
+    decision: RouteDecision,
+) -> str:
     now = utcnow()
     turn_id = new_id("turn_")
     message_id = new_id("msg_")
@@ -424,7 +440,7 @@ async def _attach_user_message(job_id: str, agent: AgentRecord, bot: BotRecord, 
                 agent_id=agent.id,
                 role="user",
                 author="user",
-                parts=[{"type": "text", "text": text}],
+                parts=_message_parts(text, decision, agent.title),
                 created_at=now,
             )
         )
@@ -474,6 +490,16 @@ def _aware(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value.replace(tzinfo=UTC)
     return value
+
+
+def _message_parts(text: str, decision: RouteDecision, title: str) -> list[dict[str, str]]:
+    """Text plus the chip the chat reads from ``part.type``."""
+    parts: list[dict[str, str]] = [{"type": "text", "text": text}]
+    if decision.ask_user:
+        parts.append({"type": "routing_ask", "choices": "|".join(decision.choices)})
+        return parts
+    parts.append({"type": "routing", "intent": decision.intent, "title": title})
+    return parts
 
 
 def _part_text(parts: list[object]) -> str:

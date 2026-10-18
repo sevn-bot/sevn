@@ -29,6 +29,8 @@ _OCCUPYING = frozenset({"running", "waiting"})
 _IDLE_TTL = timedelta(hours=24)
 _ARCHIVE_AFTER = timedelta(days=7)
 _SIBLING_LIMIT = 10
+_TITLE_LIMIT = 80
+_SUMMARY_LIMIT = 400
 
 
 class AgentRecord(BaseModel):
@@ -58,6 +60,8 @@ class AgentService:
         bot_id: str,
         *,
         origin_job_id: str | None = None,
+        title: str = "",
+        summary: str = "",
     ) -> AgentRecord:
         async with open_session() as session:
             bot = await session.get(BotRow, bot_id)
@@ -70,8 +74,8 @@ class AgentService:
                 id=agent_id,
                 bot_id=bot_id,
                 thread_id=thread_id,
-                title="",
-                summary="",
+                title=title,
+                summary=summary,
                 status="idle",
                 runtime=bot.runtime,
                 runtime_session_ref=None,
@@ -138,6 +142,17 @@ class AgentService:
         if agent.status == "done" or agent.status == "archived":
             return await self.set_status(agent_id, "idle")
         return agent
+
+
+def lane_text(text: str) -> tuple[str, str]:
+    """Title and summary a new lane can show without an extra model call."""
+    cleaned = " ".join(text.split())
+    if cleaned == "":
+        cleaned = "New task"
+    title = cleaned[:_TITLE_LIMIT].rstrip()
+    if title == "":
+        title = "New task"
+    return title, cleaned[:_SUMMARY_LIMIT]
 
 
 def apply_lifecycle(row: AgentRow, status: str, when: datetime) -> None:

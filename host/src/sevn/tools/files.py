@@ -7,6 +7,7 @@ import os
 import re
 from pathlib import Path
 
+from sevn.decisions.registry import screen_inbound
 from sevn.domain.errors import DomainError
 from sevn.domain.workspace import WorkspacePlace, acquire_write, open_place, scratch_dir
 from sevn.paths import Paths
@@ -21,7 +22,8 @@ _FILE_LIMIT = 200
 async def read_file(bot_id: str, agent_id: str, path: str) -> str:
     """Read a text file inside the workspace or Shared."""
     located = await _owned(bot_id, agent_id)
-    return await asyncio.to_thread(_read_text, located.root, path)
+    text = await asyncio.to_thread(_read_text, located.root, path)
+    return await screen_inbound(text)
 
 
 async def write_file(bot_id: str, agent_id: str, path: str, content: str) -> str:
