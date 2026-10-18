@@ -1,4 +1,4 @@
-"""approval.risk and the isolated docker runner (green after W6)."""
+"""approval.risk and the isolated docker runner."""
 
 from __future__ import annotations
 
@@ -11,11 +11,6 @@ from pathlib import Path
 import pytest
 from support.botcore import arm_configured, upgrade_home
 from support.chat import fetch_all
-
-pytestmark = pytest.mark.xfail(
-    reason="green after W6: sandbox levels",
-    strict=False,
-)
 
 
 async def _pair(

@@ -1,13 +1,6 @@
-"""inbound.injection wraps external content and does not block it (green after W6)."""
+"""inbound.injection wraps external content and does not block it."""
 
 from __future__ import annotations
-
-import pytest
-
-pytestmark = pytest.mark.xfail(
-    reason="green after W6: inbound injection",
-    strict=False,
-)
 
 _WRAPPED = '<untrusted_content flagged="injection">{text}</untrusted_content>'
 

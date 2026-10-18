@@ -1,4 +1,4 @@
-"""Owner-only allow_all mode (green after W6)."""
+"""Owner-only allow_all mode."""
 
 from __future__ import annotations
 
@@ -9,11 +9,6 @@ from pathlib import Path
 
 import pytest
 from support.chat import connected, error_body, fetch_all, load_modules, mint_id, ok, request
-
-pytestmark = pytest.mark.xfail(
-    reason="green after W6: allow_all",
-    strict=False,
-)
 
 
 class _Proc:

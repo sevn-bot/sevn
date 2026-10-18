@@ -1,4 +1,4 @@
-"""Seatbelt, bubblewrap, and per-bot network (green after W6)."""
+"""Seatbelt, bubblewrap, and per-bot network."""
 
 from __future__ import annotations
 
@@ -9,11 +9,6 @@ from pathlib import Path
 
 import pytest
 from support.botcore import arm_configured, upgrade_home
-
-pytestmark = pytest.mark.xfail(
-    reason="green after W6: sandbox levels",
-    strict=False,
-)
 
 _HOSTS_MARKER = "seatbelt-marker"
 
