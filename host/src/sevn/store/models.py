@@ -361,12 +361,61 @@ class MemoryFtsIdx(Base):
 
 
 class MessageFts(Base):
-    """Search index for UI messages. Amended with the history wave."""
+    """Columns of the FTS5 ``messages_fts`` virtual table. The migration creates it."""
 
     __tablename__ = "messages_fts"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True)
-    text: Mapped[str] = mapped_column(String, nullable=False)
+    id: Mapped[str | None] = mapped_column(String, primary_key=True, nullable=True)
+    text: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
+class MessageFtsConfig(Base):
+    """FTS5 shadow table created with ``messages_fts``."""
+
+    __tablename__ = "messages_fts_config"
+    __table_args__ = ({"sqlite_with_rowid": False},)
+
+    k: Mapped[str] = mapped_column(NullType, primary_key=True)
+    v: Mapped[str | None] = mapped_column(NullType, nullable=True)
+
+
+class MessageFtsContent(Base):
+    """FTS5 shadow table created with ``messages_fts``."""
+
+    __tablename__ = "messages_fts_content"
+
+    id: Mapped[int | None] = mapped_column(Integer, primary_key=True, nullable=True)
+    c0: Mapped[str | None] = mapped_column(NullType, nullable=True)
+    c1: Mapped[str | None] = mapped_column(NullType, nullable=True)
+
+
+class MessageFtsData(Base):
+    """FTS5 shadow table created with ``messages_fts``."""
+
+    __tablename__ = "messages_fts_data"
+
+    id: Mapped[int | None] = mapped_column(Integer, primary_key=True, nullable=True)
+    block: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+
+
+class MessageFtsDocsize(Base):
+    """FTS5 shadow table created with ``messages_fts``."""
+
+    __tablename__ = "messages_fts_docsize"
+
+    id: Mapped[int | None] = mapped_column(Integer, primary_key=True, nullable=True)
+    sz: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+
+
+class MessageFtsIdx(Base):
+    """FTS5 shadow table created with ``messages_fts``."""
+
+    __tablename__ = "messages_fts_idx"
+    __table_args__ = ({"sqlite_with_rowid": False},)
+
+    segid: Mapped[str] = mapped_column(NullType, primary_key=True)
+    term: Mapped[str] = mapped_column(NullType, primary_key=True)
+    pgno: Mapped[str | None] = mapped_column(NullType, nullable=True)
 
 
 class AgentLock(Base):

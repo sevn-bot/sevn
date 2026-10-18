@@ -60,11 +60,37 @@ def upgrade() -> None:
     op.execute(
         "CREATE VIRTUAL TABLE memories_fts USING fts5(id UNINDEXED, text, tokenize = 'unicode61')"
     )
-    op.create_table(
-        "messages_fts",
-        sa.Column("id", sa.String(), nullable=False),
-        sa.Column("text", sa.String(), nullable=False),
-        sa.PrimaryKeyConstraint("id"),
+    op.execute(
+        "CREATE VIRTUAL TABLE messages_fts USING fts5(id UNINDEXED, text, tokenize = 'unicode61')"
+    )
+    op.execute(
+        "INSERT INTO messages_fts(id, text) "
+        "SELECT messages.id, COALESCE(("
+        "SELECT group_concat(json_extract(value, '$.text'), char(10)) "
+        "FROM json_each(messages.parts) "
+        "WHERE json_extract(value, '$.text') IS NOT NULL"
+        "), '') FROM messages"
+    )
+    op.execute(
+        "CREATE TRIGGER messages_fts_insert AFTER INSERT ON messages BEGIN "
+        "INSERT INTO messages_fts(id, text) VALUES (new.id, COALESCE(("
+        "SELECT group_concat(json_extract(value, '$.text'), char(10)) "
+        "FROM json_each(new.parts) "
+        "WHERE json_extract(value, '$.text') IS NOT NULL"
+        "), '')); END"
+    )
+    op.execute(
+        "CREATE TRIGGER messages_fts_update AFTER UPDATE OF parts ON messages BEGIN "
+        "DELETE FROM messages_fts WHERE id = old.id; "
+        "INSERT INTO messages_fts(id, text) VALUES (new.id, COALESCE(("
+        "SELECT group_concat(json_extract(value, '$.text'), char(10)) "
+        "FROM json_each(new.parts) "
+        "WHERE json_extract(value, '$.text') IS NOT NULL"
+        "), '')); END"
+    )
+    op.execute(
+        "CREATE TRIGGER messages_fts_delete AFTER DELETE ON messages BEGIN "
+        "DELETE FROM messages_fts WHERE id = old.id; END"
     )
     op.create_table(
         "agent_locks",
@@ -79,7 +105,10 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_table("agent_locks")
-    op.drop_table("messages_fts")
+    op.execute("DROP TRIGGER IF EXISTS messages_fts_delete")
+    op.execute("DROP TRIGGER IF EXISTS messages_fts_update")
+    op.execute("DROP TRIGGER IF EXISTS messages_fts_insert")
+    op.execute("DROP TABLE IF EXISTS messages_fts")
     op.execute("DROP TABLE IF EXISTS memories_fts")
     op.drop_table("memories")
     op.drop_table("route_decisions")

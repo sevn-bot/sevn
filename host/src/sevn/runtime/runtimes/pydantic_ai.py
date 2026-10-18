@@ -401,7 +401,12 @@ for _message_cls in (ModelRequest, ModelResponse):
 
 def _register_feature_tools() -> None:
     """Import tool modules so ``register_toolset`` runs before a turn."""
-    for module in ("sevn.tools.files", "sevn.tools.user", "sevn.tools.agents"):
+    for module in (
+        "sevn.tools.files",
+        "sevn.tools.user",
+        "sevn.tools.agents",
+        "sevn.tools.history",
+    ):
         importlib.import_module(module)
 
 
