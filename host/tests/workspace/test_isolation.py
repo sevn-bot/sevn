@@ -1,4 +1,4 @@
-"""Per-agent scratch dirs, shared locks, and git worktrees (green after W5)."""
+"""Per-agent scratch dirs, shared locks, and git worktrees."""
 
 from __future__ import annotations
 
@@ -11,11 +11,6 @@ from pathlib import Path
 import pytest
 from support.botcore import arm_configured, upgrade_home
 from support.chat import fetch_all
-
-pytestmark = pytest.mark.xfail(
-    reason="green after W5: workspace tools and isolation",
-    strict=False,
-)
 
 
 async def _pair(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[object, object]:
@@ -108,6 +103,7 @@ async def test_lock_released_on_turn_end_and_expired_after_ttl(
     await write_file(bot.id, other.id, str(shared), "released")
     assert shared.read_text(encoding="utf-8") == "released"
 
+    await release_turn(other.id)
     await write_file(bot.id, holder.id, str(shared), "again")
     past = (datetime.now(UTC) - timedelta(minutes=1)).isoformat()
     with sqlite3.connect(tmp_path / "sevn.db") as connection:

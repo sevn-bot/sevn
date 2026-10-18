@@ -1,4 +1,4 @@
-"""Workspace file tools, user.ask, and agent tools (green after W5)."""
+"""Workspace file tools, user.ask, and agent tools."""
 
 from __future__ import annotations
 
@@ -7,11 +7,6 @@ from pathlib import Path
 import pytest
 from support.botcore import arm_configured, upgrade_home
 from support.chat import fetch_all, insert_turn, mint_id
-
-pytestmark = pytest.mark.xfail(
-    reason="green after W5: workspace tools and isolation",
-    strict=False,
-)
 
 
 async def _pair(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[object, object]:
