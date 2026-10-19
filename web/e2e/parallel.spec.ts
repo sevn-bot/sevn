@@ -11,11 +11,11 @@ test("two requests run as two lanes at once", async ({ page }) => {
     `${state.baseURL}/auth/login?token=${encodeURIComponent(state.token)}`,
   );
   await page.getByRole("button", { name: "Create bot" }).click();
-  await page.getByRole("textbox", { name: "Name" }).fill("Echo");
+  await page.getByRole("textbox", { name: "Name" }).fill("Echo lanes");
   await page.getByRole("button", { name: "Create" }).click();
   const message = page.getByRole("textbox", { name: "Message" });
   if (!(await message.isVisible())) {
-    await page.getByText("Echo").click();
+    await page.getByText("Echo lanes").click();
   }
   const started = Date.now();
   await message.fill("one-lane-marker");
