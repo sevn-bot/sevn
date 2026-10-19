@@ -50,12 +50,14 @@ def function_model(
     model_name: str = "function",
     gate: TurnGate | None = None,
     pause: asyncio.Event | None = None,
+    recorded: asyncio.Event | None = None,
 ) -> Any:
     """Return a FunctionModel that streams ``script`` and records each request.
 
     A flat list of steps is one model response. A list of lists is one response
     per request; further requests repeat the last response. A ``pause`` event
     is awaited after the response has been streamed, while the turn is still open.
+    ``recorded`` is set as soon as the request has been recorded.
     """
     from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
     from pydantic_ai.models.function import DeltaToolCall, FunctionModel
@@ -83,6 +85,8 @@ def function_model(
         if gate is not None:
             await gate.enter()
         _record(messages, info)
+        if recorded is not None:
+            recorded.set()
         parts: list[Any] = []
         for index, step in enumerate(_steps()):
             kind = str(step.get("kind") or "text")
@@ -104,6 +108,8 @@ def function_model(
         if gate is not None:
             await gate.enter()
         _record(messages, info)
+        if recorded is not None:
+            recorded.set()
         for index, step in enumerate(_steps()):
             kind = str(step.get("kind") or "text")
             if kind == "tool":

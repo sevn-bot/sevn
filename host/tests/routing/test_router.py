@@ -51,12 +51,20 @@ def _install(
     *,
     gate: TurnGate | None = None,
     pause: asyncio.Event | None = None,
+    recorded: asyncio.Event | None = None,
 ) -> None:
     from sevn.decisions.jev import use_client
     from sevn.runtime.models import use_model
 
     use_client(FakeJev(script=script))
-    use_model(function_model([{"kind": "text", "text": "ok"}], gate=gate, pause=pause))
+    use_model(
+        function_model(
+            [{"kind": "text", "text": "ok"}],
+            gate=gate,
+            pause=pause,
+            recorded=recorded,
+        )
+    )
 
 
 def _clear() -> None:
@@ -180,22 +188,22 @@ async def test_steer_enqueues_into_running_pydantic_turn(
 
     reset_model_requests()
     pause = asyncio.Event()
+    recorded = asyncio.Event()
     load_modules("sevn.api.bots", "sevn.api.messages")
     _install(
         [{"message.intent": ("new_request", 0.95), "message.target_agent": ("none", 0.9)}],
         pause=pause,
+        recorded=recorded,
     )
     try:
         async with connected(tmp_path, monkeypatch) as (host, client):
             bind(host.hub)
             bot = await _create_bot(client)
             first = await _send(client, bot["id"], "draft the note")
-            await poll_rows(
-                tmp_path,
-                "SELECT status FROM jobs WHERE id = ?",
-                (first["job_id"],),
-                lambda rows: bool(rows) and rows[0]["status"] == "started",
-            )
+            # The job row turns ``started`` before the runtime reaches the model,
+            # so wait for the recorded request itself. The pause keeps the turn
+            # open after this point for the steer message.
+            await asyncio.wait_for(recorded.wait(), 2)
             assert len(model_request_payloads()) == 1
             _clear()
             _install(
