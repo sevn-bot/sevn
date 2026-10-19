@@ -11,6 +11,7 @@ concurrency:
 permissions:
   contents: read
   pull-requests: write
+  issues: write
 
 jobs:
   ci:
@@ -70,3 +71,11 @@ jobs:
             echo '```'
           } > /tmp/comment.md
           gh pr comment 9 --body-file /tmp/comment.md
+
+      - name: Delete temporary comments
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api -X DELETE repos/sevn-bot/sevn/issues/comments/6275593447 || true
+          gh api -X DELETE repos/sevn-bot/sevn/issues/comments/6275748354 || true
