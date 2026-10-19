@@ -489,7 +489,9 @@ async def test_idle_ttl_to_done_then_archived(
     start = datetime(2026, 6, 1, tzinfo=UTC)
     _install([{"message.intent": ("new_request", 0.95), "message.target_agent": ("none", 0.9)}])
     try:
-        with freeze_time(start) as frozen:
+        # tick=True keeps the monotonic clock moving so asyncio timers in the
+        # status poll can fire; a frozen clock hangs the poll on a slow runner.
+        with freeze_time(start, tick=True) as frozen:
             async with connected(tmp_path, monkeypatch) as (host, client):
                 bind(host.hub)
                 bot = await _create_bot(client)
