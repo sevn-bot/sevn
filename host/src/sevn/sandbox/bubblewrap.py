@@ -32,6 +32,10 @@ def argv(command: str, *, workspace: Path, shared: Path, network: bool) -> list[
         "--ro-bind",
         "/",
         "/",
+        # Mask /tmp before binding the workspace and shared dirs. Pytest (and
+        # some users) put those under /tmp; a later tmpfs would hide them.
+        "--tmpfs",
+        "/tmp",  # noqa: S108  # writable tmp inside the container, not a host file
         "--bind",
         str(workspace),
         str(workspace),
@@ -42,8 +46,6 @@ def argv(command: str, *, workspace: Path, shared: Path, network: bool) -> list[
         "/dev",
         "--proc",
         "/proc",
-        "--tmpfs",
-        "/tmp",  # noqa: S108  # writable tmp inside the container, not a host file
         "--chdir",
         str(workspace),
     ]
