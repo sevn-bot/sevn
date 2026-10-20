@@ -304,7 +304,14 @@ function PartView({
     );
   }
   if (part.type === "routing_ask") {
-    return <AskChips botId={botId} choices={part.choices ?? ""} />;
+    return (
+      <AskChips
+        botId={botId}
+        messageId={messageId}
+        agents={agents}
+        choices={part.choices ?? ""}
+      />
+    );
   }
   if (part.type === "error" && part.code === "path_locked") {
     const holder = part.holder_title ?? "";

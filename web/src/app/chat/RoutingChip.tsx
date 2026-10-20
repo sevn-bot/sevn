@@ -59,15 +59,41 @@ export function RoutingChip({
 
 export function AskChips({
   botId,
+  messageId,
+  agents,
   choices,
 }: {
   botId: string;
+  messageId: string;
+  agents: readonly LaneRef[];
   choices: string;
 }) {
   const items = choices.split("|").filter((item) => item !== "");
   if (items.length === 0) {
     return null;
   }
+  const choose = (choice: string): void => {
+    if (choice === "New task") {
+      void call("messages.reroute", {
+        message_id: messageId,
+        new: true,
+      }).catch(() => undefined);
+      return;
+    }
+    const prefix = "Continue: ";
+    const title = choice.startsWith(prefix) ? choice.slice(prefix.length) : "";
+    const agent = agents.find((item) => item.title === title);
+    if (agent !== undefined) {
+      void call("messages.reroute", {
+        message_id: messageId,
+        agent_id: agent.id,
+      }).catch(() => undefined);
+      return;
+    }
+    void call("messages.send", { bot_id: botId, text: choice }).catch(
+      () => undefined,
+    );
+  };
   return (
     <div className="flex flex-wrap gap-2">
       {items.map((choice) => (
@@ -76,9 +102,7 @@ export function AskChips({
           type="button"
           className="rounded border border-zinc-700 px-2 py-1 text-sm"
           onClick={() => {
-            void call("messages.send", { bot_id: botId, text: choice }).catch(
-              () => undefined,
-            );
+            choose(choice);
           }}
         >
           {choice}

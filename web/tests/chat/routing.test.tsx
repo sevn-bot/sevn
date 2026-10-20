@@ -152,6 +152,7 @@ test("ask-user chips appear when router asks", async () => {
     "agents.list": agents,
     "pending.list": { pending: [] },
     "messages.send": {},
+    "messages.reroute": {},
   });
   const testing = await import("@testing-library/react");
   try {
@@ -166,11 +167,12 @@ test("ask-user chips appear when router asks", async () => {
     chip.click();
     await testing.waitFor(() => {
       expect(
-        requestParams(harness.requests, "messages.send").length,
+        requestParams(harness.requests, "messages.reroute").length,
       ).toBeGreaterThan(0);
     });
-    const params = requestParams(harness.requests, "messages.send").at(-1);
-    expect(params?.text).toBe("New task");
+    const params = requestParams(harness.requests, "messages.reroute").at(-1);
+    expect(params?.message_id).toBe("msg_ask");
+    expect(params?.new).toBe(true);
   } finally {
     testing.cleanup();
     harness.stop();
