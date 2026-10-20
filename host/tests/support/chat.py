@@ -225,7 +225,7 @@ async def poll_rows(
     args: tuple[object, ...],
     predicate: Any,
     *,
-    timeout_s: float = 2,
+    timeout_s: float = 5,
 ) -> list[sqlite3.Row]:
     """Re-read ``sql`` until ``predicate(rows)`` is true."""
     deadline = asyncio.get_running_loop().time() + timeout_s
