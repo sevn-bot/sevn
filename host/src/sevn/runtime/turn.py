@@ -23,6 +23,7 @@ from sevn.protocol.hub import Hub
 from sevn.runtime.base import Runtime, ToolDecision, TurnContext
 from sevn.runtime.errors import ModelError, TurnError
 from sevn.runtime.events import ApprovalCall, RuntimeEvent
+from sevn.sandbox.policy import allow_all_enabled, risk_of
 from sevn.store.db import utcnow
 from sevn.store.models import Agent as AgentRow
 from sevn.store.models import Event, Message
@@ -154,6 +155,15 @@ class TurnRunner:
             await self._runtime.open(agent)
             try:
                 outcome = await self._drive(turn_id, agent, bot, job, history, decisions)
+                # Under ``auto`` a low-risk shell command does not need the user.
+                # Approve the whole batch only when every call is low risk; a
+                # mixed batch still asks so the risky call is visible.
+                while outcome.approvals and all(_auto_low(bot, call) for call in outcome.approvals):
+                    auto = tuple(
+                        ToolDecision(tool_call_id=call.tool_call_id, approved=True)
+                        for call in outcome.approvals
+                    )
+                    outcome = await self._drive(turn_id, agent, bot, job, history, auto)
                 noted = inbound_hits()
                 if self._watch is not None and self._watch.cancelled(turn_id):
                     await MemoryStore().rollback(turn_id)
@@ -464,6 +474,16 @@ def _job_event(event_type: str, job_id: str, agent_id: str, status: str) -> Even
 def _agent_event(agent_id: str, status: str) -> Event:
     payload: dict[str, object] = {"agent_id": agent_id, "status": status}
     return Event(type="agent.updated", entity=agent_id, payload=payload, created_at=utcnow())
+
+
+def _auto_low(bot: BotRecord, call: ApprovalCall) -> bool:
+    """A low-risk shell call under ``auto`` needs no card (D15)."""
+    if bot.approval_policy != "auto" or bot.access != "full" or allow_all_enabled():
+        return False
+    if call.name != "shell":
+        return False
+    command = call.args.get("command")
+    return isinstance(command, str) and risk_of(command) == "low"
 
 
 def _pending(turn_id: str, agent_id: str, call: ApprovalCall) -> PendingRow:
