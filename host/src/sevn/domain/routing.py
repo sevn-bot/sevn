@@ -182,7 +182,7 @@ async def deliver(
     )
     await hub.emit("job.queued", job_id, payload)
     logger.info("route decided {intent} via {path}", intent=decision.intent, path=decision.path)
-    if not held and decision.intent != "answer" and decision.intent != "cancel":
+    if not held and decision.intent != "cancel" and not decision.ask_user:
         await _start(agent.id)
     return job_id, agent.id
 
@@ -302,6 +302,24 @@ async def _resolve_answer(agent_id: str, text: str) -> None:
             row.status = "resolved"
             row.answer = answer
             row.resolved_at = now
+        # Close the paused turn and its job. The answer is delivered as the
+        # next user message by ``deliver``; leaving the turn waiting wedges
+        # the agent because ``Worker._pump`` returns while a turn is waiting.
+        waiting_turns = list(
+            await session.scalars(
+                select(TurnRow)
+                .where(TurnRow.agent_id == agent_id)
+                .where(TurnRow.status == "waiting")
+            )
+        )
+        for turn in waiting_turns:
+            turn.status = "done"
+            turn.finished_at = now
+            for job_id in turn.job_ids or ():
+                job = await session.get(JobRow, job_id)
+                if job is not None and job.status in ("queued", "started"):
+                    job.status = "done"
+                    job.finished_at = now
         await session.flush()
         agent = await session.get(AgentRow, agent_id)
         if agent is not None and agent.status == "waiting":
@@ -468,7 +486,7 @@ async def _running_turn(agent_id: str) -> str | None:
         return await session.scalar(
             select(TurnRow.id)
             .where(TurnRow.agent_id == agent_id)
-            .where(TurnRow.status == "running")
+            .where(TurnRow.status.in_(("running", "waiting")))
             .limit(1)
         )
 

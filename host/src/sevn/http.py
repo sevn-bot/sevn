@@ -31,6 +31,7 @@ import sevn.sandbox.policy as sandbox_policy
 import sevn.system as system
 from sevn import __version__
 from sevn.config import Settings
+from sevn.domain.agents import expire_agents
 from sevn.log import logger
 from sevn.paths import Paths
 from sevn.protocol.hub import Hub
@@ -164,6 +165,16 @@ def create_app(settings: Settings) -> ASGIApp:
     return app
 
 
+async def _expire_loop() -> None:
+    """Apply the idle and archive clocks while the host runs."""
+    while True:
+        try:
+            await expire_agents()
+        except Exception:  # noqa: BLE001 — one failed sweep must not stop the loop
+            logger.exception("agent expiry failed")
+        await asyncio.sleep(600)
+
+
 @asynccontextmanager
 async def _lifespan(app: ASGIApp) -> AsyncGenerator[None]:
     state = _state(app)
@@ -175,12 +186,14 @@ async def _lifespan(app: ASGIApp) -> AsyncGenerator[None]:
     state.outbox = outbox
     state.oplog = oplog
     browser: asyncio.Task[None] | None = None
+    expiry: asyncio.Task[None] | None = None
     worker: Worker | None = None
     resumes: list[asyncio.Task[None]] = []
     try:
         state.hub = Hub(outbox, oplog)
         recovered = await recover()
         worker = bind(state.hub)
+        expiry = asyncio.create_task(_expire_loop())
         for item in recovered.resume:
             logger.info("resuming answered turn {turn_id}", turn_id=item.turn_id)
             resumes.append(
@@ -210,6 +223,10 @@ async def _lifespan(app: ASGIApp) -> AsyncGenerator[None]:
             browser.cancel()
             with suppress(asyncio.CancelledError):
                 await browser
+        if expiry is not None:
+            expiry.cancel()
+            with suppress(asyncio.CancelledError):
+                await expiry
         if worker is not None:
             await worker.aclose()
         await outbox.aclose()

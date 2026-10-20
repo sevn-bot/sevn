@@ -46,6 +46,7 @@ from sevn.runtime.compaction import Compaction
 from sevn.runtime.errors import TurnError
 from sevn.runtime.events import ApprovalCall, RuntimeEvent
 from sevn.runtime.models import resolve_model
+from sevn.sandbox.policy import allow_all_enabled
 from sevn.tools.registry import TurnDeps, register_toolset, toolsets_for
 
 os.environ.setdefault("PYDANTIC_AI_NO_BANNER", "1")
@@ -100,7 +101,12 @@ class PydanticAIRuntime:
             ],
             tools=[]
             if turn.ephemeral
-            else _tools(bot, agent_id=turn.agent.id, turn_id=_turn_id(turn)),
+            else _tools(
+                bot,
+                agent_id=turn.agent.id,
+                turn_id=_turn_id(turn),
+                approved=turn.approvals is not None,
+            ),
             deps_type=None,
         )
         history = _history(turn.message_history)
@@ -153,23 +159,42 @@ def _turn_id(turn: TurnContext) -> str:
     return turn.turn_id
 
 
-def _tools(bot: BotRecord, *, agent_id: str, turn_id: str) -> list[Tool[None]]:
-    """Shell and write come from the registered toolsets. ``ask`` pauses shell."""
+def _tools(
+    bot: BotRecord,
+    *,
+    agent_id: str,
+    turn_id: str,
+    approved: bool = False,
+) -> list[Tool[None]]:
+    """Shell and write come from the registered toolsets. Full access pauses shell."""
     ask = bot.approval_policy == "ask"
-    deps = TurnDeps(bot_id=bot.id, agent_id=agent_id, turn_id=turn_id)
+    deps = TurnDeps(
+        bot_id=bot.id,
+        agent_id=agent_id,
+        turn_id=turn_id,
+        approved=approved,
+    )
     tools: list[Tool[None]] = []
     for registered in toolsets_for(bot):
         if registered.name == "core":
             continue
         for name, fn in _tool_fns(registered.factory(deps)):
             # Shell stays visible: approval is the gate, and a hidden tool cannot be approved.
+            # Full access defers every shell call so the runtime owns the approval and
+            # the tool executes only after ``pending.answer`` resumes it.
             visible_shell = name == "shell"
+            needs_approval = (
+                visible_shell
+                and bot.approval_policy != "allow_all"
+                and not allow_all_enabled()
+                and (ask or bot.access == "full")
+            )
             tools.append(
                 Tool(
                     fn,
                     name=name,
                     takes_ctx=False,
-                    requires_approval=ask and visible_shell,
+                    requires_approval=needs_approval,
                     defer_loading=name in registered.deferred and not visible_shell,
                 )
             )

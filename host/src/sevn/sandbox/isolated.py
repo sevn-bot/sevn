@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 from pathlib import Path
 
@@ -20,6 +21,12 @@ def argv(command: str, *, workspace: Path, shared: Path, network: bool) -> list[
         binary,
         "run",
         "--rm",
+        # Run as the host user so files created in the bind-mounted workspace
+        # stay writable by later file tools.
+        "--user",
+        f"{os.getuid()}:{os.getgid()}",
+        "--env",
+        "HOME=/tmp",
         "-v",
         f"{workspace}:{workspace}",
         "-w",

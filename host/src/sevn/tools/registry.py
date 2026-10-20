@@ -15,6 +15,7 @@ class TurnDeps:
     bot_id: str = ""
     agent_id: str = ""
     turn_id: str = ""
+    approved: bool = False
 
 
 type ToolsetFactory = Callable[[TurnDeps], object]

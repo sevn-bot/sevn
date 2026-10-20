@@ -47,12 +47,22 @@ class _Target:
     root: Path
 
 
-async def execute(bot_id: str, agent_id: str, command: str) -> ShellResult:
-    """Run ``command`` for one agent, or record an approval and do not run it."""
+async def execute(
+    bot_id: str,
+    agent_id: str,
+    command: str,
+    *,
+    approved: bool = False,
+) -> ShellResult:
+    """Run ``command`` for one agent, or record an approval and do not run it.
+
+    ``approved`` is set when the runtime resumed this tool call after the user
+    approved it. Without it the tool would ask again on resume and never run.
+    """
     target = await _load(bot_id, agent_id)
     risk = risk_of(command)
     host_allow_all = await asyncio.to_thread(allow_all_enabled)
-    if approval_required(
+    if not approved and approval_required(
         access=target.access,
         policy=target.approval_policy,
         risk=risk,
@@ -89,7 +99,12 @@ def shell_toolset(deps: TurnDeps) -> dict[str, object]:
 
     async def shell(command: str) -> str:
         """Run a shell command under this bot's access level."""
-        result = await execute(deps.bot_id, deps.agent_id, command)
+        result = await execute(
+            deps.bot_id,
+            deps.agent_id,
+            command,
+            approved=deps.approved,
+        )
         if result.pending_id is not None:
             return result.pending_id
         return result.stdout

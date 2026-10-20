@@ -7,6 +7,7 @@ import shutil
 from pathlib import Path
 
 from sevn.domain.errors import DomainError
+from sevn.paths import Paths
 
 _SHELL = "/bin/sh"
 _HIDDEN = (
@@ -46,9 +47,17 @@ def argv(command: str, *, workspace: Path, shared: Path, network: bool) -> list[
         "/dev",
         "--proc",
         "/proc",
-        "--chdir",
-        str(workspace),
     ]
+    # The host home holds the database, the secret store, the age key and the
+    # run token. Mask them: ``--ro-bind / /`` would expose the rest of the host.
+    paths = Paths.from_env()
+    for secret_file in (paths.db, paths.secrets_file):
+        if secret_file.is_file():
+            args.extend(["--ro-bind", "/dev/null", str(secret_file)])
+    for secret_dir in (paths.keys, paths.run, paths.logs):
+        if secret_dir.is_dir():
+            args.extend(["--tmpfs", str(secret_dir)])
+    args.extend(["--chdir", str(workspace)])
     home = Path(os.environ.get("HOME", str(Path.home()))).expanduser().resolve()
     for name in _HIDDEN:
         secret = home / name

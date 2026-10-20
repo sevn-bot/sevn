@@ -1,4 +1,5 @@
-;; Workspace shell. Parameters: WORKSPACE, SHARED, NETWORK=on|off.
+;; Workspace shell. Parameters: WORKSPACE, SHARED, NETWORK=on|off,
+;; SEVN_DB, SEVN_SECRETS, SEVN_KEYS, SEVN_RUN, SEVN_LOGS.
 (version 1)
 (deny default)
 (allow process-exec*)
@@ -21,6 +22,12 @@
 (deny file-read* (regex #"/\.codex(/|$)"))
 (deny file-read* (regex #"/\.claude(/|$)"))
 (deny file-read* (regex #"/\.config/claude(/|$)"))
+;; The host home holds the database, secrets, age key, run token and logs.
+(deny file-read* (literal (param "SEVN_DB")))
+(deny file-read* (literal (param "SEVN_SECRETS")))
+(deny file-read* (subpath (param "SEVN_KEYS")))
+(deny file-read* (subpath (param "SEVN_RUN")))
+(deny file-read* (subpath (param "SEVN_LOGS")))
 (deny file-write*)
 (allow file-write*
     (subpath (param "WORKSPACE"))
@@ -34,5 +41,10 @@
 (deny file-write* (regex #"/\.codex(/|$)"))
 (deny file-write* (regex #"/\.claude(/|$)"))
 (deny file-write* (regex #"/\.config/claude(/|$)"))
+(deny file-write* (literal (param "SEVN_DB")))
+(deny file-write* (literal (param "SEVN_SECRETS")))
+(deny file-write* (subpath (param "SEVN_KEYS")))
+(deny file-write* (subpath (param "SEVN_RUN")))
+(deny file-write* (subpath (param "SEVN_LOGS")))
 (if (string=? (param "NETWORK") "on")
     (allow network*))

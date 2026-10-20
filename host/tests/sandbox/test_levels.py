@@ -94,6 +94,18 @@ async def test_low_risk_auto_runs_and_ask_waits(
     assert asked.pending_id
 
 
+async def test_approved_full_shell_runs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from sevn.tools.shell import execute
+
+    bot, agent = await _pair(tmp_path, monkeypatch, access="full", approval_policy="ask")
+    ran = await execute(bot.id, agent.id, "printf hi", approved=True)
+    assert ran.risk == "low"
+    assert ran.executed is True
+    assert ran.returncode == 0
+    assert ran.stdout == "hi"
+    assert ran.pending_id is None
+
+
 @pytest.mark.live
 @pytest.mark.skipif(shutil.which("docker") is None, reason="docker not installed")
 async def test_isolated_runs_in_docker(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -117,3 +129,5 @@ async def test_isolated_runs_in_docker(tmp_path: Path, monkeypatch: pytest.Monke
     flat = " ".join(str(part) for args in recorded for part in args)
     assert "docker" in flat
     assert "--rm" in flat
+    assert "--user" in flat
+    assert "HOME=/tmp" in flat

@@ -96,6 +96,27 @@ async def test_shell_bwrap_denies_outside_write(
 
 @pytest.mark.skipif(
     sys.platform not in {"darwin", "linux"},
+    reason="sandbox home masking is macOS or Linux",
+)
+async def test_shell_denies_sevn_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from sevn.tools.shell import execute
+
+    bot, agent = await _pair(tmp_path, monkeypatch)
+    keys = tmp_path / "keys"
+    keys.mkdir(exist_ok=True)
+    (keys / "marker").write_text(_HOSTS_MARKER + "\n", encoding="utf-8")
+    run = tmp_path / "run"
+    run.mkdir(exist_ok=True)
+    (run / "marker").write_text(_HOSTS_MARKER + "\n", encoding="utf-8")
+    for path in (keys / "marker", run / "marker"):
+        shown = await execute(bot.id, agent.id, f'cat "{path}"')
+        assert shown.executed is True
+        assert _HOSTS_MARKER not in shown.stdout
+        assert _HOSTS_MARKER not in shown.stderr
+
+
+@pytest.mark.skipif(
+    sys.platform not in {"darwin", "linux"},
     reason="sandbox network is macOS or Linux",
 )
 async def test_network_off_blocks_curl(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

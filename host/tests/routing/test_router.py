@@ -294,6 +294,62 @@ async def test_answer_resolves_pending_question(
         assert revived.status != "waiting"
 
 
+async def test_user_ask_answer_reaches_the_next_turn(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fakes.fake_jev import FakeJev
+    from sevn.decisions.jev import use_client
+    from sevn.runtime.models import use_model
+    from sevn.runtime.worker import bind
+    from support.canary import model_request_payloads
+
+    reset_model_requests()
+    load_modules("sevn.api.bots", "sevn.api.messages")
+    use_client(FakeJev(answers={}))
+    use_model(
+        function_model(
+            [
+                [
+                    {
+                        "kind": "tool",
+                        "name": "user.ask",
+                        "args": {"question": "Which day?"},
+                    }
+                ],
+                [{"kind": "text", "text": "ok"}],
+            ]
+        )
+    )
+    try:
+        async with connected(tmp_path, monkeypatch) as (host, client):
+            bind(host.hub)
+            bot = await _create_bot(client)
+            first = await _send(client, bot["id"], "book it")
+            await poll_rows(
+                tmp_path,
+                "SELECT id FROM pending_requests WHERE agent_id = ? AND status = 'waiting'",
+                (first["agent_id"],),
+                lambda rows: bool(rows),
+            )
+            answer = await _send(client, bot["id"], "Tuesday")
+            await poll_rows(
+                tmp_path,
+                "SELECT status FROM jobs WHERE id = ?",
+                (answer["job_id"],),
+                lambda rows: bool(rows) and rows[0]["status"] == "done",
+            )
+            later = "\n".join(str(item) for item in model_request_payloads()[1:])
+            assert "Tuesday" in later
+            rows = fetch_all(
+                tmp_path,
+                "SELECT status FROM pending_requests WHERE agent_id = ?",
+                (first["agent_id"],),
+            )
+            assert rows and all(row["status"] == "resolved" for row in rows)
+    finally:
+        _clear()
+
+
 async def test_cancel_stops_agent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from sevn.domain.agents import AgentService
     from sevn.runtime.worker import bind
