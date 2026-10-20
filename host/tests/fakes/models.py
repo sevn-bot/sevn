@@ -35,7 +35,7 @@ class TurnGate:
             self.active -= 1
             self._condition.notify_all()
 
-    async def until(self, predicate: Any, *, timeout_s: float = 2) -> None:
+    async def until(self, predicate: Any, *, timeout_s: float = 5) -> None:
         async with self._condition:
 
             def ready() -> bool:

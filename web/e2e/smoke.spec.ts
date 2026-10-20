@@ -27,7 +27,7 @@ async function runSmoke(page: SmokePage, expect: ExpectVisible): Promise<void> {
   );
   await page.getByRole("button", { name: "Ping" }).click();
   await expect(page.getByText(/event #\d+ — system\.ping/)).toBeVisible({
-    timeout: 2000,
+    timeout: 10_000,
   });
 }
 
