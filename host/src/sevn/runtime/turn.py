@@ -9,15 +9,21 @@ from typing import Protocol
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sevn.decisions.registry import begin_inbound, end_inbound, inbound_hits
 from sevn.domain.agents import AgentRecord, AgentService
 from sevn.domain.bots import BotRecord, BotService
 from sevn.domain.ids import new_id
+from sevn.domain.pending import PendingService
 from sevn.domain.session import open_session
+from sevn.domain.workspace import drop_locks
 from sevn.log import logger
+from sevn.memory.context import capture_after_turn
+from sevn.memory.store import MemoryStore
 from sevn.protocol.hub import Hub
 from sevn.runtime.base import Runtime, ToolDecision, TurnContext
 from sevn.runtime.errors import ModelError, TurnError
 from sevn.runtime.events import ApprovalCall, RuntimeEvent
+from sevn.sandbox.policy import allow_all_enabled, risk_of
 from sevn.store.db import utcnow
 from sevn.store.models import Agent as AgentRow
 from sevn.store.models import Event, Message
@@ -42,6 +48,7 @@ class _Job:
     bot_id: str
     agent_id: str
     text: str
+    origin: str = "user"
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,13 +87,21 @@ class TurnRunner:
         agent = await AgentService().get(job.agent_id)
         bot = await BotService().get(job.bot_id)
         history = await _previous_messages(agent.id)
-        turn_id = new_id("turn_")
         started = utcnow()
         stored = False
-        if self._watch is not None:
-            await _insert_open_turn(turn_id, started, job, agent, bot)
-            self._watch.open_turn(turn_id, agent.id)
-            stored = True
+        existing = await _queued_turn_id(job.id)
+        if existing is not None:
+            turn_id = existing
+            if self._watch is not None:
+                await _promote_turn(turn_id, started, agent, bot)
+                self._watch.open_turn(turn_id, agent.id)
+                stored = True
+        else:
+            turn_id = new_id("turn_")
+            if self._watch is not None:
+                await _insert_open_turn(turn_id, started, job, agent, bot)
+                self._watch.open_turn(turn_id, agent.id)
+                stored = True
         await self._hub.emit(
             "turn.started",
             turn_id,
@@ -135,19 +150,46 @@ class TurnRunner:
         *,
         stored: bool,
     ) -> None:
-        await self._runtime.open(agent)
+        token = begin_inbound()
         try:
-            outcome = await self._drive(turn_id, agent, bot, job, history, decisions)
-            if self._watch is not None and self._watch.cancelled(turn_id):
-                await self._persist_cancelled(turn_id, started, job, agent, bot, stored=stored)
-            elif outcome.approvals:
-                await self._persist_waiting(
-                    turn_id, started, job, agent, bot, outcome, stored=stored
-                )
-            else:
-                await self._persist_done(turn_id, started, job, agent, bot, outcome, stored=stored)
+            await self._runtime.open(agent)
+            try:
+                outcome = await self._drive(turn_id, agent, bot, job, history, decisions)
+                # Under ``auto`` a low-risk shell command does not need the user.
+                # Approve the whole batch only when every call is low risk; a
+                # mixed batch still asks so the risky call is visible.
+                while outcome.approvals and all(_auto_low(bot, call) for call in outcome.approvals):
+                    auto = tuple(
+                        ToolDecision(tool_call_id=call.tool_call_id, approved=True)
+                        for call in outcome.approvals
+                    )
+                    outcome = await self._drive(turn_id, agent, bot, job, history, auto)
+                noted = inbound_hits()
+                if self._watch is not None and self._watch.cancelled(turn_id):
+                    await MemoryStore().rollback(turn_id)
+                    await self._persist_cancelled(turn_id, started, job, agent, bot, stored=stored)
+                elif outcome.approvals or await PendingService().has_waiting(turn_id):
+                    await self._persist_waiting(
+                        turn_id, started, job, agent, bot, outcome, stored=stored
+                    )
+                else:
+                    await self._persist_done(
+                        turn_id,
+                        started,
+                        job,
+                        agent,
+                        bot,
+                        outcome,
+                        stored=stored,
+                        noted=noted,
+                    )
+            except Exception:
+                await MemoryStore().rollback(turn_id)
+                raise
+            finally:
+                await self._runtime.close(agent.id)
         finally:
-            await self._runtime.close(agent.id)
+            end_inbound(token)
 
     async def _drive(
         self,
@@ -166,6 +208,7 @@ class TurnRunner:
             turn_id=turn_id,
             message_history=history,
             approvals=decisions,
+            ephemeral=job.origin == "chit_chat",
         )
         parts: list[str] = []
         finished: RuntimeEvent | None = None
@@ -214,11 +257,14 @@ class TurnRunner:
         outcome: _Outcome,
         *,
         stored: bool,
+        noted: list[str] | None = None,
     ) -> None:
         finished_at = utcnow()
         async with open_session() as session:
             if await _is_cancelled(session, turn_id):
+                await MemoryStore().rollback(turn_id)
                 return
+            await MemoryStore().write(session, turn_id)
             await _bind_turn(
                 session,
                 stored=stored,
@@ -237,17 +283,28 @@ class TurnRunner:
                 user = _user_message(turn_id, started, job, agent)
                 session.add(user)
                 events.append(_message_event(user))
-            assistant = _assistant_message(turn_id, finished_at, agent, bot, outcome.text)
+            extra = [{"type": "injection", "text": item} for item in noted or []]
+            assistant = _assistant_message(
+                turn_id,
+                finished_at,
+                agent,
+                bot,
+                outcome.text,
+                extra=extra or None,
+            )
             session.add(assistant)
             events.append(_message_event(assistant))
             await _finish_job(session, job.id, "done", finished_at)
-            await _set_agent(session, agent.id, "idle", finished_at)
+            agent_status = "done" if job.origin == "chit_chat" else "idle"
+            await _set_agent(session, agent.id, agent_status, finished_at)
             events.append(_turn_event("turn.finished", turn_id, agent.id, "done"))
             events.append(_job_event("job.done", job.id, agent.id, "done"))
-            events.append(_agent_event(agent.id, "idle"))
+            events.append(_agent_event(agent.id, agent_status))
             for event in events:
                 session.add(event)
+            await drop_locks(session, agent.id)
             await session.commit()
+            await capture_after_turn(agent.id, job.text)
             for event in events:
                 await self._hub.relay(event)
 
@@ -336,6 +393,7 @@ class TurnRunner:
             events.extend(await _resolve_open_pendings(session, turn, finished_at))
             for event in events:
                 session.add(event)
+            await drop_locks(session, agent.id)
             await session.commit()
             for event in events:
                 await self._hub.relay(event)
@@ -365,7 +423,11 @@ def _assistant_message(
     agent: AgentRecord,
     bot: BotRecord,
     text: str,
+    extra: list[dict[str, str]] | None = None,
 ) -> Message:
+    parts = _text_parts(text)
+    if extra:
+        parts.extend(extra)
     return Message(
         id=new_id("msg_"),
         thread_id=agent.thread_id,
@@ -373,7 +435,7 @@ def _assistant_message(
         agent_id=agent.id,
         role="assistant",
         author=bot.id,
-        parts=_text_parts(text),
+        parts=parts,
         created_at=finished_at,
     )
 
@@ -414,6 +476,16 @@ def _agent_event(agent_id: str, status: str) -> Event:
     return Event(type="agent.updated", entity=agent_id, payload=payload, created_at=utcnow())
 
 
+def _auto_low(bot: BotRecord, call: ApprovalCall) -> bool:
+    """A low-risk shell call under ``auto`` needs no card (D15)."""
+    if bot.approval_policy != "auto" or bot.access != "full" or allow_all_enabled():
+        return False
+    if call.name != "shell":
+        return False
+    command = call.args.get("command")
+    return isinstance(command, str) and risk_of(command) == "low"
+
+
 def _pending(turn_id: str, agent_id: str, call: ApprovalCall) -> PendingRow:
     payload: dict[str, object] = {"name": call.name, "args": call.args}
     return PendingRow(
@@ -452,7 +524,13 @@ async def _mark_started(job_id: str) -> _Job:
         if row.started_at is None:
             row.started_at = utcnow()
         await session.commit()
-        return _Job(id=row.id, bot_id=row.to_bot_id, agent_id=agent_id, text=row.text)
+        return _Job(
+            id=row.id,
+            bot_id=row.to_bot_id,
+            agent_id=agent_id,
+            text=row.text,
+            origin=row.origin,
+        )
 
 
 async def _previous_messages(agent_id: str) -> list[object] | None:
@@ -511,6 +589,7 @@ async def _load_resume(turn_id: str) -> _Loaded:
             bot_id=job_row.to_bot_id,
             agent_id=job_row.agent_id,
             text=job_row.text,
+            origin=job_row.origin,
         )
         agent_id = turn.agent_id
         bot_id = job_row.to_bot_id
@@ -587,12 +666,47 @@ async def _finish_job(session: AsyncSession, job_id: str, status: str, when: dat
     row.finished_at = when
 
 
+async def _queued_turn_id(job_id: str) -> str | None:
+    async with open_session() as session:
+        rows = list(await session.scalars(select(TurnRow).where(TurnRow.status == "queued")))
+        for row in rows:
+            if job_id in row.job_ids:
+                return row.id
+    return None
+
+
+async def _promote_turn(
+    turn_id: str,
+    started: datetime,
+    agent: AgentRecord,
+    bot: BotRecord,
+) -> None:
+    async with open_session() as session:
+        row = await session.get(TurnRow, turn_id)
+        if row is None:
+            raise TurnError("turn not found")
+        row.status = "running"
+        row.agent_id = agent.id
+        row.thread_id = agent.thread_id
+        row.model = bot.model
+        row.started_at = started
+        messages = list(await session.scalars(select(Message).where(Message.turn_id == turn_id)))
+        for message in messages:
+            message.agent_id = agent.id
+            message.thread_id = agent.thread_id
+        await _set_agent(session, agent.id, "running", started)
+        await session.commit()
+
+
 async def _set_agent(session: AsyncSession, agent_id: str, status: str, when: datetime) -> None:
+    from sevn.domain.agents import apply_lifecycle
+
     row = await session.get(AgentRow, agent_id)
     if row is None:
         return
     row.status = status
     row.last_activity_at = when
+    apply_lifecycle(row, status, when)
 
 
 _TERMINAL = frozenset({"done", "cancelled", "failed", "interrupted"})
@@ -740,6 +854,7 @@ async def _fail_open_turn(
     session.add(assistant)
     events.append(_message_event(assistant))
     events.append(_turn_event("turn.finished", turn.id, turn.agent_id, "failed"))
+    await drop_locks(session, turn.agent_id)
     return events
 
 

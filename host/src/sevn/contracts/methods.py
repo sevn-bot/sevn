@@ -7,15 +7,24 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-from sevn.contracts.kinds import AccessName, ApprovalPolicy, RuntimeName
+from sevn.contracts.kinds import AccessName, ApprovalPolicy, NetworkFlag, RuntimeName
 from sevn.domain.agents import AgentRecord
 from sevn.domain.bots import BotRecord
 from sevn.domain.jobs import MessageRecord
 from sevn.domain.pending import PendingRecord
+from sevn.memory.store import MemoryRecord
 
 
 class SystemInfoParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+class SystemCaps(BaseModel):
+    """Capabilities ``system.info`` reports to every client (D14)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    allow_all: bool
 
 
 class SystemInfoResult(BaseModel):
@@ -24,7 +33,7 @@ class SystemInfoResult(BaseModel):
     host_id: str
     version: str
     proto: int
-    caps: list[str]
+    caps: SystemCaps
     host_pubkey_fp: str
 
 
@@ -55,6 +64,22 @@ class SyncSinceResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     host_seq: int
+
+
+class SandboxModeParams(BaseModel):
+    """Owner confirm phrase for ``host.set_sandbox_mode`` (D14)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal["allow_all", "enforced"]
+    confirm: str
+    op_id: str | None = None
+
+
+class SandboxModeResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal["allow_all", "enforced"]
 
 
 class BotsCreateParams(BaseModel):
@@ -104,6 +129,7 @@ class BotsUpdateParams(BaseModel):
     effort: str | None = None
     access: AccessName | None = None
     approval_policy: ApprovalPolicy | None = None
+    network: NetworkFlag | None = None
     folder_id: str | None = None
     paused: bool | None = None
     can_create_bots: bool | None = None
@@ -177,6 +203,22 @@ class MessagesSendResult(BaseModel):
     agent_id: str
 
 
+class MessagesRerouteParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    message_id: str
+    agent_id: str | None = None
+    new: bool = False
+    op_id: str | None = None
+
+
+class MessagesRerouteResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    job_id: str
+    agent_id: str
+
+
 class MessagesListParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -243,6 +285,49 @@ class TurnsCancelResult(BaseModel):
     status: str
 
 
+class MemoriesListParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    bot_id: str
+
+
+class MemoriesListResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    memories: list[MemoryRecord]
+
+
+class MemoriesUpdateParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    text: str
+    revision: int | None = None
+    op_id: str | None = None
+
+
+class MemoriesDeleteParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    op_id: str | None = None
+
+
+class MemoriesDeleteResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+
+
+class MemoriesPinParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    tier: Literal["pinned", "recall"] | None = None
+    revision: int | None = None
+    op_id: str | None = None
+
+
 @dataclass(frozen=True, slots=True)
 class MethodSpec:
     name: str
@@ -266,6 +351,7 @@ METHODS: dict[str, MethodSpec] = {
     for spec in (
         _spec("system.info", SystemInfoParams, SystemInfoResult, mutating=False),
         _spec("system.ping", SystemPingParams, SystemPingResult, mutating=True),
+        _spec("host.set_sandbox_mode", SandboxModeParams, SandboxModeResult, mutating=True),
         _spec("sync.since", SyncSinceParams, SyncSinceResult, mutating=False),
         _spec("bots.create", BotsCreateParams, BotRecord, mutating=True),
         _spec("bots.list", BotsListParams, BotsListResult, mutating=False),
@@ -276,10 +362,15 @@ METHODS: dict[str, MethodSpec] = {
         _spec("agents.get", AgentsGetParams, AgentRecord, mutating=False),
         _spec("models.list", ModelsListParams, ModelsListResult, mutating=False),
         _spec("messages.send", MessagesSendParams, MessagesSendResult, mutating=True),
+        _spec("messages.reroute", MessagesRerouteParams, MessagesRerouteResult, mutating=True),
         _spec("messages.list", MessagesListParams, MessagesListResult, mutating=False),
         _spec("pending.list", PendingListParams, PendingListResult, mutating=False),
         _spec("pending.answer", PendingAnswerParams, PendingAnswerResult, mutating=True),
         _spec("turns.snapshot", TurnsSnapshotParams, TurnsSnapshotResult, mutating=False),
         _spec("turns.cancel", TurnsCancelParams, TurnsCancelResult, mutating=True),
+        _spec("memories.list", MemoriesListParams, MemoriesListResult, mutating=False),
+        _spec("memories.update", MemoriesUpdateParams, MemoryRecord, mutating=True),
+        _spec("memories.delete", MemoriesDeleteParams, MemoriesDeleteResult, mutating=True),
+        _spec("memories.pin", MemoriesPinParams, MemoryRecord, mutating=True),
     )
 }

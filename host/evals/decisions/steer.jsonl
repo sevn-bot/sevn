@@ -1,0 +1,20 @@
+{"intent":"steer","target":"agent_poster","text":"Drop the header and use a plain title","open_agents":[{"id":"agent_poster","title":"Poster layout","summary":"blue header","status":"running"}]}
+{"intent":"steer","target":"agent_invoice","text":"Stop the tax form and draft a receipt","open_agents":[{"id":"agent_invoice","title":"Invoice script","summary":"tax totals","status":"running"}]}
+{"intent":"steer","target":"agent_logo","text":"Switch from a circle to a simple square","open_agents":[{"id":"agent_logo","title":"Logo sketch","summary":"circle mark","status":"running"}]}
+{"intent":"steer","target":"agent_map","text":"Ignore the north loop and draw the lake path","open_agents":[{"id":"agent_map","title":"Trail map","summary":"north loop","status":"running"}]}
+{"intent":"steer","target":"agent_letter","text":"Make the note shorter and warmer","open_agents":[{"id":"agent_letter","title":"Thank you note","summary":"formal draft","status":"running"}]}
+{"intent":"steer","target":"agent_shelf","text":"Use pine boards instead of oak","open_agents":[{"id":"agent_shelf","title":"Bookshelf plan","summary":"oak boards","status":"running"}]}
+{"intent":"steer","target":"agent_quiz","text":"Cut it down to five questions","open_agents":[{"id":"agent_quiz","title":"Quiz sheet","summary":"ten questions","status":"running"}]}
+{"intent":"steer","target":"agent_banner","text":"Replace the sale headline with a welcome","open_agents":[{"id":"agent_banner","title":"Banner copy","summary":"sale headline","status":"running"}]}
+{"intent":"steer","target":"agent_chart","text":"Show a single yearly total instead","open_agents":[{"id":"agent_chart","title":"Budget chart","summary":"monthly bars","status":"running"}]}
+{"intent":"steer","target":"agent_route","text":"Skip downtown and stay on the river road","open_agents":[{"id":"agent_route","title":"Bus route","summary":"downtown stops","status":"running"}]}
+{"intent":"steer","target":"agent_tune","text":"Slow the chorus and drop the bridge","open_agents":[{"id":"agent_tune","title":"Song draft","summary":"fast chorus","status":"running"}]}
+{"intent":"steer","target":"agent_form","text":"Keep only name and preferred day","open_agents":[{"id":"agent_form","title":"Signup form","summary":"eight fields","status":"running"}]}
+{"intent":"steer","target":"agent_slide","text":"Switch the deck to a light background","open_agents":[{"id":"agent_slide","title":"Title slide","summary":"dark theme","status":"running"}]}
+{"intent":"steer","target":"agent_recipe","text":"Make it a single layer sheet cake","open_agents":[{"id":"agent_recipe","title":"Cake recipe","summary":"three layers","status":"running"}]}
+{"intent":"steer","target":"agent_label","text":"Use a plain font and a larger size","open_agents":[{"id":"agent_label","title":"Jar labels","summary":"script font","status":"running"}]}
+{"intent":"steer","target":"agent_plot","text":"Leave two rows empty for flowers","open_agents":[{"id":"agent_plot","title":"Garden plot","summary":"six rows","status":"running"}]}
+{"intent":"steer","target":"agent_note","text":"Keep only the decisions and owners","open_agents":[{"id":"agent_note","title":"Meeting note","summary":"long minutes","status":"running"}]}
+{"intent":"steer","target":"agent_icon","text":"Simplify it to one shape","open_agents":[{"id":"agent_icon","title":"App icon","summary":"detailed scene","status":"running"}]}
+{"intent":"steer","target":"agent_tour","text":"Cover only the sculpture room","open_agents":[{"id":"agent_tour","title":"Museum tour","summary":"full wing","status":"running"}]}
+{"intent":"steer","target":"agent_draft","text":"Cut the speech to eight minutes","open_agents":[{"id":"agent_draft","title":"Speech draft","summary":"twenty minutes","status":"running"}]}

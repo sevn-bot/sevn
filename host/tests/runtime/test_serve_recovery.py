@@ -298,7 +298,7 @@ async def _plant_open_approval(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
         frame, _earlier = await request(
             client,
             "bots.create",
-            {"name": "Nimbus", "op_id": mint_id("op_")},
+            {"name": "Nimbus", "access": "full", "op_id": mint_id("op_")},
         )
         bot = ok(frame)
         await request(
@@ -427,7 +427,7 @@ async def _send_shell_turn(home: Path, client: object) -> str:
     frame, _earlier = await request(
         client,
         "bots.create",
-        {"name": "Nimbus", "op_id": mint_id("op_")},
+        {"name": "Nimbus", "access": "full", "op_id": mint_id("op_")},
     )
     bot = ok(frame)
     await request(

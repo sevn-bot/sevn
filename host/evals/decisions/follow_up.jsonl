@@ -1,0 +1,20 @@
+{"intent":"follow_up","target":"agent_lisbon","text":"Add a museum on the second morning","open_agents":[{"id":"agent_lisbon","title":"Lisbon trip","summary":"three day outline","status":"idle"}]}
+{"intent":"follow_up","target":"agent_pasta","text":"Swap the salad for roasted vegetables","open_agents":[{"id":"agent_pasta","title":"Pasta night","summary":"grocery draft","status":"idle"}]}
+{"intent":"follow_up","target":"agent_bike","text":"Include a lock and a helmet in the total","open_agents":[{"id":"agent_bike","title":"Bicycle budget","summary":"price notes","status":"idle"}]}
+{"intent":"follow_up","target":"agent_plants","text":"Add a slide about watering schedules","open_agents":[{"id":"agent_plants","title":"Houseplant talk","summary":"slide outline","status":"idle"}]}
+{"intent":"follow_up","target":"agent_novels","text":"Add one more title set on a train","open_agents":[{"id":"agent_novels","title":"Mystery list","summary":"five titles","status":"idle"}]}
+{"intent":"follow_up","target":"agent_move","text":"Add a box label for the kitchen","open_agents":[{"id":"agent_move","title":"Apartment move","summary":"checklist","status":"idle"}]}
+{"intent":"follow_up","target":"agent_workout","text":"Repeat the same walk on Thursday","open_agents":[{"id":"agent_workout","title":"Beginner workout","summary":"week one","status":"idle"}]}
+{"intent":"follow_up","target":"agent_menu","text":"Keep dessert cold and simple","open_agents":[{"id":"agent_menu","title":"Guest menu","summary":"weekend meals","status":"idle"}]}
+{"intent":"follow_up","target":"agent_paint","text":"Add a larger brush to the list","open_agents":[{"id":"agent_paint","title":"Watercolor project","summary":"supply list","status":"idle"}]}
+{"intent":"follow_up","target":"agent_camp","text":"Bring an extra blanket for the nights","open_agents":[{"id":"agent_camp","title":"Camping trip","summary":"packing list","status":"idle"}]}
+{"intent":"follow_up","target":"agent_club","text":"Move the discussion questions up front","open_agents":[{"id":"agent_club","title":"Book club","summary":"meeting notes","status":"idle"}]}
+{"intent":"follow_up","target":"agent_dinner","text":"Seat the guest of honor by the window","open_agents":[{"id":"agent_dinner","title":"Birthday dinner","summary":"six guests","status":"idle"}]}
+{"intent":"follow_up","target":"agent_exam","text":"Review the timeline again on Friday","open_agents":[{"id":"agent_exam","title":"History exam","summary":"study schedule","status":"idle"}]}
+{"intent":"follow_up","target":"agent_herbs","text":"Put the mint in its own corner","open_agents":[{"id":"agent_herbs","title":"Herb garden","summary":"layout sketch","status":"idle"}]}
+{"intent":"follow_up","target":"agent_walks","text":"Group the river photos on one page","open_agents":[{"id":"agent_walks","title":"City walks","summary":"photo album","status":"idle"}]}
+{"intent":"follow_up","target":"agent_road","text":"Add three quiet songs for the morning","open_agents":[{"id":"agent_road","title":"Road trip","summary":"playlist","status":"idle"}]}
+{"intent":"follow_up","target":"agent_soup","text":"Include a note about simmering time","open_agents":[{"id":"agent_soup","title":"Soup recipes","summary":"starter file","status":"idle"}]}
+{"intent":"follow_up","target":"agent_morning","text":"Leave ten minutes for stretching","open_agents":[{"id":"agent_morning","title":"Weekday routine","summary":"morning plan","status":"idle"}]}
+{"intent":"follow_up","target":"agent_cabin","text":"Add matches for the wood stove","open_agents":[{"id":"agent_cabin","title":"Cabin stay","summary":"packing list","status":"idle"}]}
+{"intent":"follow_up","target":"agent_light","text":"End the second scene at dusk","open_agents":[{"id":"agent_light","title":"Lighthouse story","summary":"outline","status":"idle"}]}

@@ -45,6 +45,7 @@ class TurnContext:
     turn_id: str | None = None
     message_history: list[object] | None = None
     approvals: tuple[ToolDecision, ...] | None = None
+    ephemeral: bool = False
 
 
 class Runtime(Protocol):

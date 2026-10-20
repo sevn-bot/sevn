@@ -11,10 +11,12 @@ from sqlalchemy import and_, or_, select
 from sevn.domain.errors import DomainError
 from sevn.domain.session import open_session
 from sevn.store.db import utcnow
+from sevn.store.models import Agent as AgentRow
 from sevn.store.models import Bot as BotRow
 from sevn.store.models import Job as JobRow
 from sevn.store.models import Message
 from sevn.store.models import Thread as ThreadRow
+from sevn.store.models import Turn as TurnRow
 
 _PAGE = 50
 
@@ -58,7 +60,17 @@ class MessagePage(BaseModel):
 class JobService:
     """Insert a job that the worker will claim."""
 
-    async def enqueue(self, job_id: str, bot_id: str, agent_id: str, text: str) -> JobRecord:
+    async def enqueue(
+        self,
+        job_id: str,
+        bot_id: str,
+        agent_id: str,
+        text: str,
+        *,
+        origin: str = "user",
+        route_decision_id: str | None = None,
+        status: str = "queued",
+    ) -> JobRecord:
         now = utcnow()
         async with open_session() as session:
             session.add(
@@ -66,21 +78,21 @@ class JobService:
                     id=job_id,
                     to_bot_id=bot_id,
                     agent_id=agent_id,
-                    route_decision_id=None,
-                    origin="user",
+                    route_decision_id=route_decision_id,
+                    origin=origin,
                     text=text,
                     attachments=[],
                     reply_to=None,
                     expects_reply=True,
                     hop=0,
-                    status="queued",
+                    status=status,
                     created_at=now,
                     started_at=None,
                     finished_at=None,
                 )
             )
             await session.commit()
-        return JobRecord(id=job_id, bot_id=bot_id, agent_id=agent_id, text=text, status="queued")
+        return JobRecord(id=job_id, bot_id=bot_id, agent_id=agent_id, text=text, status=status)
 
 
 async def page_messages(bot_id: str, cursor: str | None) -> MessagePage:
@@ -118,6 +130,34 @@ async def page_messages(bot_id: str, cursor: str | None) -> MessagePage:
     page = rows[:_PAGE]
     next_cursor = page[-1].id if len(rows) > _PAGE and page else None
     return MessagePage(messages=[_message(row) for row in page], next_cursor=next_cursor)
+
+
+async def park_job(job_id: str, agent_id: str) -> None:
+    """Leave ``job_id`` queued on ``agent_id`` and move a not-yet-started turn with it."""
+    async with open_session() as session:
+        job = await session.get(JobRow, job_id)
+        if job is None:
+            raise DomainError("not_found", "job not found")
+        agent = await session.get(AgentRow, agent_id)
+        if agent is None:
+            raise DomainError("not_found", "agent not found")
+        job.agent_id = agent_id
+        job.status = "queued"
+        job.started_at = None
+        job.finished_at = None
+        turns = list(await session.scalars(select(TurnRow).where(TurnRow.status == "queued")))
+        for turn in turns:
+            if job_id not in turn.job_ids:
+                continue
+            turn.agent_id = agent_id
+            turn.thread_id = agent.thread_id
+            messages = list(
+                await session.scalars(select(Message).where(Message.turn_id == turn.id))
+            )
+            for message in messages:
+                message.agent_id = agent_id
+                message.thread_id = agent.thread_id
+        await session.commit()
 
 
 def _message(row: Message) -> MessageRecord:

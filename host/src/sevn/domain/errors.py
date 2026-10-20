@@ -4,7 +4,16 @@ from __future__ import annotations
 
 from typing import Literal
 
-type DomainCode = Literal["not_found", "invalid_params", "pending_resolved"]
+type DomainCode = Literal[
+    "not_found",
+    "invalid_params",
+    "pending_resolved",
+    "pinned_budget",
+    "memory_locked",
+    "revision_conflict",
+    "path_outside_workspace",
+    "path_locked",
+]
 
 
 class DomainError(Exception):
@@ -12,8 +21,15 @@ class DomainError(Exception):
 
     code: DomainCode
     message: str
+    data: dict[str, object] | None
 
-    def __init__(self, code: DomainCode, message: str) -> None:
+    def __init__(
+        self,
+        code: DomainCode,
+        message: str,
+        data: dict[str, object] | None = None,
+    ) -> None:
         self.code = code
         self.message = message
+        self.data = data
         super().__init__(message)

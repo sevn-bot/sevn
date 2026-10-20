@@ -1,4 +1,4 @@
-"""``sevn serve``, ``sevn probe``, and ``sevn doctor`` (D9, D13)."""
+"""``sevn serve``, ``sevn probe``, ``sevn doctor``, and ``sevn evals`` (D9, D13, D17)."""
 
 from __future__ import annotations
 
@@ -27,9 +27,11 @@ app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 probe_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 contracts_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 secret_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
+evals_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 app.add_typer(probe_app, name="probe")
 app.add_typer(contracts_app, name="contracts")
 app.add_typer(secret_app, name="secret")
+app.add_typer(evals_app, name="evals")
 
 _LOOPBACK = frozenset({"127.0.0.1", "localhost", "::1", "[::1]"})
 
@@ -116,10 +118,11 @@ def contracts_export(
 def doctor(
     as_json: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
-    """Print host paths, the secret backend, the version, and Claude login."""
+    """Print host paths, the secret backend, decision routing, and Claude login."""
     settings = _settings()
     paths = Paths.from_env()
     claude_present, claude_login = _run(_claude_login())
+    decisions = settings.decisions
     payload = {
         "home": str(paths.home.resolve()),
         "db": str(paths.db),
@@ -128,6 +131,10 @@ def doctor(
         "version": __version__,
         "claude_present": claude_present,
         "claude_login": claude_login,
+        "jev_key": _jev_key(settings, paths),
+        "ollama": _ollama_reachable(),
+        "allow_cli_fallback": decisions.allow_cli_fallback,
+        "decisions_provider": decisions.provider,
     }
     if as_json:
         typer.echo(json.dumps(payload))
@@ -169,6 +176,24 @@ def secret_rm(name: str) -> None:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1) from exc
     typer.echo(f"removed {name}")
+
+
+@evals_app.command("run")
+def evals_run(suite: str) -> None:
+    """Replay one synthetic suite. Nothing runs unless ``evals_on`` is set."""
+    if suite != "decisions":
+        typer.echo(f"unknown eval suite: {suite}", err=True)
+        raise typer.Exit(code=2)
+    from sevn.evals.decisions import run_decisions
+    from sevn.evals.errors import EvalsError
+
+    try:
+        outcome = run_decisions()
+    except EvalsError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    if outcome.disabled:
+        typer.echo("evals disabled")
 
 
 def _open_secrets() -> KeychainBackend | AgeFileBackend | EnvBackend:
@@ -214,6 +239,33 @@ async def _claude_login() -> tuple[bool, int | None]:
         await process.wait()
         return True, None
     return True, code
+
+
+def _jev_key(settings: Settings, paths: Paths) -> str:
+    """``yes`` when a TypeSafe key is configured. The value is not printed."""
+    if os.environ.get("TYPESAFE_API_KEY", "").strip() != "":
+        return "yes"
+    try:
+        open_backend(settings, paths).get("provider/typesafe")
+    except SecretNotFound:
+        return "no"
+    return "yes"
+
+
+def _ollama_reachable() -> str:
+    """``yes`` when ``SEVN_OLLAMA_URL`` answers. A missing or dead URL is ``no``."""
+    url = os.environ.get("SEVN_OLLAMA_URL", "").strip()
+    if url == "":
+        return "no"
+    import httpx
+
+    try:
+        response = httpx.get(url, timeout=2.0)
+    except (httpx.HTTPError, OSError):
+        return "no"
+    if response.status_code >= 400:
+        return "no"
+    return "yes"
 
 
 def _secrets_backend(settings: Settings) -> str:

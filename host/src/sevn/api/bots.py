@@ -75,6 +75,7 @@ async def bots_update(ctx: Ctx, params: BotsUpdateParams) -> BotRecord:
             folder_id=params.folder_id,
             paused=params.paused,
             can_create_bots=params.can_create_bots,
+            network=params.network,
             fields=params.model_fields_set,
         )
     except DomainError as exc:

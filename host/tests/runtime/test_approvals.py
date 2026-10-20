@@ -36,7 +36,7 @@ async def _bot(client: object) -> dict[str, object]:
     frame, _earlier = await request(
         client,
         "bots.create",
-        {"name": "Nimbus", "op_id": mint_id("op_")},
+        {"name": "Nimbus", "access": "full", "op_id": mint_id("op_")},
     )
     return ok(frame)
 

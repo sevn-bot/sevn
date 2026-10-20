@@ -17,6 +17,7 @@ from sevn.errors import ConfigError
 from sevn.paths import Paths
 
 type BackendName = Literal["keychain", "age-file", "env"]
+type DecisionProvider = Literal["jev", "llm", "rules"]
 
 
 class ProtocolSettings(BaseModel):
@@ -38,6 +39,38 @@ class RuntimeSettings(BaseModel):
     max_running_turns: int = 3
 
 
+class BotsSettings(BaseModel):
+    """Per-bot limits from spec §5.1. Absent config keeps the defaults."""
+
+    max_parallel_agents: int = 3
+
+
+class DecisionThresholds(BaseModel):
+    """Confidence gates for the jev router questions (D4)."""
+
+    intent: float = 0.70
+    target: float = 0.65
+    busy: float = 0.60
+
+
+class MemorySettings(BaseModel):
+    """Pinned memories share one byte budget (D9). Absent config keeps 4 KB."""
+
+    pinned_budget: int = 4096
+
+
+class DecisionsSettings(BaseModel):
+    """How the host answers decision points (spec §7, D4)."""
+
+    provider: DecisionProvider = "jev"
+    jev_model: str = "jev-1.13.0"
+    llm_model: str = ""
+    ollama_model: str = "llama3.2:3b"
+    allow_cli_fallback: bool = True
+    evals_on: bool = False
+    thresholds: DecisionThresholds = Field(default_factory=DecisionThresholds)
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="SEVN_",
@@ -49,6 +82,9 @@ class Settings(BaseSettings):
     secrets: SecretsSettings = Field(default_factory=SecretsSettings)
     http: HttpSettings = Field(default_factory=HttpSettings)
     runtime: RuntimeSettings = Field(default_factory=RuntimeSettings)
+    bots: BotsSettings = Field(default_factory=BotsSettings)
+    memory: MemorySettings = Field(default_factory=MemorySettings)
+    decisions: DecisionsSettings = Field(default_factory=DecisionsSettings)
 
     @classmethod
     def settings_customise_sources(
