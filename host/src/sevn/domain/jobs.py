@@ -69,6 +69,7 @@ class JobService:
         *,
         origin: str = "user",
         route_decision_id: str | None = None,
+        status: str = "queued",
     ) -> JobRecord:
         now = utcnow()
         async with open_session() as session:
@@ -84,14 +85,14 @@ class JobService:
                     reply_to=None,
                     expects_reply=True,
                     hop=0,
-                    status="queued",
+                    status=status,
                     created_at=now,
                     started_at=None,
                     finished_at=None,
                 )
             )
             await session.commit()
-        return JobRecord(id=job_id, bot_id=bot_id, agent_id=agent_id, text=text, status="queued")
+        return JobRecord(id=job_id, bot_id=bot_id, agent_id=agent_id, text=text, status=status)
 
 
 async def page_messages(bot_id: str, cursor: str | None) -> MessagePage:

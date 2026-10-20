@@ -167,7 +167,6 @@ def _tools(
     approved: bool = False,
 ) -> list[Tool[None]]:
     """Shell and write come from the registered toolsets. Full access pauses shell."""
-    ask = bot.approval_policy == "ask"
     deps = TurnDeps(
         bot_id=bot.id,
         agent_id=agent_id,
@@ -187,7 +186,7 @@ def _tools(
                 visible_shell
                 and bot.approval_policy != "allow_all"
                 and not allow_all_enabled()
-                and (ask or bot.access == "full")
+                and bot.access == "full"
             )
             tools.append(
                 Tool(

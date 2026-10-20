@@ -31,7 +31,11 @@ async def ask(agent_id: str, turn_id: str, question: str) -> str:
                 agent_id=agent_id,
                 kind="question",
                 tool_call_id=None,
-                payload={"text": question},
+                payload={
+                    "text": question,
+                    "name": "user.ask",
+                    "args": {"question": question},
+                },
                 answer=None,
                 status="waiting",
                 created_at=now,

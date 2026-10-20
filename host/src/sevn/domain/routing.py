@@ -147,8 +147,9 @@ async def deliver(
     after = last_decision_id()
     decision_id = after if after != before else None
     bot = await BotService().get(message.bot_id)
-    agent, origin = await _act(message, decision, job_id)
+    agent, origin, consumed = await _act(message, decision, job_id)
     held = await _over_cap(bot.id, decision.intent)
+    job_status = "waiting" if decision.ask_user else ("done" if consumed else "queued")
     await JobService().enqueue(
         job_id,
         bot.id,
@@ -156,13 +157,14 @@ async def deliver(
         message.text,
         origin=origin,
         route_decision_id=decision_id,
+        status=job_status,
     )
     message_id = await _attach_user_message(job_id, agent, bot, message.text, decision)
     payload: dict[str, object] = {
         "job_id": job_id,
         "agent_id": agent.id,
         "bot_id": bot.id,
-        "status": "queued",
+        "status": job_status,
     }
     if held:
         ahead = await _ahead(bot.id, job_id)
@@ -182,7 +184,7 @@ async def deliver(
     )
     await hub.emit("job.queued", job_id, payload)
     logger.info("route decided {intent} via {path}", intent=decision.intent, path=decision.path)
-    if not held and decision.intent != "cancel" and not decision.ask_user:
+    if not held and not consumed and not decision.ask_user:
         await _start(agent.id)
     return job_id, agent.id
 
@@ -203,6 +205,7 @@ async def reroute(
             raise DomainError("invalid_params", "agent_id or new is required")
         target = await _agent_on_bot(bot_id, agent_id)
     await _requeue(job_id, target.id)
+    await _start(target.id)
     await mark_corrected(decision_id, target.id)
     await hub.emit(
         "route.corrected",
@@ -214,31 +217,32 @@ async def reroute(
 
 async def _act(
     message: RoutedMessage, decision: RouteDecision, job_id: str
-) -> tuple[AgentRecord, str]:
+) -> tuple[AgentRecord, str, bool]:
+    """Choose the lane. ``consumed`` means the message must not run as a job."""
     if decision.ask_user:
         agent = await _first_open(message.bot_id)
         if agent is None:
             agent = await _spawn(message, job_id)
-        return agent, "user"
+        return agent, "user", False
     if decision.intent in _FRESH or decision.target_agent_id is None:
         agent = await _spawn(message, job_id)
         origin = "chit_chat" if decision.intent == "chit_chat" else "user"
-        return agent, origin
+        return agent, origin, False
     agent = await _agent_on_bot(message.bot_id, decision.target_agent_id)
     if decision.intent == "follow_up":
-        return await AgentService().revive(agent.id), "user"
+        return await AgentService().revive(agent.id), "user", False
     if decision.intent == "steer":
         steered = await _steer(agent.id, message.text)
         if not steered:
             logger.info("steer queued for {runtime}", runtime=agent.runtime)
-        return agent, "user"
+        return agent, "user", steered
     if decision.intent == "answer":
         await _resolve_answer(agent.id, message.text)
-        return agent, "user"
+        return agent, "user", False
     if decision.intent == "cancel":
         await _cancel_agent(agent.id)
-        return agent, "user"
-    return agent, "user"
+        return agent, "user", True
+    return agent, "user", False
 
 
 async def _over_cap(bot_id: str, intent: str) -> bool:

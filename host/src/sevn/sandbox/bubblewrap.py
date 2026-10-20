@@ -51,7 +51,10 @@ def argv(command: str, *, workspace: Path, shared: Path, network: bool) -> list[
     # The host home holds the database, the secret store, the age key and the
     # run token. Mask them: ``--ro-bind / /`` would expose the rest of the host.
     paths = Paths.from_env()
-    for secret_file in (paths.db, paths.secrets_file):
+    sidecars = tuple(
+        paths.db.with_name(paths.db.name + suffix) for suffix in ("-wal", "-shm", "-journal")
+    )
+    for secret_file in (paths.db, *sidecars, paths.secrets_file):
         if secret_file.is_file():
             args.extend(["--ro-bind", "/dev/null", str(secret_file)])
     for secret_dir in (paths.keys, paths.run, paths.logs):
