@@ -132,6 +132,11 @@ export async function loadMemoriesPanel(): Promise<Component> {
   return named(modules, "MemoriesPanel");
 }
 
+export async function loadDashboard(): Promise<Component> {
+  const modules = import.meta.glob("../../src/app/fleet/Dashboard.tsx");
+  return named(modules, "Dashboard");
+}
+
 async function named(
   modules: Record<string, () => Promise<unknown>>,
   exportName: string,

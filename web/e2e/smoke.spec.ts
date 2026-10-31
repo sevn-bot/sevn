@@ -25,6 +25,12 @@ async function runSmoke(page: SmokePage, expect: ExpectVisible): Promise<void> {
   await page.goto(
     `${state.baseURL}/auth/login?token=${encodeURIComponent(state.token)}`,
   );
+  await expect(page.getByText(/^Waiting on you \(\d+\)$/)).toBeVisible({
+    timeout: 10_000,
+  });
+  await expect(page.getByText(/^Updated \d{2}:\d{2}$/)).toBeVisible({
+    timeout: 10_000,
+  });
   await page.getByRole("button", { name: "Ping" }).click();
   await expect(page.getByText(/event #\d+ — system\.ping/)).toBeVisible({
     timeout: 10_000,
