@@ -31,16 +31,28 @@ const refreshKinds = new Set([
   "turn.finished",
 ]);
 
-export function Chat({ botId }: { botId: string }) {
+export function Chat({
+  botId,
+  agentId = null,
+}: {
+  botId: string;
+  agentId?: string | null;
+}) {
   const [client] = useState(() => createQueryClient());
   return (
     <QueryClientProvider client={client}>
-      <ChatView botId={botId} />
+      <ChatView botId={botId} agentId={agentId} />
     </QueryClientProvider>
   );
 }
 
-function ChatView({ botId }: { botId: string }) {
+function ChatView({
+  botId,
+  agentId,
+}: {
+  botId: string;
+  agentId: string | null;
+}) {
   const messagesQuery = useCall("messages.list", { bot_id: botId });
   const agentsQuery = useCall("agents.list", { bot_id: botId });
   const pendingQuery = useCall("pending.list", {});
@@ -64,6 +76,7 @@ function ChatView({ botId }: { botId: string }) {
   const pending = (pendingQuery.data?.pending ?? []).filter((item) =>
     agentIds.has(item.agent_id),
   );
+  const focused = agents.find((agent) => agent.id === agentId);
   const botName = botQuery.data?.name ?? "";
   const model = botQuery.data?.model ?? "";
   const persisted = new Set(
@@ -140,7 +153,12 @@ function ChatView({ botId }: { botId: string }) {
     }
     setDraft("");
     try {
-      await call("messages.send", { bot_id: botId, text });
+      await call(
+        "messages.send",
+        focused === undefined
+          ? { bot_id: botId, text }
+          : { bot_id: botId, text, agent_id: focused.id },
+      );
     } catch {
       setDraft(text);
     }
@@ -167,7 +185,7 @@ function ChatView({ botId }: { botId: string }) {
           Sandbox allow all is on
         </p>
       ) : null}
-      <Lanes agents={laneAgents} />
+      <Lanes agents={laneAgents} focusedId={agentId} />
       <div
         ref={logRef}
         role="log"
@@ -197,6 +215,20 @@ function ChatView({ botId }: { botId: string }) {
           />
         ))}
       </div>
+      {focused !== undefined ? (
+        <div className="flex flex-wrap items-baseline gap-2 text-sm text-zinc-400">
+          <p>{`Sending to ${focused.title !== "" ? focused.title : focused.id}`}</p>
+          <button
+            type="button"
+            className="underline"
+            onClick={() => {
+              go(`/bots/${encodeURIComponent(botId)}`);
+            }}
+          >
+            Any lane
+          </button>
+        </div>
+      ) : null}
       <label className="block text-sm">
         Message
         <input

@@ -89,6 +89,55 @@ type PendingItem = {
   status: string;
 };
 
+export type FleetBotStatus = "running" | "waiting" | "idle" | "quiet";
+
+export type FleetBot = {
+  id: string;
+  name: string;
+  title: string;
+  avatar: string;
+  paused: boolean;
+  status: FleetBotStatus;
+  open_agents: number;
+  waiting: number;
+};
+
+export type FleetWaiting = {
+  id: string;
+  kind: string;
+  text: string;
+  name: string;
+  args: Record<string, unknown>;
+  bot_id: string;
+  bot_name: string;
+  agent_id: string;
+  agent_title: string;
+  turn_id: string;
+  created_at: string;
+};
+
+export type FleetFinished = {
+  turn_id: string;
+  status: string;
+  preview: string;
+  bot_id: string;
+  bot_name: string;
+  agent_id: string;
+  agent_title: string;
+  finished_at: string;
+};
+
+export type FleetDay = { bot_id: string; day: string; turns: number };
+
+export type FleetOverview = {
+  as_of: string;
+  days: string[];
+  bots: FleetBot[];
+  waiting: FleetWaiting[];
+  finished: FleetFinished[];
+  activity: FleetDay[];
+};
+
 export type MethodParams = {
   "system.info": Record<string, never>;
   "system.ping": { note: string; op_id?: string };
@@ -172,6 +221,7 @@ export type MethodParams = {
   };
   "turns.snapshot": { turn_id: string };
   "turns.cancel": { turn_id: string; op_id?: string };
+  "fleet.overview": { bot_id?: string };
 };
 
 export type MethodResult = {
@@ -204,6 +254,7 @@ export type MethodResult = {
   "pending.answer": { id: string; status: string };
   "turns.snapshot": { text: string; status: string };
   "turns.cancel": { turn_id: string; status: string };
+  "fleet.overview": FleetOverview;
 };
 
 export type Status =
