@@ -20,6 +20,7 @@ from sevn.runtime.runtimes.pydantic_ai import PydanticAIRuntime
 from sevn.runtime.turn import (
     TurnRunner,
     cancel_persisted_waiting,
+    persist_queued_cancel,
     persist_running_cancel,
     record_turn_failure,
 )
@@ -164,12 +165,14 @@ class Worker:
             self.kick(agent_id)
 
     async def cancel(self, turn_id: str) -> str:
-        """Cancel a live or waiting turn. A finished turn keeps its stored status."""
+        """Cancel a queued, live or waiting turn. A finished turn keeps its stored status."""
         live = self._board.agent_id(turn_id)
         self._board.cancel(turn_id)
         if await cancel_persisted_waiting(self.hub, turn_id):
             agent_id = live if live is not None else await _agent_for_turn(turn_id)
             self.kick(agent_id)
+            return "cancelled"
+        if await persist_queued_cancel(self.hub, turn_id):
             return "cancelled"
         if live is None:
             if await persist_running_cancel(self.hub, turn_id):

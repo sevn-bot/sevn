@@ -260,9 +260,10 @@ async def test_turns_cancel_stops_turn(tmp_path: Path, monkeypatch: pytest.Monke
             bind(host.hub)
             bot = await _create_bot(client)
             await _send(client, bot["id"], "hi")
+            # Routing stores the turn as queued first; wait until it runs.
             turns = await poll_rows(
                 tmp_path,
-                "SELECT id FROM turns",
+                "SELECT id FROM turns WHERE status = 'running'",
                 (),
                 lambda rows: bool(rows),
             )
@@ -282,6 +283,47 @@ async def test_turns_cancel_stops_turn(tmp_path: Path, monkeypatch: pytest.Monke
             )
     finally:
         pause.set()
+
+
+async def test_cancel_queued_turn_never_runs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sevn.runtime.models import use_model
+    from sevn.runtime.worker import Worker, bind
+
+    recorded = asyncio.Event()
+    use_model(function_model([{"kind": "text", "text": "hello"}], recorded=recorded))
+    load_modules("sevn.api.bots", "sevn.api.messages")
+    real_kick = Worker.kick
+    monkeypatch.setattr(Worker, "kick", lambda _self, _agent_id: None)
+    async with connected(tmp_path, monkeypatch) as (host, client):
+        worker = bind(host.hub)
+        bot = await _create_bot(client)
+        await _send(client, bot["id"], "hi")
+        queued = await poll_rows(
+            tmp_path,
+            "SELECT id, agent_id, job_ids FROM turns WHERE status = 'queued'",
+            (),
+            lambda rows: bool(rows),
+        )
+        turn_id = queued[0]["id"]
+        frame, _earlier = await request(
+            client,
+            "turns.cancel",
+            {"turn_id": turn_id, "op_id": mint_id("op_")},
+        )
+        ok(frame)
+        rows = fetch_all(tmp_path, "SELECT status FROM turns WHERE id = ?", (turn_id,))
+        assert rows[0]["status"] == "cancelled"
+        job_id = json.loads(str(queued[0]["job_ids"]))[0]
+        jobs = fetch_all(tmp_path, "SELECT status FROM jobs WHERE id = ?", (job_id,))
+        assert jobs[0]["status"] == "cancelled"
+        monkeypatch.setattr(Worker, "kick", real_kick)
+        worker.kick(str(queued[0]["agent_id"]))
+        await worker.settle(str(queued[0]["agent_id"]))
+        assert not recorded.is_set()
+        rows = fetch_all(tmp_path, "SELECT status FROM turns WHERE id = ?", (turn_id,))
+        assert rows[0]["status"] == "cancelled"
 
 
 @asynccontextmanager

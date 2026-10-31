@@ -83,6 +83,9 @@ class TurnRunner:
 
     async def run(self, job_id: str) -> None:
         job = await _mark_started(job_id)
+        if job is None:
+            logger.info("job cancelled before it started")
+            return
         await self._hub.emit(
             "job.started",
             job.id,
@@ -94,17 +97,19 @@ class TurnRunner:
         started = utcnow()
         stored = False
         existing = await _queued_turn_id(job.id)
+        # Register the turn before its row is visible, so a cancel that reads the
+        # row also finds the live turn and interrupts it.
         if existing is not None:
             turn_id = existing
             if self._watch is not None:
-                await _promote_turn(turn_id, started, agent, bot)
                 self._watch.open_turn(turn_id, agent.id)
+                await _promote_turn(turn_id, started, agent, bot)
                 stored = True
         else:
             turn_id = new_id("turn_")
             if self._watch is not None:
-                await _insert_open_turn(turn_id, started, job, agent, bot)
                 self._watch.open_turn(turn_id, agent.id)
+                await _insert_open_turn(turn_id, started, job, agent, bot)
                 stored = True
         await self._hub.emit(
             "turn.started",
@@ -527,11 +532,14 @@ def _pending_event(row: PendingRow) -> Event:
     return Event(type="pending.created", entity=row.id, payload=payload, created_at=utcnow())
 
 
-async def _mark_started(job_id: str) -> _Job:
+async def _mark_started(job_id: str) -> _Job | None:
+    """Mark the job started. ``None`` when it was cancelled while it waited for a slot."""
     async with open_session() as session:
         row = await session.get(JobRow, job_id)
         if row is None:
             raise TurnError("job not found")
+        if row.status == "cancelled":
+            return None
         agent_id = row.agent_id
         if agent_id is None:
             raise TurnError("job has no agent")
@@ -954,6 +962,31 @@ async def persist_running_cancel(hub: Hub, turn_id: str) -> bool:
         )
         events.append(_agent_event(turn.agent_id, "idle"))
         events.extend(await _resolve_open_pendings(session, turn, finished_at))
+        for event in events:
+            session.add(event)
+        await session.commit()
+        for event in events:
+            await hub.relay(event)
+    return True
+
+
+async def persist_queued_cancel(hub: Hub, turn_id: str) -> bool:
+    """Cancel a turn that has not started, so the pump never runs its jobs.
+
+    Routing stores a ``queued`` turn with the user message before the job runs.
+    Returns true when this call wrote ``cancelled``.
+    """
+    finished_at = utcnow()
+    async with open_session() as session:
+        turn = await session.get(TurnRow, turn_id)
+        if turn is None or turn.status != "queued":
+            return False
+        turn.status = "cancelled"
+        turn.finished_at = finished_at
+        events = [_turn_event("turn.finished", turn.id, turn.agent_id, "cancelled")]
+        for owned_id in turn.job_ids:
+            await _finish_job(session, owned_id, "cancelled", finished_at)
+            events.append(_job_event("job.done", owned_id, turn.agent_id, "cancelled"))
         for event in events:
             session.add(event)
         await session.commit()

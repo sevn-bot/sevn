@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- The workspace shell no longer reads the home directory outside git's config and toolchain installs, keeps no host secrets in its environment, cannot reach the keychain, pasteboard or Apple Events on macOS, and runs in its own namespaces on Linux. Commands time out after 300 seconds, stop with their process group on cancel, and show the model the exit code and stderr. Under `auto` only read-only commands skip approval, `history.read` stays within the bot, and a cancelled queued turn never runs.
 - Jev router with a no-key fallback chain, parallel agents with workspace isolation, memories, sandboxed workspace tools, allow_all, compaction, and decision evals (off by default).
 - Event replay is paged so a reconnect cannot overflow the session, an approval no longer blocks other calls, and exception text is redacted in logs.
 - Database upgrades keep the initial tables as they shipped, so a later column can be added without colliding, including from a packaged install even when a parent directory has another project's alembic.ini.
