@@ -2,8 +2,8 @@
 #
 # Reviewer: OpenCode Go subscription, model opencode-go/deepseek-v4.1-flash.
 # That is the primary rung in alexhawat/mergeCraft's own review workflow.
-# The action pin below is that workflow's verified image commit. The tagged
-# v0.1.0a1 action does not include this model.
+# The action pin below is the v0.1.0a4 release commit; its action.yml pins the
+# container image by digest.
 #
 # Trigger is pull_request, not pull_request_target. This job is not a required
 # ruleset, and pull_request keeps repository secrets out of fork runs. The
@@ -39,6 +39,9 @@ jobs:
       pull-requests: write
       issues: write
       checks: write
+      # Lets the reviewer read this PR's and the base branch's CI runs, so a
+      # failure already on the base is not blamed on the PR.
+      actions: read
     env:
       # Fork pull_request runs receive an empty secret. The same-repo clause
       # stays even if the trigger later changes.
@@ -52,7 +55,7 @@ jobs:
 
       - name: Run mergeCraft
         if: env.HAS_OPENCODE_GO == 'true'
-        uses: alexhawat/mergeCraft@677c192c0229a96777b0092febd7d1c3264319d3 # verified image manifest
+        uses: alexhawat/mergeCraft@7080e962c2259757a34b9f745602f093e4ee3378 # v0.1.0a4
         with:
           prompt: >
             ${{ github.event_name == 'pull_request'
@@ -66,7 +69,7 @@ jobs:
           timeout: 25m
         env:
           # Keep equal to the uses: commit above. The container cannot read it.
-          MERGECRAFT_ACTION_SHA: 677c192c0229a96777b0092febd7d1c3264319d3
+          MERGECRAFT_ACTION_SHA: 7080e962c2259757a34b9f745602f093e4ee3378
           LLM_PROVIDER_9: opencode-go
           OPENCODE_GO_API_KEY: ${{ secrets.LLM_PROVIDER_9_API_KEY }}
 
