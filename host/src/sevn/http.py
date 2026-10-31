@@ -24,6 +24,7 @@ from starlette.websockets import WebSocket
 
 import sevn.api.agents as agent_api
 import sevn.api.bots as bot_api
+import sevn.api.fleet as fleet_api
 import sevn.api.memories as memory_api
 import sevn.api.messages as message_api
 import sevn.api.models as model_api
@@ -70,6 +71,7 @@ _REGISTERED = (
     memory_api.memories_update,
     memory_api.memories_delete,
     memory_api.memories_pin,
+    fleet_api.fleet_overview,
 )
 
 CSP = (

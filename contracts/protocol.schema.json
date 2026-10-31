@@ -812,6 +812,283 @@
       "title": "Evt",
       "type": "object"
     },
+    "FleetBot": {
+      "additionalProperties": false,
+      "description": "One bot on the dashboard header.",
+      "properties": {
+        "avatar": {
+          "title": "Avatar",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "open_agents": {
+          "title": "Open Agents",
+          "type": "integer"
+        },
+        "paused": {
+          "title": "Paused",
+          "type": "boolean"
+        },
+        "status": {
+          "$ref": "#/$defs/FleetBotStatus"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "waiting": {
+          "title": "Waiting",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "title",
+        "avatar",
+        "paused",
+        "status",
+        "open_agents",
+        "waiting"
+      ],
+      "title": "FleetBot",
+      "type": "object"
+    },
+    "FleetBotStatus": {
+      "enum": [
+        "running",
+        "waiting",
+        "idle",
+        "quiet"
+      ],
+      "type": "string"
+    },
+    "FleetDay": {
+      "additionalProperties": false,
+      "description": "Turns one bot finished on one UTC day.",
+      "properties": {
+        "bot_id": {
+          "title": "Bot Id",
+          "type": "string"
+        },
+        "day": {
+          "title": "Day",
+          "type": "string"
+        },
+        "turns": {
+          "title": "Turns",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "bot_id",
+        "day",
+        "turns"
+      ],
+      "title": "FleetDay",
+      "type": "object"
+    },
+    "FleetFinished": {
+      "additionalProperties": false,
+      "description": "One turn that ended.",
+      "properties": {
+        "agent_id": {
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "agent_title": {
+          "title": "Agent Title",
+          "type": "string"
+        },
+        "bot_id": {
+          "title": "Bot Id",
+          "type": "string"
+        },
+        "bot_name": {
+          "title": "Bot Name",
+          "type": "string"
+        },
+        "finished_at": {
+          "format": "date-time",
+          "title": "Finished At",
+          "type": "string"
+        },
+        "preview": {
+          "title": "Preview",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "turn_id": {
+          "title": "Turn Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "turn_id",
+        "status",
+        "preview",
+        "bot_id",
+        "bot_name",
+        "agent_id",
+        "agent_title",
+        "finished_at"
+      ],
+      "title": "FleetFinished",
+      "type": "object"
+    },
+    "FleetOverview": {
+      "additionalProperties": false,
+      "description": "Everything the main dashboard shows, read at ``as_of``.",
+      "properties": {
+        "activity": {
+          "items": {
+            "$ref": "#/$defs/FleetDay"
+          },
+          "title": "Activity",
+          "type": "array"
+        },
+        "as_of": {
+          "format": "date-time",
+          "title": "As Of",
+          "type": "string"
+        },
+        "bots": {
+          "items": {
+            "$ref": "#/$defs/FleetBot"
+          },
+          "title": "Bots",
+          "type": "array"
+        },
+        "days": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Days",
+          "type": "array"
+        },
+        "finished": {
+          "items": {
+            "$ref": "#/$defs/FleetFinished"
+          },
+          "title": "Finished",
+          "type": "array"
+        },
+        "waiting": {
+          "items": {
+            "$ref": "#/$defs/FleetWaiting"
+          },
+          "title": "Waiting",
+          "type": "array"
+        }
+      },
+      "required": [
+        "as_of",
+        "days",
+        "bots",
+        "waiting",
+        "finished",
+        "activity"
+      ],
+      "title": "FleetOverview",
+      "type": "object"
+    },
+    "FleetOverviewParams": {
+      "additionalProperties": false,
+      "description": "``bot_id`` narrows only the finished list.",
+      "properties": {
+        "bot_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bot Id"
+        }
+      },
+      "title": "FleetOverviewParams",
+      "type": "object"
+    },
+    "FleetWaiting": {
+      "additionalProperties": false,
+      "description": "One request waiting on the owner.",
+      "properties": {
+        "agent_id": {
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "agent_title": {
+          "title": "Agent Title",
+          "type": "string"
+        },
+        "args": {
+          "additionalProperties": true,
+          "title": "Args",
+          "type": "object"
+        },
+        "bot_id": {
+          "title": "Bot Id",
+          "type": "string"
+        },
+        "bot_name": {
+          "title": "Bot Name",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "turn_id": {
+          "title": "Turn Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "text",
+        "name",
+        "args",
+        "bot_id",
+        "bot_name",
+        "agent_id",
+        "agent_title",
+        "turn_id",
+        "created_at"
+      ],
+      "title": "FleetWaiting",
+      "type": "object"
+    },
     "Hello": {
       "properties": {
         "caps": {
@@ -2051,6 +2328,11 @@
       "mutating": true,
       "params": "BotsUpdateParams",
       "result": "BotRecord"
+    },
+    "fleet.overview": {
+      "mutating": false,
+      "params": "FleetOverviewParams",
+      "result": "FleetOverview"
     },
     "host.set_sandbox_mode": {
       "mutating": true,

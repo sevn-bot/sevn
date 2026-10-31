@@ -36,6 +36,11 @@ export const methods = {
     params: "BotsUpdateParams",
     result: "BotRecord",
   },
+  "fleet.overview": {
+    mutating: false,
+    params: "FleetOverviewParams",
+    result: "FleetOverview",
+  },
   "host.set_sandbox_mode": {
     mutating: true,
     params: "SandboxModeParams",
