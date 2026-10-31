@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import os
+import signal
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -10,21 +13,29 @@ from sevn.domain.errors import DomainError
 from sevn.domain.ids import new_id
 from sevn.domain.session import open_session
 from sevn.domain.workspace import open_place
+from sevn.sandbox.env import child_env
 from sevn.sandbox.policy import (
-    Risk,
     allow_all_enabled,
     approval_required,
     direct_argv,
     isolated_command,
-    risk_of,
     workspace_argv,
 )
+from sevn.sandbox.risk import Risk, risk_of
 from sevn.store.db import utcnow
 from sevn.store.models import Agent as AgentRow
 from sevn.store.models import Bot as BotRow
 from sevn.store.models import PendingRequest
 from sevn.store.models import Turn as TurnRow
 from sevn.tools.registry import TurnDeps, register_toolset
+
+# One command may run this long. Past it the whole process group is stopped.
+TIMEOUT_SECONDS = 300.0
+# Bytes kept per stream. The rest is read and dropped so the command never
+# blocks on a full pipe.
+OUTPUT_LIMIT = 64_000
+_CHUNK = 65_536
+_TERM_GRACE = 2.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,6 +48,8 @@ class ShellResult:
     returncode: int | None
     stdout: str
     stderr: str
+    timed_out: bool = False
+    truncated: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,15 +96,35 @@ async def execute(
         target,
         host_allow_all=host_allow_all,
     )
-    code, stdout, stderr = await _run(argv, target.root.resolve())
+    ran = await _run(
+        argv,
+        target.root.resolve(),
+        child_env(docker=target.access == "isolated" and not host_allow_all),
+    )
     return ShellResult(
         executed=True,
         risk=risk,
         pending_id=None,
-        returncode=code,
-        stdout=stdout,
-        stderr=stderr,
+        returncode=ran.returncode,
+        stdout=ran.stdout,
+        stderr=ran.stderr,
+        timed_out=ran.timed_out,
+        truncated=ran.truncated,
     )
+
+
+def tool_output(result: ShellResult) -> str:
+    """What the model reads: the exit code, stdout, then stderr when there is any."""
+    lines = [f"exit code: {result.returncode}"]
+    if result.timed_out:
+        lines.append(f"timed out after {TIMEOUT_SECONDS:g}s; the command was stopped")
+    if result.truncated:
+        lines.append(f"output was cut at {OUTPUT_LIMIT} bytes per stream")
+    if result.stdout:
+        lines.extend(["stdout:", result.stdout.rstrip("\n")])
+    if result.stderr:
+        lines.extend(["stderr:", result.stderr.rstrip("\n")])
+    return "\n".join(lines)
 
 
 def shell_toolset(deps: TurnDeps) -> dict[str, object]:
@@ -107,7 +140,7 @@ def shell_toolset(deps: TurnDeps) -> dict[str, object]:
         )
         if result.pending_id is not None:
             return result.pending_id
-        return result.stdout
+        return tool_output(result)
 
     return {"shell": shell}
 
@@ -180,17 +213,82 @@ async def _ask(agent_id: str, command: str, risk: Risk) -> str:
     return pending_id
 
 
-async def _run(argv: list[str], cwd: Path) -> tuple[int, str, str]:
+@dataclass(frozen=True, slots=True)
+class _Ran:
+    returncode: int
+    stdout: str
+    stderr: str
+    timed_out: bool
+    truncated: bool
+
+
+async def _run(argv: list[str], cwd: Path, env: dict[str, str]) -> _Ran:
+    """Run ``argv`` in its own session so a timeout or cancel stops every child."""
     process = await asyncio.create_subprocess_exec(
         *argv,
         cwd=cwd,
+        env=env,
         stdin=asyncio.subprocess.DEVNULL,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
+        start_new_session=True,
     )
-    stdout, stderr = await process.communicate()
+    collected = asyncio.gather(
+        _read_capped(process.stdout),
+        _read_capped(process.stderr),
+        process.wait(),
+    )
+    timed_out = False
+    try:
+        (out, out_cut), (err, err_cut), _code = await asyncio.wait_for(
+            collected, timeout=TIMEOUT_SECONDS
+        )
+    except TimeoutError:
+        timed_out = True
+        await _stop(process)
+        out, out_cut, err, err_cut = b"", False, b"", False
+    except asyncio.CancelledError:
+        await asyncio.shield(_stop(process))
+        raise
     code = 1 if process.returncode is None else process.returncode
-    return code, _text(stdout), _text(stderr)
+    return _Ran(
+        returncode=code,
+        stdout=_text(out),
+        stderr=_text(err),
+        timed_out=timed_out,
+        truncated=out_cut or err_cut,
+    )
+
+
+async def _read_capped(stream: asyncio.StreamReader | None) -> tuple[bytes, bool]:
+    if stream is None:
+        return b"", False
+    kept = bytearray()
+    cut = False
+    while chunk := await stream.read(_CHUNK):
+        room = OUTPUT_LIMIT - len(kept)
+        if room > 0:
+            kept.extend(chunk[:room])
+        if len(chunk) > room:
+            cut = True
+    return bytes(kept), cut
+
+
+async def _stop(process: asyncio.subprocess.Process) -> None:
+    """SIGTERM the process group, then SIGKILL what is left after a short grace."""
+    if process.returncode is not None:
+        return
+    _signal_group(process.pid, signal.SIGTERM)
+    try:
+        await asyncio.wait_for(process.wait(), timeout=_TERM_GRACE)
+    except TimeoutError:
+        _signal_group(process.pid, signal.SIGKILL)
+        await process.wait()
+
+
+def _signal_group(pid: int, sig: signal.Signals) -> None:
+    with suppress(ProcessLookupError, PermissionError):
+        os.killpg(pid, sig)
 
 
 def _text(raw: bytes | None) -> str:

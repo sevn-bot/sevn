@@ -11,8 +11,20 @@ import pytest
 from support.chat import connected, error_body, fetch_all, load_modules, mint_id, ok, request
 
 
+def _stream(data: bytes) -> asyncio.StreamReader:
+    reader = asyncio.StreamReader()
+    reader.feed_data(data)
+    reader.feed_eof()
+    return reader
+
+
 class _Proc:
     returncode = 0
+    pid = 0
+
+    def __init__(self) -> None:
+        self.stdout = _stream(b"ok")
+        self.stderr = _stream(b"")
 
     async def communicate(self) -> tuple[bytes, bytes]:
         return b"ok", b""

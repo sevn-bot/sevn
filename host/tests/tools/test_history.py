@@ -81,11 +81,30 @@ async def test_history_read_by_cursor(tmp_path: Path, monkeypatch: pytest.Monkey
     _insert(tmp_path, agent, turn_id, "history-needle-beta", "2026-06-01T00:01:00+00:00")
     hits = await search(str(bot.id), "history-needle-alpha")
     assert hits[0].message_id == first_id
-    page = await read(message_id=first_id)
+    page = await read(str(bot.id), message_id=first_id)
     assert page.text == "history-needle-alpha"
     assert isinstance(page.cursor, str) and page.cursor != ""
-    nxt = await read(cursor=page.cursor)
+    nxt = await read(str(bot.id), cursor=page.cursor)
     assert nxt.text == "history-needle-beta"
+
+
+async def test_history_read_refuses_another_bots_message(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sevn.domain.bots import BotService
+    from sevn.domain.errors import DomainError
+    from sevn.tools.history import read
+
+    _bot, agent, turn_id = await _thread(tmp_path, monkeypatch)
+    message_id = _insert(
+        tmp_path, agent, turn_id, "history-needle-private", "2026-06-01T00:00:00+00:00"
+    )
+    other = await BotService().create("Cirrus")
+    with pytest.raises(DomainError) as caught:
+        await read(str(other.id), message_id=message_id)
+    assert caught.value.code == "not_found"
+    with pytest.raises(DomainError):
+        await read(str(other.id), cursor=message_id)
 
 
 async def test_history_tools_are_deferred(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

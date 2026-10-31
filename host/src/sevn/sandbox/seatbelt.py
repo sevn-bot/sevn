@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from sevn.paths import Paths
@@ -14,10 +15,13 @@ _SHELL = "/bin/sh"
 def argv(command: str, *, workspace: Path, shared: Path, network: bool) -> list[str]:
     """Run ``command`` under ``sevn-workspace.sb``."""
     paths = Paths.from_env()
+    home = Path(os.environ.get("HOME", str(Path.home()))).expanduser().resolve()
     return [
         _SANDBOX_EXEC,
         "-f",
         str(_PROFILE),
+        "-D",
+        f"HOME={home}",
         "-D",
         f"WORKSPACE={workspace}",
         "-D",

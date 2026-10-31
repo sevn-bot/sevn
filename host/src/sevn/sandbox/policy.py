@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-import re
 import sys
 from pathlib import Path
-from typing import Literal
 
 from sevn.contracts.errors import ProtocolError
 from sevn.contracts.methods import SandboxModeParams, SandboxModeResult
@@ -16,31 +14,11 @@ from sevn.paths import Paths
 from sevn.protocol.registry import Ctx, method
 from sevn.sandbox.bubblewrap import argv as bwrap_argv
 from sevn.sandbox.isolated import argv as isolated_argv
+from sevn.sandbox.risk import Risk
 from sevn.sandbox.seatbelt import argv as seatbelt_argv
-
-type Risk = Literal["low", "medium", "high", "destructive"]
 
 _CONFIRM = "I understand"
 _MODE_NAME = "sandbox.mode"
-_RM_RF = re.compile(r"(?:^|\s)-[A-Za-z]*r[A-Za-z]*f|(?:^|\s)-[A-Za-z]*f[A-Za-z]*r")
-_ROOT = re.compile(r"(?:^|\s)/(?:\s|$|\*)")
-_SUDO = re.compile(r"(?:^|\s)sudo(?:\s|$)")
-_PIPE_SHELL = re.compile(r"\b(?:curl|wget)\b[^|]*\|\s*(?:sh|bash|zsh)\b")
-_REDIRECT = re.compile(r"(?:>>|>)\s*([^\s;|&]+)")
-_HIGH = ("curl", "wget", "ssh", "nc ", "ncat")
-_MEDIUM = re.compile(r"\b(?:rm|chmod|chown|mv)\b")
-
-
-def risk_of(command: str) -> Risk:
-    """Score one shell command. The listed overrides are always destructive (D15)."""
-    if _destructive(command):
-        return "destructive"
-    folded = command.lower()
-    if any(token in folded for token in _HIGH):
-        return "high"
-    if _MEDIUM.search(folded):
-        return "medium"
-    return "low"
 
 
 def approval_required(*, access: str, policy: str, risk: Risk, host_allow_all: bool) -> bool:
@@ -115,17 +93,3 @@ def _write_mode(mode: str) -> None:
     path = _mode_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(mode + "\n", encoding="utf-8")
-
-
-def _destructive(command: str) -> bool:
-    if _SUDO.search(command) or _PIPE_SHELL.search(command) or _dotfile(command):
-        return True
-    return _RM_RF.search(command) is not None and _ROOT.search(command) is not None
-
-
-def _dotfile(command: str) -> bool:
-    for match in _REDIRECT.finditer(command):
-        leaf = match.group(1).rstrip("/").rsplit("/", 1)[-1]
-        if leaf.startswith("."):
-            return True
-    return False

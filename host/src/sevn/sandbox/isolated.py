@@ -21,6 +21,9 @@ def argv(command: str, *, workspace: Path, shared: Path, network: bool) -> list[
         binary,
         "run",
         "--rm",
+        # tini as pid 1 passes the SIGTERM the docker client forwards on a
+        # timeout or cancel; a bare ``sh`` as pid 1 would ignore it.
+        "--init",
         # Run as the host user so files created in the bind-mounted workspace
         # stay writable by later file tools.
         "--user",

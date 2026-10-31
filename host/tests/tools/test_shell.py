@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import os
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -13,13 +15,15 @@ from support.botcore import arm_configured, upgrade_home
 _HOSTS_MARKER = "seatbelt-marker"
 
 
-async def _pair(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[object, object]:
+async def _pair(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, access: str = "workspace"
+) -> tuple[object, object]:
     from sevn.domain.agents import AgentService
     from sevn.domain.bots import BotService
 
     arm_configured(monkeypatch, tmp_path)
     await upgrade_home(tmp_path)
-    bot = await BotService().create("Nimbus")
+    bot = await BotService().create("Nimbus", access=access)
     agent = await AgentService().spawn(bot.id)
     return bot, agent
 
@@ -157,3 +161,133 @@ async def test_shell_is_deferred(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
         deferred.update(item.deferred)
     assert "shell" in deferred
     assert "shell" not in eager
+
+
+@pytest.mark.skipif(
+    sys.platform not in {"darwin", "linux"},
+    reason="sandbox home masking is macOS or Linux",
+)
+async def test_shell_denies_home_outside_the_allowlist(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sevn.tools.shell import execute
+
+    home = tmp_path / "home"
+    (home / ".docker").mkdir(parents=True)
+    (home / ".docker" / "config.json").write_text(_HOSTS_MARKER, encoding="utf-8")
+    (home / ".zsh_history").write_text(_HOSTS_MARKER, encoding="utf-8")
+    (home / ".gitconfig").write_text("[user]\n\tname = Marker\n", encoding="utf-8")
+    monkeypatch.setenv("HOME", str(home))
+    bot, agent = await _pair(tmp_path, monkeypatch)
+    for path in (home / ".docker" / "config.json", home / ".zsh_history"):
+        shown = await execute(bot.id, agent.id, f'cat "{path}"')
+        assert shown.executed is True
+        assert shown.returncode != 0
+        assert _HOSTS_MARKER not in shown.stdout
+    listed = await execute(bot.id, agent.id, f'ls -a "{home}"')
+    assert ".zsh_history" not in listed.stdout
+    config = await execute(bot.id, agent.id, f'cat "{home / ".gitconfig"}"')
+    assert "Marker" in config.stdout
+
+
+def test_bwrap_argv_unshares_every_namespace(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import shutil
+
+    from sevn.sandbox.bubblewrap import argv
+
+    home = tmp_path / "home"
+    (home / ".ssh").mkdir(parents=True)
+    (home / ".local" / "bin").mkdir(parents=True)
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("SEVN_HOME", str(tmp_path / "sevn"))
+    monkeypatch.setattr(shutil, "which", lambda _name: "/usr/bin/bwrap")
+    workspace = tmp_path / "ws"
+    shared = tmp_path / "Shared"
+    closed = argv("true", workspace=workspace, shared=shared, network=False)
+    assert "--unshare-all" in closed
+    assert "--new-session" in closed
+    assert "--share-net" not in closed
+    home_mask = closed.index(str(home)) - 1
+    assert closed[home_mask] == "--tmpfs"
+    readable = str(home / ".local" / "bin")
+    assert closed[closed.index(readable) - 1] == "--ro-bind"
+    assert str(home / ".ssh") not in closed
+    assert closed.index("--bind") > home_mask
+    opened = argv("true", workspace=workspace, shared=shared, network=True)
+    assert "--share-net" in opened
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="bubblewrap is Linux-only")
+async def test_shell_bwrap_cannot_see_host_processes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sevn.tools.shell import execute
+
+    bot, agent = await _pair(tmp_path, monkeypatch)
+    host_pid = os.getpid()
+    probed = await execute(bot.id, agent.id, f"kill -0 {host_pid}; cat /proc/{host_pid}/environ")
+    assert probed.executed is True
+    assert probed.returncode != 0
+    assert "SEVN_HOME" not in probed.stdout
+
+
+async def test_shell_times_out_and_stops_the_command(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import sevn.tools.shell as shell
+    from sevn.tools.shell import execute, tool_output
+
+    monkeypatch.setattr(shell, "TIMEOUT_SECONDS", 0.5)
+    bot, agent = await _pair(tmp_path, monkeypatch, access="full")
+    loop = asyncio.get_running_loop()
+    started = loop.time()
+    ran = await execute(bot.id, agent.id, "sleep 30", approved=True)
+    assert loop.time() - started < 10
+    assert ran.executed is True
+    assert ran.timed_out is True
+    assert ran.returncode != 0
+    assert "timed out" in tool_output(ran)
+
+
+async def test_cancelled_shell_kills_the_command(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sevn.tools.shell import execute
+
+    bot, agent = await _pair(tmp_path, monkeypatch, access="full")
+    workspace = Path(str(bot.workspace_path))
+    task = asyncio.create_task(
+        execute(bot.id, agent.id, "echo $$ > child.pid; exec sleep 30", approved=True)
+    )
+    pid_file = workspace / "child.pid"
+    for _ in range(200):
+        if pid_file.is_file() and pid_file.read_text(encoding="utf-8").strip():
+            break
+        await asyncio.sleep(0.05)
+    pid = int(pid_file.read_text(encoding="utf-8").strip())
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    with pytest.raises(ProcessLookupError):
+        os.kill(pid, 0)
+
+
+async def test_shell_caps_output_and_reports_stderr(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sevn.tools.shell import OUTPUT_LIMIT, execute, tool_output
+
+    bot, agent = await _pair(tmp_path, monkeypatch, access="full")
+    big = await execute(
+        bot.id, agent.id, f"head -c {OUTPUT_LIMIT * 3} /dev/zero | tr '\\0' a", approved=True
+    )
+    assert big.returncode == 0
+    assert big.truncated is True
+    assert len(big.stdout) == OUTPUT_LIMIT
+    failed = await execute(bot.id, agent.id, "echo out; echo oops >&2; exit 3", approved=True)
+    text = tool_output(failed)
+    assert text.startswith("exit code: 3")
+    assert "stdout:\nout" in text
+    assert "stderr:\noops" in text

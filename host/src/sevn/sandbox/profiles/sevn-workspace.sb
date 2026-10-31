@@ -1,5 +1,6 @@
-;; Workspace shell. Parameters: WORKSPACE, SHARED, NETWORK=on|off,
-;; SEVN_DB, SEVN_SECRETS, SEVN_KEYS, SEVN_RUN, SEVN_LOGS.
+;; Workspace shell. Parameters: HOME, WORKSPACE, SHARED, NETWORK=on|off,
+;; SEVN_DB, SEVN_DB_WAL, SEVN_DB_SHM, SEVN_DB_JOURNAL, SEVN_SECRETS,
+;; SEVN_KEYS, SEVN_RUN, SEVN_LOGS.
 (version 1)
 (deny default)
 (allow process-exec*)
@@ -7,13 +8,55 @@
 (allow signal (target self))
 (allow signal (target same-sandbox))
 (allow sysctl-read)
-(allow mach-lookup)
 (allow ipc-posix*)
 (allow system-socket)
 (allow file-ioctl)
 (allow file-read-metadata)
 (allow file-map-executable)
+
+;; Mach services: name lookup, logging and preferences, plus DNS and TLS trust.
+;; The keychain (SecurityServer, secd), the pasteboard, Launch Services and
+;; Apple Events stay out of reach, so a command cannot read secrets or ask
+;; another app to run something outside the sandbox.
+(allow mach-lookup
+    (global-name "com.apple.system.opendirectoryd.libinfo")
+    (global-name "com.apple.system.opendirectoryd.membership")
+    (global-name "com.apple.system.notification_center")
+    (global-name "com.apple.system.logger")
+    (global-name "com.apple.logd")
+    (global-name "com.apple.diagnosticd")
+    (global-name "com.apple.cfprefsd.daemon")
+    (global-name "com.apple.cfprefsd.agent")
+    (global-name "com.apple.bsd.dirhelper")
+    (global-name "com.apple.SystemConfiguration.configd")
+    (global-name "com.apple.dnssd.service")
+    (global-name "com.apple.trustd")
+    (global-name "com.apple.trustd.agent")
+    (global-name "com.apple.analyticsd"))
+
+;; Reads: the system, not the user's home. The workspace, Shared, git's config
+;; and the usual toolchain install paths are readable again below.
 (allow file-read*)
+(deny file-read* (subpath (param "HOME")))
+(allow file-read*
+    (subpath (param "WORKSPACE"))
+    (subpath (param "SHARED"))
+    (literal (string-append (param "HOME") "/.gitconfig"))
+    (subpath (string-append (param "HOME") "/.config/git"))
+    (subpath (string-append (param "HOME") "/.local/bin"))
+    (subpath (string-append (param "HOME") "/.local/share/uv"))
+    (subpath (string-append (param "HOME") "/.local/share/pnpm"))
+    (subpath (string-append (param "HOME") "/Library/pnpm"))
+    (subpath (string-append (param "HOME") "/.cargo/bin"))
+    (subpath (string-append (param "HOME") "/.rustup/toolchains"))
+    (subpath (string-append (param "HOME") "/.nvm/versions"))
+    (subpath (string-append (param "HOME") "/.pyenv/versions"))
+    (subpath (string-append (param "HOME") "/.pyenv/shims"))
+    (subpath (string-append (param "HOME") "/.bun/bin"))
+    (subpath (string-append (param "HOME") "/.deno/bin"))
+    (subpath (string-append (param "HOME") "/go/bin")))
+;; Secret paths outside the home: keychains, CLI credentials, and the sevn home
+;; (database, secrets, age key, run token, logs), which SEVN_HOME can move.
 (deny file-read* (regex #"/\.ssh(/|$)"))
 (deny file-read* (regex #"/\.aws(/|$)"))
 (deny file-read* (regex #"/Library/Keychains(/|$)"))
@@ -22,7 +65,6 @@
 (deny file-read* (regex #"/\.codex(/|$)"))
 (deny file-read* (regex #"/\.claude(/|$)"))
 (deny file-read* (regex #"/\.config/claude(/|$)"))
-;; The host home holds the database, secrets, age key, run token and logs.
 (deny file-read* (literal (param "SEVN_DB")))
 (deny file-read* (literal (param "SEVN_DB_WAL")))
 (deny file-read* (literal (param "SEVN_DB_SHM")))
@@ -31,6 +73,7 @@
 (deny file-read* (subpath (param "SEVN_KEYS")))
 (deny file-read* (subpath (param "SEVN_RUN")))
 (deny file-read* (subpath (param "SEVN_LOGS")))
+
 (deny file-write*)
 (allow file-write*
     (subpath (param "WORKSPACE"))

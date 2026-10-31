@@ -24,7 +24,8 @@ from sevn.protocol.hub import Hub
 from sevn.runtime.base import Runtime, ToolDecision, TurnContext
 from sevn.runtime.errors import ModelError, TurnError
 from sevn.runtime.events import ApprovalCall, RuntimeEvent
-from sevn.sandbox.policy import allow_all_enabled, risk_of
+from sevn.sandbox.policy import allow_all_enabled
+from sevn.sandbox.risk import risk_of
 from sevn.store.db import utcnow
 from sevn.store.models import Agent as AgentRow
 from sevn.store.models import Event, Message

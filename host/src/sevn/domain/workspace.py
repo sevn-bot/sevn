@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import os
 import shutil
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -16,6 +15,7 @@ from sevn.domain.errors import DomainError
 from sevn.domain.ids import new_id
 from sevn.domain.session import open_session
 from sevn.log import logger
+from sevn.sandbox.env import child_env
 from sevn.store.db import utcnow
 from sevn.store.models import Agent as AgentRow
 from sevn.store.models import AgentLock, Message
@@ -207,10 +207,16 @@ async def _git(cwd: Path, *args: str) -> int:
     git = await asyncio.to_thread(shutil.which, "git")
     if git is None or not Path(git).is_absolute():
         raise DomainError("invalid_params", "git is not available")
-    env = os.environ.copy()
+    env = child_env()
     env["GIT_TERMINAL_PROMPT"] = "0"
+    # The bot can write the workspace's .git, so its hooks and fsmonitor would
+    # run here on the host, outside the sandbox.
     process = await asyncio.create_subprocess_exec(
         git,
+        "-c",
+        "core.hooksPath=/dev/null",
+        "-c",
+        "core.fsmonitor=false",
         *args,
         cwd=cwd,
         env=env,

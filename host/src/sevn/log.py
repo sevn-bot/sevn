@@ -181,4 +181,4 @@ def setup(level: str, json_file: Path) -> None:
     _install_intercept(level)
 
 
-__all__ = ["InterceptHandler", "logger", "redact", "setup"]
+__all__ = ["InterceptHandler", "logger", "redact", "redact_string", "setup"]

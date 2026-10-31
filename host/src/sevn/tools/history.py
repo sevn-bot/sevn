@@ -9,9 +9,10 @@ from sqlalchemy import select, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sevn.decisions.registry import screen_inbound
 from sevn.domain.errors import DomainError
 from sevn.domain.session import open_session
-from sevn.store.models import Message
+from sevn.store.models import Message, Thread
 from sevn.tools.registry import TurnDeps, register_toolset
 
 _LIMIT = 20
@@ -69,17 +70,22 @@ async def search(bot_id: str, query: str, *, limit: int = _LIMIT) -> list[Histor
 
 
 async def read(
+    bot_id: str,
     *,
     message_id: str | None = None,
     cursor: str | None = None,
 ) -> HistoryPage:
-    """Read one UI message by id, or the message a previous cursor names."""
+    """Read one of ``bot_id``'s UI messages by id, or the message a cursor names.
+
+    A message in another bot's thread is ``not_found``, the same as a missing one.
+    """
     target = message_id if message_id else cursor
     if target is None or target == "":
         raise DomainError("invalid_params", "message id or cursor is required")
     async with open_session() as session:
         row = await session.get(Message, target)
-        if row is None:
+        thread = None if row is None else await session.get(Thread, row.thread_id)
+        if row is None or thread is None or thread.bot_id != bot_id:
             raise DomainError("not_found", "message not found")
         nxt = await _next_message(session, row)
         page_cursor = "" if nxt is None else nxt.id
@@ -92,17 +98,20 @@ def history_toolset(deps: TurnDeps) -> dict[str, object]:
     async def search_history(query: str, limit: int = _LIMIT) -> str:
         """Search this bot's stored UI messages."""
         found = await search(deps.bot_id, query, limit=limit)
-        return "\n".join(f"{hit.message_id}\t{hit.text}" for hit in found)
+        # Stored messages include tool output and pasted text: untrusted data.
+        return await screen_inbound("\n".join(f"{hit.message_id}\t{hit.text}" for hit in found))
 
     async def read_history(message_id: str = "", cursor: str = "") -> str:
         """Read one stored UI message, then the next one when ``cursor`` is set."""
         page = await read(
+            deps.bot_id,
             message_id=None if message_id == "" else message_id,
             cursor=None if cursor == "" else cursor,
         )
+        text = await screen_inbound(page.text)
         if page.cursor == "":
-            return page.text
-        return f"{page.text}\ncursor={page.cursor}"
+            return text
+        return f"{text}\ncursor={page.cursor}"
 
     return {"history.search": search_history, "history.read": read_history}
 
