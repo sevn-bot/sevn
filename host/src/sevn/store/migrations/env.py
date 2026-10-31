@@ -2,17 +2,21 @@
 
 from __future__ import annotations
 
+import logging
 from logging.config import fileConfig
 
 from alembic import context
+from sevn.log import InterceptHandler
 from sevn.store.db import on_sqlite_connect
 from sevn.store.models import Base
 from sqlalchemy import engine_from_config, event, pool
 
 config = context.config
-if config.config_file_name is not None:
-    # sevn.log.setup already owns logging. The default fileConfig disables every
-    # logger that already exists, which hides uvicorn's bind errors after upgrade.
+if config.config_file_name is not None and not any(
+    isinstance(handler, InterceptHandler) for handler in logging.root.handlers
+):
+    # sevn.log.setup already owns logging. fileConfig would replace that handler
+    # and let stdlib logs skip redaction.
     fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata

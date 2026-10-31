@@ -3,14 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from sevn.log import redact
-
-if TYPE_CHECKING:
-    from loguru import Record
+from sevn.log import redact_string
 
 _STATE_LIMIT = 4000
 
@@ -50,13 +47,8 @@ class ModelRoute(BaseModel):
 
 
 def redact_text(text: str) -> str:
-    """Replace registered secrets in ``text`` using the log redaction patcher."""
-    record: dict[str, object] = {"message": text, "extra": {}}
-    redact(cast("Record", record))
-    message = record["message"]
-    if isinstance(message, str):
-        return message
-    return text
+    """Replace registered secrets in ``text`` using the log redaction rules."""
+    return redact_string(text)
 
 
 def object_dict(value: object) -> dict[str, object] | None:

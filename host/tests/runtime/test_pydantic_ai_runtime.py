@@ -163,7 +163,7 @@ async def test_agent_rebuilt_per_run_uses_current_model(
     monkeypatch.setattr(model_mod, "resolve_model", resolve)
     monkeypatch.setattr(pai, "resolve_model", resolve, raising=False)
     async with _world(tmp_path, monkeypatch) as (host, client, created):
-        for model_name in ("anthropic:one", "openai:two"):
+        for model_name in ("anthropic:claude-sonnet-4-5", "openai:gpt-5"):
             updated, _earlier = await request(
                 client,
                 "bots.update",
@@ -171,7 +171,7 @@ async def test_agent_rebuilt_per_run_uses_current_model(
             )
             ok(updated)
             await _run_text(host, tmp_path, created, model_name)
-    assert seen == ["anthropic:one", "openai:two"]
+    assert seen == ["anthropic:claude-sonnet-4-5", "openai:gpt-5"]
 
 
 async def test_instructions_layout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

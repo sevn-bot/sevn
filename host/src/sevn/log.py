@@ -6,8 +6,9 @@ import json
 import logging
 import re
 import sys
+import traceback
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from loguru import logger
 
@@ -25,12 +26,16 @@ _PATTERNS = (
     re.compile(r"AKIA[0-9A-Z]{16}"),
 )
 _JSON_KEY = "_json"
+_EXCEPTION_KEY = "_exception_text"
+_HIDDEN_EXTRA = frozenset({_JSON_KEY, _EXCEPTION_KEY})
 _STD_LOGGERS = ("uvicorn", "uvicorn.error", "uvicorn.access", "sqlalchemy", "httpx")
+_QUIET_LOGGERS = frozenset({"sqlalchemy"})
 _PRETTY = (
     "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
     "<level>{level: <8}</level> | "
     "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
-    "<level>{message}</level>"
+    "<level>{message}</level>\n"
+    "{extra[_exception_text]}"
 )
 _managed_sinks: list[int] = []
 
@@ -44,24 +49,60 @@ def _redact_text(text: str, secrets: tuple[tuple[str, str], ...]) -> str:
     return text
 
 
+def _redact_value(value: object, secrets: tuple[tuple[str, str], ...]) -> object:
+    if isinstance(value, str):
+        return _redact_text(value, secrets)
+    if isinstance(value, dict):
+        redacted: dict[str, object] = {}
+        items = cast("dict[object, object]", value)
+        for key, item in items.items():
+            redacted[str(key)] = _redact_value(item, secrets)
+        return redacted
+    if isinstance(value, list):
+        items_list = cast("list[object]", value)
+        return [_redact_value(item, secrets) for item in items_list]
+    if isinstance(value, tuple):
+        items_tuple = cast("tuple[object, ...]", value)
+        return tuple(_redact_value(item, secrets) for item in items_tuple)
+    return value
+
+
+def _exception_text(record: Record, secrets: tuple[tuple[str, str], ...]) -> str:
+    exc = record["exception"]
+    if exc is None or exc.type is None:
+        return ""
+    lines = traceback.format_exception(exc.type, exc.value, exc.traceback)
+    return _redact_text("".join(lines), secrets)
+
+
+def redact_string(text: str) -> str:
+    """Apply the log redaction rules to one string outside a log record."""
+    return _redact_text(text, registered_secrets())
+
+
 def redact(record: Record) -> None:
     secrets = registered_secrets()
-    record["message"] = _redact_text(record["message"], secrets)
+    record["message"] = _redact_text(str(record["message"]), secrets)
     extra = record["extra"]
     for key, value in list(extra.items()):
-        if isinstance(value, str):
-            extra[key] = _redact_text(value, secrets)
+        if key in _HIDDEN_EXTRA:
+            continue
+        extra[key] = _redact_value(value, secrets)
+    extra[_EXCEPTION_KEY] = _exception_text(record, secrets)
 
 
 def _json_format(record: Record) -> str:
     extra = record["extra"]
-    visible = {key: value for key, value in extra.items() if key != _JSON_KEY}
+    visible = {key: value for key, value in extra.items() if key not in _HIDDEN_EXTRA}
     payload: dict[str, object] = {
         "time": record["time"].isoformat(),
         "level": record["level"].name,
         "message": record["message"],
         "extra": visible,
     }
+    exception = extra.get(_EXCEPTION_KEY)
+    if isinstance(exception, str) and exception != "":
+        payload["exception"] = exception
     extra[_JSON_KEY] = json.dumps(payload, default=str, ensure_ascii=False)
     return "{extra[_json]}\n"
 
@@ -97,25 +138,35 @@ def _install_intercept(level: str) -> None:
     for name in _STD_LOGGERS:
         named = logging.getLogger(name)
         named.handlers = [handler]
-        named.setLevel(numeric)
+        named.setLevel(logging.WARNING if name in _QUIET_LOGGERS else numeric)
         named.propagate = False
         named.disabled = False
 
 
 def setup(level: str, json_file: Path) -> None:
     """Install stderr, a rotating JSON file, interception, and the redaction patcher."""
-    for sink_id in _managed_sinks:
-        try:
-            logger.remove(sink_id)
-        except ValueError:
-            pass
+    logger.remove()
     _managed_sinks.clear()
     logger.configure(patcher=redact)
     json_file.parent.mkdir(parents=True, exist_ok=True)
     if sys.stderr.isatty():
-        stderr_id = logger.add(sys.stderr, level=level, format=_PRETTY, colorize=True)
+        stderr_id = logger.add(
+            sys.stderr,
+            level=level,
+            format=_PRETTY,
+            colorize=True,
+            diagnose=False,
+            backtrace=False,
+        )
     else:
-        stderr_id = logger.add(sys.stderr, level=level, format=_json_format, colorize=False)
+        stderr_id = logger.add(
+            sys.stderr,
+            level=level,
+            format=_json_format,
+            colorize=False,
+            diagnose=False,
+            backtrace=False,
+        )
     file_id = logger.add(
         json_file,
         level=level,
@@ -123,6 +174,8 @@ def setup(level: str, json_file: Path) -> None:
         rotation="20 MB",
         retention=10,
         colorize=False,
+        diagnose=False,
+        backtrace=False,
     )
     _managed_sinks.extend((stderr_id, file_id))
     _install_intercept(level)

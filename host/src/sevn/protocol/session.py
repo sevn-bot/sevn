@@ -5,10 +5,11 @@ from __future__ import annotations
 import asyncio
 import enum
 import hmac
+import json
 from collections import deque
 from collections.abc import Coroutine
 from contextlib import suppress
-from typing import Self
+from typing import Self, cast
 
 from sevn.contracts.errors import ProtocolError
 from sevn.contracts.frames import (
@@ -35,6 +36,8 @@ from sevn.protocol.errors import (
 from sevn.protocol.hub import Hub
 from sevn.protocol.registry import dispatch, error_res
 from sevn.transports.base import Connection, ConnectionClosed
+
+_HANDSHAKE_DEADLINE_S = 10.0
 
 
 class _Phase(enum.Enum):
@@ -73,6 +76,9 @@ class Session:
                 self._cookie_rejected = True
         self._pending: deque[str] = deque()
         self._deferred: list[str] = []
+        self._held: list[str] = []
+        self._hold_live = False
+        self._replaying = False
         self._wake = asyncio.Event()
         self._tasks: set[asyncio.Task[None]] = set()
         self._in_request = False
@@ -88,15 +94,24 @@ class Session:
 
     async def run(self) -> None:
         sender = asyncio.create_task(self._send_loop())
+        deadline = asyncio.create_task(self._handshake_deadline())
         try:
             await self._receive_loop()
         finally:
+            deadline.cancel()
             sender.cancel()
             with suppress(asyncio.CancelledError, ConnectionClosed):
                 await sender
+            with suppress(asyncio.CancelledError):
+                await deadline
             if not self._closed:
                 with suppress(Exception):
                     await self.close(1000, "closed")
+
+    async def _handshake_deadline(self) -> None:
+        await asyncio.sleep(_HANDSHAKE_DEADLINE_S)
+        if self._phase is not _Phase.READY and not self._closed:
+            await self.close(1002, "handshake timeout")
 
     async def close(self, code: int, reason: str) -> None:
         if self._closed:
@@ -114,10 +129,33 @@ class Session:
     def deliver(self, frame: str) -> None:
         if self._closing or self._phase is not _Phase.READY:
             return
+        if self._hold_live and not self._replaying:
+            self._held.append(frame)
+            return
         if self._in_request:
             self._deferred.append(frame)
             return
         self.enqueue(frame)
+
+    def hold_live(self) -> None:
+        self._hold_live = True
+
+    def replay(self, frame: str) -> None:
+        self._replaying = True
+        try:
+            self.deliver(frame)
+        finally:
+            self._replaying = False
+
+    def release_live(self, high_water: int) -> None:
+        self._hold_live = False
+        held = self._held
+        self._held = []
+        for frame in held:
+            seq = _evt_seq(frame)
+            if seq is not None and seq <= high_water:
+                continue
+            self.deliver(frame)
 
     def enqueue(self, text: str) -> None:
         if self._closing:
@@ -159,6 +197,9 @@ class Session:
                 )
                 return
             await self._on_req(frame)
+            return
+        if self._phase is not _Phase.READY:
+            await self.close(1002, "protocol error")
 
     async def _on_hello(self, hello: Hello) -> None:
         if not _compatible(hello.proto):
@@ -236,6 +277,22 @@ class Session:
                 logger.opt(exception=exc).error("session task failed")
 
         task.add_done_callback(_done)
+
+
+def _evt_seq(frame: str) -> int | None:
+    try:
+        parsed: object = json.loads(frame)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    body = cast("dict[str, object]", parsed)
+    if body.get("t") != "evt":
+        return None
+    seq = body.get("s")
+    if isinstance(seq, int) and not isinstance(seq, bool):
+        return seq
+    return None
 
 
 def _compatible(proto: list[int]) -> bool:

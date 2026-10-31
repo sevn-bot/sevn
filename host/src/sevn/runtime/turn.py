@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
@@ -40,6 +41,8 @@ class TurnWatch(Protocol):
     def append(self, turn_id: str, text: str) -> None: ...
 
     def cancelled(self, turn_id: str) -> bool: ...
+
+    def forget(self, turn_id: str) -> None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -113,11 +116,10 @@ class TurnRunner:
             logger.info("turn finished")
 
     async def resume(self, turn_id: str, decisions: tuple[ToolDecision, ...]) -> None:
-        if self._watch is not None and self._watch.cancelled(turn_id):
-            return
         loaded = await _load_resume(turn_id)
         if loaded.status == "cancelled":
             return
+        await _mark_running(turn_id)
         if self._watch is not None:
             self._watch.open_turn(turn_id, loaded.agent.id)
         with logger.contextualize(
@@ -154,16 +156,26 @@ class TurnRunner:
         try:
             await self._runtime.open(agent)
             try:
-                outcome = await self._drive(turn_id, agent, bot, job, history, decisions)
-                # Under ``auto`` a low-risk shell command does not need the user.
-                # Approve the whole batch only when every call is low risk; a
-                # mixed batch still asks so the risky call is visible.
-                while outcome.approvals and all(_auto_low(bot, call) for call in outcome.approvals):
-                    auto = tuple(
-                        ToolDecision(tool_call_id=call.tool_call_id, approved=True)
-                        for call in outcome.approvals
-                    )
-                    outcome = await self._drive(turn_id, agent, bot, job, history, auto)
+                try:
+                    outcome = await self._drive(turn_id, agent, bot, job, history, decisions)
+                    # Under ``auto`` a low-risk shell command does not need the user.
+                    # Approve the whole batch only when every call is low risk; a
+                    # mixed batch still asks so the risky call is visible.
+                    while outcome.approvals and all(
+                        _auto_low(bot, call) for call in outcome.approvals
+                    ):
+                        auto = tuple(
+                            ToolDecision(tool_call_id=call.tool_call_id, approved=True)
+                            for call in outcome.approvals
+                        )
+                        outcome = await self._drive(turn_id, agent, bot, job, history, auto)
+                except asyncio.CancelledError:
+                    if self._watch is not None and self._watch.cancelled(turn_id):
+                        await MemoryStore().rollback(turn_id)
+                        await self._persist_cancelled(
+                            turn_id, started, job, agent, bot, stored=stored
+                        )
+                    raise
                 noted = inbound_hits()
                 if self._watch is not None and self._watch.cancelled(turn_id):
                     await MemoryStore().rollback(turn_id)
@@ -188,6 +200,8 @@ class TurnRunner:
                 raise
             finally:
                 await self._runtime.close(agent.id)
+                if self._watch is not None:
+                    self._watch.forget(turn_id)
         finally:
             end_inbound(token)
 
@@ -572,6 +586,15 @@ async def _insert_open_turn(
             )
         )
         await _set_agent(session, agent.id, "running", started)
+        await session.commit()
+
+
+async def _mark_running(turn_id: str) -> None:
+    async with open_session() as session:
+        row = await session.get(TurnRow, turn_id)
+        if row is None or row.status != "waiting":
+            return
+        row.status = "running"
         await session.commit()
 
 

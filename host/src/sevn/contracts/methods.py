@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from sevn.contracts.kinds import AccessName, ApprovalPolicy, NetworkFlag, RuntimeName
 from sevn.domain.agents import AgentRecord
@@ -52,18 +52,26 @@ class SystemPingResult(BaseModel):
     seq: int
 
 
+_SEQ_MAX = 2**63 - 1
+_SYNC_PAGE_DEFAULT = 200
+_SYNC_PAGE_MAX = 500
+
+
 class SyncSinceParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    seq: int
+    seq: int = Field(ge=0, le=_SEQ_MAX)
+    limit: int = Field(default=_SYNC_PAGE_DEFAULT, ge=1, le=_SYNC_PAGE_MAX)
 
 
 class SyncSinceResult(BaseModel):
-    """Cursor after durable events have been replayed as `evt` frames."""
+    """Head of the log, plus the cursor for the next page of `evt` frames."""
 
     model_config = ConfigDict(extra="forbid")
 
     host_seq: int
+    next_seq: int
+    more: bool
 
 
 class SandboxModeParams(BaseModel):

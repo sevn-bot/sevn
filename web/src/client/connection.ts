@@ -3,6 +3,9 @@ import { IncompatibleHost, ProtocolError, Unauthorized } from "./errors.ts";
 
 const INITIAL_BACKOFF_MS = 500;
 const MAX_BACKOFF_MS = 10_000;
+const CONNECT_TIMEOUT_MS = 15_000;
+const SYNC_LIMIT = 200;
+const EVENT_BUFFER_CAP = 500;
 
 export type MethodName = keyof typeof methods;
 
@@ -89,7 +92,7 @@ type PendingItem = {
 export type MethodParams = {
   "system.info": Record<string, never>;
   "system.ping": { note: string; op_id?: string };
-  "sync.since": { seq: number };
+  "sync.since": { seq: number; limit?: number };
   "host.set_sandbox_mode": {
     mode: "allow_all" | "enforced";
     confirm: string;
@@ -180,7 +183,7 @@ export type MethodResult = {
     host_pubkey_fp: string;
   };
   "system.ping": { seq: number };
-  "sync.since": { host_seq: number };
+  "sync.since": { host_seq: number; next_seq: number; more: boolean };
   "host.set_sandbox_mode": { mode: "allow_all" | "enforced" };
   "bots.create": Bot;
   "bots.list": { bots: Bot[] };
@@ -203,7 +206,12 @@ export type MethodResult = {
   "turns.cancel": { turn_id: string; status: string };
 };
 
-export type Status = "connecting" | "connected" | "reconnecting";
+export type Status =
+  | "connecting"
+  | "connected"
+  | "reconnecting"
+  | "unauthorized"
+  | "incompatible";
 
 export type ProtocolEvent = {
   s: number;
@@ -248,6 +256,11 @@ const tickListeners: Array<{ kind: string; handler: TickHandler }> = [];
 const eventListeners: EventHandler[] = [];
 
 let active: Connection | null = null;
+let stopInflight: (() => void) | null = null;
+
+export function cancelConnect(): void {
+  stopInflight?.();
+}
 
 export function onTick(kind: string, handler: TickHandler): () => void {
   const entry = { kind, handler };
@@ -298,10 +311,12 @@ export function connect(options: ConnectOptions): Promise<Connection> {
   const token = options.token;
   let lastSeq = options.lastSeq ?? 0;
   let nextSeq = lastSeq + 1;
+  let knownHostSeq = lastSeq;
   let backoff = INITIAL_BACKOFF_MS;
   let status: Status = "connecting";
   let socket: WebSocket | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let connectTimer: ReturnType<typeof setTimeout> | undefined;
   let stopped = false;
   let settled = false;
   let reconnecting = false;
@@ -362,6 +377,10 @@ export function connect(options: ConnectOptions): Promise<Connection> {
         clearTimeout(timer);
         timer = undefined;
       }
+      if (connectTimer !== undefined) {
+        clearTimeout(connectTimer);
+        connectTimer = undefined;
+      }
       const current = socket;
       socket = null;
       rejectPending(new Error("closed"));
@@ -375,9 +394,17 @@ export function connect(options: ConnectOptions): Promise<Connection> {
       if (active === connection) {
         active = null;
       }
+      if (stopInflight === stop) {
+        stopInflight = null;
+      }
+      fail(new Error("closed"));
     },
   };
 
+  const stop = (): void => {
+    connection.close();
+  };
+  stopInflight = stop;
   active = connection;
   attachListeners(connection);
   openSocket();
@@ -393,6 +420,10 @@ export function connect(options: ConnectOptions): Promise<Connection> {
   function succeed(): void {
     if (settled) {
       return;
+    }
+    if (connectTimer !== undefined) {
+      clearTimeout(connectTimer);
+      connectTimer = undefined;
     }
     settled = true;
     resolveReady(connection);
@@ -412,6 +443,20 @@ export function connect(options: ConnectOptions): Promise<Connection> {
     }
     const next = new WebSocket(url);
     socket = next;
+    if (!settled) {
+      if (connectTimer !== undefined) {
+        clearTimeout(connectTimer);
+      }
+      connectTimer = setTimeout(() => {
+        connectTimer = undefined;
+        if (settled || stopped) {
+          return;
+        }
+        fail(new Error("connect timeout"));
+        stopped = true;
+        next.close();
+      }, CONNECT_TIMEOUT_MS);
+    }
     next.addEventListener("open", () => {
       if (socket !== next) {
         return;
@@ -462,8 +507,18 @@ export function connect(options: ConnectOptions): Promise<Connection> {
       backoff = INITIAL_BACKOFF_MS;
       emitStatus("connected");
       succeed();
-      const seq = lastSeq;
-      void request("sync.since", { seq }).catch(() => undefined);
+      const hostSeq =
+        typeof frame.host_seq === "number" ? frame.host_seq : lastSeq;
+      knownHostSeq = hostSeq;
+      if (hostSeq < lastSeq) {
+        lastSeq = 0;
+        nextSeq = 1;
+        buffered.clear();
+      } else if (lastSeq === 0 && hostSeq > 0) {
+        lastSeq = hostSeq;
+        nextSeq = hostSeq + 1;
+      }
+      void catchUp(lastSeq).catch(() => undefined);
       return;
     }
     if (frame.t === "res") {
@@ -486,8 +541,15 @@ export function connect(options: ConnectOptions): Promise<Connection> {
     }
     if (code === 4001 || code === 4002) {
       const error = code === 4001 ? new Unauthorized() : new IncompatibleHost();
+      emitStatus(code === 4001 ? "unauthorized" : "incompatible");
       fail(error);
+      stopped = true;
       return;
+    }
+    if (code === 4008 && knownHostSeq > lastSeq) {
+      lastSeq = knownHostSeq;
+      nextSeq = knownHostSeq + 1;
+      buffered.clear();
     }
     if (reconnecting) {
       return;
@@ -539,10 +601,12 @@ export function connect(options: ConnectOptions): Promise<Connection> {
     if (isRecord(frame.e)) {
       const code = frame.e.code;
       const message = frame.e.message;
+      const data = isRecord(frame.e.data) ? frame.e.data : undefined;
       waiter.reject(
         new ProtocolError(
           typeof code === "string" ? code : "protocol_error",
           typeof message === "string" ? message : "request failed",
+          data,
         ),
       );
       return;
@@ -564,7 +628,15 @@ export function connect(options: ConnectOptions): Promise<Connection> {
     if (seq < nextSeq) {
       return;
     }
+    if (seq > nextSeq) {
+      void catchUp(lastSeq).catch(() => undefined);
+    }
     buffered.set(seq, { s: seq, k: kind, d: data });
+    if (buffered.size > EVENT_BUFFER_CAP) {
+      buffered.clear();
+      void catchUp(lastSeq).catch(() => undefined);
+      return;
+    }
     while (buffered.has(nextSeq)) {
       const event = buffered.get(nextSeq);
       buffered.delete(nextSeq);
@@ -587,6 +659,45 @@ export function connect(options: ConnectOptions): Promise<Connection> {
     }
     for (const handler of tickHandlers.get(kind) ?? []) {
       handler(data);
+    }
+  }
+
+  async function catchUp(start: number): Promise<void> {
+    let seq = start;
+    for (;;) {
+      if (stopped) {
+        return;
+      }
+      let page: MethodResult["sync.since"];
+      try {
+        page = await request("sync.since", { seq, limit: SYNC_LIMIT });
+      } catch (error) {
+        if (
+          error instanceof ProtocolError &&
+          error.code === "resync_required" &&
+          typeof error.data?.min_seq === "number"
+        ) {
+          const minSeq = error.data.min_seq;
+          lastSeq = Math.max(0, minSeq - 1);
+          nextSeq = minSeq;
+          buffered.clear();
+          seq = lastSeq;
+          continue;
+        }
+        throw error;
+      }
+      if (typeof page.host_seq === "number") {
+        knownHostSeq = page.host_seq;
+      }
+      if (
+        page.more === true &&
+        typeof page.next_seq === "number" &&
+        page.next_seq > seq
+      ) {
+        seq = page.next_seq;
+        continue;
+      }
+      return;
     }
   }
 

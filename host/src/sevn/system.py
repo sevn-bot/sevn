@@ -40,5 +40,5 @@ async def system_ping(ctx: Ctx, params: SystemPingParams) -> SystemPingResult:
 
 @method("sync.since", params=SyncSinceParams, result=SyncSinceResult, mutating=False)
 async def sync_since(ctx: Ctx, params: SyncSinceParams) -> SyncSinceResult:
-    host_seq = await ctx.hub.sync_since(ctx, params.seq)
-    return SyncSinceResult(host_seq=host_seq)
+    page = await ctx.hub.sync_since(ctx, params.seq, limit=params.limit)
+    return SyncSinceResult(host_seq=page.host_seq, next_seq=page.next_seq, more=page.more)
