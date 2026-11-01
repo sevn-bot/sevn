@@ -656,3 +656,51 @@ async def test_spend_tile_shows_the_host_budget_level(
         body = ok(await _call(client, "fleet.overview"))
         spend = next(tile for tile in body["kpis"] if tile["key"] == "spend_today")
         assert spend["level"] == "over"
+
+
+async def test_cost_per_run_is_the_median_of_the_last_ten_runs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two old expensive runs do not move it; one unknown run in the ten makes it null."""
+    load_modules(*_MODULES)
+    now = datetime.now(UTC)
+    async with connected(tmp_path, monkeypatch) as (_host, client):
+        bot_id = await _bot(client, "Social")
+        steady = await _create(client, bot_id, name="Steady", schedule="0 9 * * *")
+        mixed = await _create(client, bot_id, name="Mixed", schedule="0 9 * * *")
+        for days in (12, 13):
+            await _routine_turn(tmp_path, steady["id"], bot_id, now - timedelta(days=days), cost=5)
+        for days in range(1, 11):
+            cost = 0.9 if days in (1, 2, 3) else 0.1
+            await _routine_turn(
+                tmp_path, steady["id"], bot_id, now - timedelta(days=days), cost=cost
+            )
+        for days in range(1, 5):
+            await _routine_turn(tmp_path, mixed["id"], bot_id, now - timedelta(days=days), cost=0.2)
+        await _routine_turn(
+            tmp_path, mixed["id"], bot_id, now - timedelta(hours=5), cost=None, source="unknown"
+        )
+        body = ok(await _call(client, "fleet.overview"))
+    byname = {item["name"]: item for item in body["upcoming"]}
+    assert byname["Steady"]["cost_per_run_usd"] == pytest.approx(0.1)
+    assert byname["Mixed"]["cost_per_run_usd"] is None
+    assert byname["Mixed"]["unpriced_runs_30d"] == 1
+    assert body["projection_unpriced"] == 1
+    assert body["projection_7d_usd"] == pytest.approx(0.1 * 7)
+
+
+async def test_a_paused_bot_has_no_runs_ahead(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The scheduler skips a paused bot's slots, so the panel does not count them."""
+    load_modules(*_MODULES)
+    now = datetime.now(UTC)
+    async with connected(tmp_path, monkeypatch) as (_host, client):
+        bot_id = await _bot(client, "Sleepy")
+        routine = await _create(client, bot_id, name="Hourly", schedule="0 * * * *")
+        await _routine_turn(tmp_path, routine["id"], bot_id, now - timedelta(days=1), cost=0.3)
+        ok(await _call(client, "bots.update", bot_id=bot_id, paused=True))
+        body = ok(await _call(client, "fleet.overview"))
+    item = next(entry for entry in body["upcoming"] if entry["id"] == routine["id"])
+    assert item["runs_next_7d"] == 0
+    assert body["projection_7d_usd"] == 0
