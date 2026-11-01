@@ -9,7 +9,13 @@ from fakes.models import function_model
 from support.chat import connected, fetch_all, load_modules, mint_id, ok, poll_rows, request
 
 
-def _response(model: str, provider: str | None, input_tokens: int, output_tokens: int) -> object:
+def _response(
+    model: str | None,
+    provider: str | None,
+    input_tokens: int,
+    output_tokens: int,
+    cache_read_tokens: int = 0,
+) -> object:
     from pydantic_ai.messages import ModelResponse, TextPart
     from pydantic_ai.usage import RequestUsage
 
@@ -17,7 +23,11 @@ def _response(model: str, provider: str | None, input_tokens: int, output_tokens
         parts=[TextPart(content="x")],
         model_name=model,
         provider_name=provider,
-        usage=RequestUsage(input_tokens=input_tokens, output_tokens=output_tokens),
+        usage=RequestUsage(
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cache_read_tokens=cache_read_tokens,
+        ),
     )
 
 
@@ -56,6 +66,19 @@ def test_local_and_unknown_models() -> None:
         _response("function:x", None, 10, 10),
     ]
     assert price_responses(mixed) == (None, "unknown")
+
+
+def test_pricing_errors_are_unknown_not_a_failed_turn() -> None:
+    """``ModelResponse.cost()`` lets pricing errors through on purpose."""
+    from sevn.runtime.usage import price_responses
+
+    # genai-prices raises ValueError when cache reads exceed the input.
+    broken = _response("claude-haiku-4-5", "anthropic", 10, 5, cache_read_tokens=500)
+    assert price_responses([broken]) == (None, "unknown")
+    # A response with no model name trips an assertion inside cost().
+    nameless = _response(None, "anthropic", 10, 5)
+    assert price_responses([nameless]) == (None, "unknown")
+    assert price_responses([_response("", "anthropic", 10, 5)]) == (None, "unknown")
 
 
 def test_combine_adds_runs_of_one_turn() -> None:
@@ -111,11 +134,39 @@ def test_claude_result_is_subscription_with_the_sdk_estimate() -> None:
     assert usage["cost_source"] == "subscription"
     assert usage["cost_usd"] is None
     assert usage["estimated_usd"] == pytest.approx(0.0123)
-    assert usage["input_tokens"] == 120
+    # Anthropic's input_tokens leaves cache out; the shared shape counts it in.
+    assert usage["input_tokens"] == 120 + 400 + 900
     assert usage["output_tokens"] == 30
     assert usage["cache_write_tokens"] == 400
     assert usage["cache_read_tokens"] == 900
     assert usage["requests"] == 2
+
+
+def test_claude_tokens_count_cache_reads_and_writes() -> None:
+    """A recorded spike turn: 6 uncached input, 37,923 cache reads, 3,913 writes."""
+    from sevn.runtime.runtimes.claude import _map_result
+    from sevn.runtime.usage import tokens_of
+
+    event = _map_result(
+        {
+            "type": "result",
+            "subtype": "success",
+            "is_error": False,
+            "terminal_reason": None,
+            "result": "done",
+            "usage": {
+                "input_tokens": 6,
+                "output_tokens": 202,
+                "cache_creation_input_tokens": 3913,
+                "cache_read_input_tokens": 37923,
+            },
+            "total_cost_usd": 0.04,
+            "num_turns": 1,
+        }
+    )
+    assert event.usage is not None
+    assert event.usage["input_tokens"] == 6 + 3913 + 37923
+    assert tokens_of(event.usage) == 6 + 3913 + 37923 + 202
 
 
 def _clear() -> None:
