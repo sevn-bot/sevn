@@ -1,6 +1,6 @@
 ;; Workspace shell. Parameters: HOME, WORKSPACE, SHARED, NETWORK=on|off,
 ;; SEVN_DB, SEVN_DB_WAL, SEVN_DB_SHM, SEVN_DB_JOURNAL, SEVN_SECRETS,
-;; SEVN_KEYS, SEVN_RUN, SEVN_LOGS.
+;; SEVN_KEYS, SEVN_RUN, SEVN_LOGS, SEVN_HOME, SEVN_WORKSPACES.
 (version 1)
 (deny default)
 (allow process-exec*)
@@ -34,10 +34,13 @@
     (global-name "com.apple.trustd.agent")
     (global-name "com.apple.analyticsd"))
 
-;; Reads: the system, not the user's home. The workspace, Shared, git's config
-;; and the usual toolchain install paths are readable again below.
+;; Reads: the system, not the user's home, the sevn home, or other bots'
+;; workspaces. This workspace, Shared, git's config and the usual toolchain
+;; install paths are readable again below.
 (allow file-read*)
 (deny file-read* (subpath (param "HOME")))
+(deny file-read* (subpath (param "SEVN_HOME")))
+(deny file-read* (subpath (param "SEVN_WORKSPACES")))
 (allow file-read*
     (subpath (param "WORKSPACE"))
     (subpath (param "SHARED"))

@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Protocol
+from typing import Protocol, cast
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -174,7 +174,11 @@ class TurnRunner:
                             ToolDecision(tool_call_id=call.tool_call_id, approved=True)
                             for call in outcome.approvals
                         )
-                        outcome = await self._drive(turn_id, agent, bot, job, history, auto)
+                        # The approvals answer the calls on the latest response,
+                        # so the next drive needs the history that ends with it.
+                        outcome = await self._drive(
+                            turn_id, agent, bot, job, outcome.model_messages, auto
+                        )
                 except asyncio.CancelledError:
                     if self._watch is not None and self._watch.cancelled(turn_id):
                         await MemoryStore().rollback(turn_id)
@@ -364,6 +368,10 @@ class TurnRunner:
                 pending = _pending(turn_id, agent.id, call)
                 session.add(pending)
                 events.append(_pending_event(pending))
+            asked = await _question_message(session, turn_id, agent, bot, outcome.text)
+            if asked is not None:
+                session.add(asked)
+                events.append(_message_event(asked))
             await _set_agent(session, agent.id, "waiting", utcnow())
             events.append(_turn_event("turn.waiting", turn_id, agent.id, "waiting"))
             events.append(_agent_event(agent.id, "waiting"))
@@ -520,6 +528,59 @@ def _pending(turn_id: str, agent_id: str, call: ApprovalCall) -> PendingRow:
         created_at=utcnow(),
         resolved_at=None,
     )
+
+
+async def _question_message(
+    session: AsyncSession,
+    turn_id: str,
+    agent: AgentRecord,
+    bot: BotRecord,
+    text: str,
+) -> Message | None:
+    """The assistant message that shows ``user.ask`` questions in the thread.
+
+    A question turn never resumes: the answer arrives as the next user message
+    and closes it. Without this message the question lives only in a pending
+    row, so a reloaded chat shows a waiting lane with nothing to answer.
+    """
+    rows = list(
+        await session.scalars(
+            select(PendingRow)
+            .where(PendingRow.turn_id == turn_id)
+            .where(PendingRow.kind == "question")
+            .where(PendingRow.status == "waiting")
+            .order_by(PendingRow.created_at, PendingRow.id)
+        )
+    )
+    if not rows:
+        return None
+    parts: list[object] = _text_parts(text) if text != "" else []
+    for row in rows:
+        question = _question_text(row.payload)
+        parts.append({"type": "text", "text": question})
+        parts.append({"type": "question", "pending_id": row.id, "text": question})
+    return Message(
+        id=new_id("msg_"),
+        thread_id=agent.thread_id,
+        turn_id=turn_id,
+        agent_id=agent.id,
+        role="assistant",
+        author=bot.id,
+        parts=parts,
+        created_at=utcnow(),
+    )
+
+
+def _question_text(payload: dict[str, object]) -> str:
+    text = payload.get("text")
+    if isinstance(text, str):
+        return text
+    args = payload.get("args")
+    if isinstance(args, dict):
+        question = cast("dict[str, object]", args).get("question")
+        if isinstance(question, str):
+            return question
+    return ""
 
 
 def _pending_event(row: PendingRow) -> Event:
@@ -955,6 +1016,7 @@ async def persist_running_cancel(hub: Hub, turn_id: str) -> bool:
         for owned_id in turn.job_ids:
             await _finish_job(session, owned_id, "cancelled", finished_at)
         await _set_agent(session, turn.agent_id, "idle", finished_at)
+        await drop_locks(session, turn.agent_id)
         events.append(_turn_event("turn.finished", turn.id, turn.agent_id, "cancelled"))
         events.extend(
             _job_event("job.done", owned_id, turn.agent_id, "cancelled")
@@ -1014,6 +1076,7 @@ async def cancel_persisted_waiting(hub: Hub, turn_id: str) -> bool:
         for job_id in turn.job_ids:
             await _finish_job(session, job_id, "cancelled", finished_at)
         await _set_agent(session, turn.agent_id, "idle", finished_at)
+        await drop_locks(session, turn.agent_id)
         events: list[Event] = [
             _turn_event("turn.finished", turn.id, turn.agent_id, "cancelled"),
         ]
