@@ -73,10 +73,21 @@ def echo_enabled() -> bool:
     return os.environ.get("SEVN_DEV") == "1" and os.environ.get("SEVN_TEST_MODEL") == "echo"
 
 
+_OLLAMA_PREFIX = "ollama:"
+
+
 def model_allowed(model_id: str) -> bool:
-    """Catalog ids are selectable. Echo is selectable only behind the dev flags."""
+    """Catalog ids and ``ollama:<name>`` are selectable.
+
+    ``models.list`` adds local Ollama models under that prefix when the
+    server answers, so the picker can send them. Echo is selectable only
+    behind the dev flags.
+    """
     if model_id == ECHO_ID:
         return echo_enabled()
+    if model_id.startswith(_OLLAMA_PREFIX):
+        name = model_id[len(_OLLAMA_PREFIX) :]
+        return name != "" and not any(char.isspace() for char in name)
     return any(item.id == model_id for item in _CATALOG)
 
 
