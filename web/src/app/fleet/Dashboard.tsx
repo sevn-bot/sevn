@@ -15,6 +15,7 @@ import { createQueryClient, useEvents } from "../../client/hooks.ts";
 import { ApprovalCard } from "../approvals/ApprovalCard.tsx";
 import { agentPath, go } from "../routes.ts";
 import { ActivityGrid } from "./ActivityGrid.tsx";
+import { KpiStrip } from "./KpiStrip.tsx";
 import { age, clock, olderThan, staleAfterMs, stamp } from "./time.ts";
 
 const refreshKinds = new Set([
@@ -98,6 +99,7 @@ function DashboardView() {
         </p>
       </div>
       <FleetHeader bots={data.bots} />
+      <KpiStrip kpis={data.kpis} />
       <div className="grid gap-4 md:grid-cols-2">
         <WaitingPanel overview={data} />
         <FinishedPanel

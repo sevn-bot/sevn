@@ -1,6 +1,6 @@
 # Plan: fleet dashboards
 
-Status: phase 1 in progress. Integration branch: `wave/fleet-dashboards`, cut from `wave/0020-bot-core` (PR #9). Every PR for this plan targets `wave/fleet-dashboards`, not `test` or `main`.
+Status: phase 1 in review (PR #11), phase 2 in review. Integration branch: `wave/fleet-dashboards`, cut from `wave/0020-bot-core` (PR #9). Every PR for this plan targets `wave/fleet-dashboards`, not `test` or `main`.
 
 Source: the "Agent Fleet Dashboards" playbook, which restates ideas from Alex Finn's video on running a fleet of about 20 agents. This plan maps those ideas onto sevn.
 
@@ -63,12 +63,14 @@ Done when:
 
 ## Phase 2: usage and cost
 
-- One usage shape for both runtimes: `input_tokens`, `output_tokens`, `cache_read_tokens`, `cache_write_tokens`, `cost_usd` (or null) and `cost_source` (`provider`, `price_table`, `subscription` or `unknown`).
-- Claude: read `total_cost_usd` from the result message. A turn on the user's own login is `subscription`.
-- Pydantic AI: price from a table in the model catalog. A model with no price is `unknown`.
-- Router spend: decisions logged by jev, the LLM step and the Claude CLI step count toward the bot that owned the message.
-- KPI strip: spend today, tokens today, waiting requests, running turns against `runtime.max_running_turns`. Each tile has `as_of` and a source.
+- One usage shape for both runtimes (`runtime/usage.py`): `requests`, `tool_calls`, `input_tokens`, `output_tokens`, `cache_read_tokens`, `cache_write_tokens`, `cost_usd` (or null), `cost_source` and `estimated_usd`.
+- `cost_source` is `price_table`, `local`, `subscription` or `unknown`.
+- Pydantic AI: each model response is priced on its own usage with `genai-prices`, because some prices are tiered by request size. A model with no price makes the turn `unknown`, with `cost_usd` null, never a partial sum. Ollama is `local` at 0.
+- Claude: a turn on the user's own login is `subscription` with `cost_usd` null. The SDK's `total_cost_usd` is kept as `estimated_usd`.
+- A resumed or auto-approved turn adds up the usage of each of its runs.
+- KPI strip: spend today (priced turns only, with unpriced and subscription counts beside it), tokens today, waiting requests, running turns against `runtime.max_running_turns`. Each tile names its source. A missing value reads unavailable.
 - The heat map can switch to cost.
+- Not done yet: router spend. `decision_log` has no usage or bot id, so jev, the LLM step and the Claude CLI step are not counted. The spend tile says so. This needs a column on `decision_log` and usage from each decider.
 - No migration: the usage shape lives in the existing `turns.usage` JSON column.
 
 ## Phase 3: questions with options

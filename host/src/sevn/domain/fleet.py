@@ -7,14 +7,17 @@ signals that something changed.
 from __future__ import annotations
 
 from collections import Counter
+from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import Literal, cast
 
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sevn.config import Settings
 from sevn.domain.session import open_session
+from sevn.runtime.usage import cost_of, cost_source_of, tokens_of
 from sevn.store.db import utcnow
 from sevn.store.models import Agent as AgentRow
 from sevn.store.models import Bot as BotRow
@@ -80,13 +83,31 @@ class FleetFinished(BaseModel):
 
 
 class FleetDay(BaseModel):
-    """Turns one bot finished on one UTC day."""
+    """Turns one bot finished on one UTC day, and what the priced ones cost."""
 
     model_config = ConfigDict(extra="forbid")
 
     bot_id: str
     day: str
     turns: int
+    cost_usd: float
+    unpriced: int
+
+
+class FleetKpi(BaseModel):
+    """One tile on the KPI strip. ``value`` is null when it cannot be read."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    label: str
+    value: float | None
+    unit: str
+    source: str
+    note: str
+    limit: int | None = None
+    unpriced: int | None = None
+    subscription: int | None = None
 
 
 class FleetOverview(BaseModel):
@@ -96,6 +117,7 @@ class FleetOverview(BaseModel):
 
     as_of: datetime
     days: list[str]
+    kpis: list[FleetKpi]
     bots: list[FleetBot]
     waiting: list[FleetWaiting]
     finished: list[FleetFinished]
@@ -113,10 +135,13 @@ async def overview(*, bot_id: str | None = None) -> FleetOverview:
         finished = await _finished(session, names, bot_id)
         activity = await _activity(session, days[0])
         statuses = await _agent_statuses(session)
+        today = await _today(session, days[-1])
+        running = await _running_turns(session)
     counts = Counter(item.bot_id for item in waiting)
     return FleetOverview(
         as_of=now,
         days=[day.isoformat() for day in days],
+        kpis=_kpis(today, waiting=len(waiting), running=running),
         bots=[_bot(bot, statuses.get(bot.id, []), counts[bot.id]) for bot in bots],
         waiting=waiting,
         finished=finished,
@@ -255,24 +280,149 @@ async def _previews(session: AsyncSession, turn_ids: list[str]) -> dict[str, str
 async def _activity(session: AsyncSession, first: date) -> list[FleetDay]:
     start = datetime(first.year, first.month, first.day, tzinfo=UTC)
     rows = await session.execute(
-        select(AgentRow.bot_id, TurnRow.finished_at)
+        select(AgentRow.bot_id, TurnRow.status, TurnRow.finished_at, TurnRow.usage)
         .join(AgentRow, TurnRow.agent_id == AgentRow.id)
         .where(TurnRow.status.in_(_ENDED))
         .where(TurnRow.finished_at.is_not(None))
         .where(TurnRow.finished_at >= start)
     )
     counts: Counter[tuple[str, str]] = Counter()
-    for bot_id, finished_at in rows:
+    costs: dict[tuple[str, str], float] = {}
+    unpriced: Counter[tuple[str, str]] = Counter()
+    for bot_id, status, finished_at, usage in rows:
         if finished_at is None:
             continue
         stamp = _utc(finished_at)
         if stamp < start:
             continue
-        counts[(bot_id, stamp.date().isoformat())] += 1
+        key = (bot_id, stamp.date().isoformat())
+        # Every finished turn is activity, failed or cancelled too (as on #11).
+        _ = status
+        counts[key] += 1
+        spent = _spend(usage)
+        if spent is _UNPRICED:
+            unpriced[key] += 1
+        elif isinstance(spent, float):
+            costs[key] = costs.get(key, 0.0) + spent
+    keys = sorted(set(counts) | set(costs) | set(unpriced))
     return [
-        FleetDay(bot_id=bot_id, day=day, turns=turns)
-        for (bot_id, day), turns in sorted(counts.items())
+        FleetDay(
+            bot_id=bot_id,
+            day=day,
+            turns=counts[(bot_id, day)],
+            cost_usd=round(costs.get((bot_id, day), 0.0), 6),
+            unpriced=unpriced[(bot_id, day)],
+        )
+        for bot_id, day in keys
     ]
+
+
+_UNPRICED = object()
+
+
+def _spend(usage: object) -> float | object | None:
+    """Dollars one turn cost, ``_UNPRICED``, or ``None`` when it has no dollar cost.
+
+    Empty usage (a cancelled turn) is ``None``: nothing was recorded.
+    A subscription turn is ``None``: it spends quota, not dollars.
+    """
+    body = _object_dict(usage)
+    if not body:
+        return None
+    source = cost_source_of(body)
+    if source == "subscription":
+        return None
+    if source == "unknown":
+        return _UNPRICED
+    return cost_of(body) or 0.0
+
+
+@dataclass(slots=True)
+class _Today:
+    spend: float = 0.0
+    tokens: int = 0
+    unpriced: int = 0
+    subscription: int = 0
+
+
+async def _today(session: AsyncSession, today: date) -> _Today:
+    start = datetime(today.year, today.month, today.day, tzinfo=UTC)
+    rows = await session.execute(
+        select(TurnRow.finished_at, TurnRow.usage)
+        .where(TurnRow.status.in_(_ENDED))
+        .where(TurnRow.finished_at.is_not(None))
+        .where(TurnRow.finished_at >= start)
+    )
+    found = _Today()
+    for finished_at, usage in rows:
+        if finished_at is None or _utc(finished_at) < start:
+            continue
+        body = _object_dict(usage) or {}
+        found.tokens += tokens_of(body)
+        if body and cost_source_of(body) == "subscription":
+            found.subscription += 1
+        spent = _spend(body)
+        if spent is _UNPRICED:
+            found.unpriced += 1
+        elif isinstance(spent, float):
+            found.spend += spent
+    return found
+
+
+async def _running_turns(session: AsyncSession) -> int:
+    value = await session.scalar(
+        select(func.count()).select_from(TurnRow).where(TurnRow.status == "running")
+    )
+    return int(value or 0)
+
+
+def _kpis(today: _Today, *, waiting: int, running: int) -> list[FleetKpi]:
+    notes = ["turns finished since 00:00 UTC", "routing calls not included"]
+    if today.unpriced:
+        notes.append(f"{today.unpriced} unpriced")
+    if today.subscription:
+        notes.append(f"{today.subscription} on subscription")
+    return [
+        FleetKpi(
+            key="spend_today",
+            label="Spend today",
+            value=round(today.spend, 6),
+            unit="USD",
+            source="turn usage priced with genai-prices",
+            note="; ".join(notes),
+            unpriced=today.unpriced,
+            subscription=today.subscription,
+        ),
+        FleetKpi(
+            key="tokens_today",
+            label="Tokens today",
+            value=float(today.tokens),
+            unit="tokens",
+            source="turn usage (input + output)",
+            note="turns finished since 00:00 UTC",
+        ),
+        FleetKpi(
+            key="waiting",
+            label="Waiting on you",
+            value=float(waiting),
+            unit="",
+            source="pending requests",
+            note="approvals and questions",
+        ),
+        FleetKpi(
+            key="running",
+            label="Running turns",
+            value=float(running),
+            unit="",
+            source="turns",
+            note=f"host limit {_running_limit()}",
+            limit=_running_limit(),
+        ),
+    ]
+
+
+def _running_limit() -> int:
+    return Settings.load().runtime.max_running_turns
 
 
 def _request_view(kind: str, payload: object) -> tuple[str, dict[str, object], str]:
