@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import socket
 import threading
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
@@ -17,9 +18,10 @@ from support.chat import connected, load_modules, mint_id, ok, request
 
 
 @contextmanager
-def _ollama() -> Iterator[str]:
+def _ollama(delay: float = 0.0) -> Iterator[str]:
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
+            time.sleep(delay)
             if self.path == "/api/tags":
                 body: dict[str, Any] = {"models": [{"name": "llama3.2:3b"}, {"name": "qwen3:8b"}]}
             elif self.path == "/api/ps":
@@ -131,3 +133,57 @@ async def test_queue_depth_counts_queued_jobs(
         await JobService().enqueue(mint_id("job_"), bot_id, agent.id, "done", status="done")
         host = await _panel(client)
     assert host["queued_jobs"] == 3
+
+
+async def test_a_slow_ollama_is_asked_both_questions_at_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two 1.2-second answers take about 1.2 seconds, not 2.4."""
+    from sevn.domain.host_status import ollama_status
+
+    with _ollama(delay=1.2) as url:
+        monkeypatch.setenv("SEVN_OLLAMA_URL", url)
+        started = time.monotonic()
+        status = await ollama_status()
+        elapsed = time.monotonic() - started
+    assert status.reachable is True
+    assert elapsed < 2.0
+
+
+async def test_a_hanging_ollama_gives_up_within_the_timeout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sevn.domain.host_status import ollama_status
+
+    with _ollama(delay=6.0) as url:
+        monkeypatch.setenv("SEVN_OLLAMA_URL", url)
+        started = time.monotonic()
+        status = await ollama_status()
+        elapsed = time.monotonic() - started
+    assert status.reachable is False
+    assert elapsed < 3.0
+
+
+async def test_a_stale_check_does_not_hold_up_the_dashboard(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """After the first check, a read returns the last status and refreshes behind it."""
+    import asyncio
+
+    from sevn.domain import host_status
+
+    with _ollama(delay=1.0) as url:
+        monkeypatch.setenv("SEVN_OLLAMA_URL", url)
+        first = await host_status.ollama_status()
+        monkeypatch.setattr(host_status, "_CACHE_S", 0.0)
+        started = time.monotonic()
+        second = await host_status.ollama_status()
+        elapsed = time.monotonic() - started
+        assert second.reachable is True
+        assert second.checked_at == first.checked_at
+        assert elapsed < 0.5
+        # Let the background refresh finish before the server stops.
+        await asyncio.sleep(1.5)
+        third = await host_status.ollama_status()
+    assert third.checked_at is not None and first.checked_at is not None
+    assert third.checked_at > first.checked_at
