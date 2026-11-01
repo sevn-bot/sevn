@@ -20,12 +20,14 @@ def memory_toolset(deps: TurnDeps) -> dict[str, object]:
             origin="bot",
             turn_id=deps.turn_id,
         )
-        return record.id
+        return f"{record.id}\t{record.tier}\trevision {record.revision}"
 
     async def search(query: str, limit: int = 5) -> str:
-        """Find committed memories. ``limit`` caps the number of hits."""
+        """Find committed memories: id, tier, revision, text. ``limit`` caps the hits."""
         found = await store.search(deps.bot_id, query, limit=limit)
-        return "\n".join(item.text for item in found)
+        return "\n".join(
+            f"{item.id}\t{item.tier}\trevision {item.revision}\t{item.text}" for item in found
+        )
 
     async def forget(id: str) -> str:
         """Forget a memory at the end of this turn."""
@@ -41,6 +43,7 @@ def memory_toolset(deps: TurnDeps) -> dict[str, object]:
                 actor="bot",
                 revision=revision,
                 turn_id=deps.turn_id,
+                caller_bot_id=deps.bot_id,
             )
         except DomainError as exc:
             return exc.code
