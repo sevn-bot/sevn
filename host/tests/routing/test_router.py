@@ -215,7 +215,8 @@ async def test_steer_enqueues_into_running_pydantic_turn(
                     }
                 ]
             )
-            await _send(client, bot["id"], "steer-marker add a date")
+            consumed = await _send(client, bot["id"], "steer-marker add a date")
+            await _assert_consumed_turn_done(tmp_path, client, consumed["job_id"])
             pause.set()
             await poll_rows(
                 tmp_path,
@@ -478,6 +479,11 @@ async def test_reroute_waits_for_a_slot_under_the_parallel_cap(
                 lambda rows: bool(rows) and rows[0]["status"] == "done",
             )
             assert moved["agent_id"] not in (first["agent_id"], second["agent_id"])
+            from sevn.domain.agents import AgentService
+
+            target = await AgentService().get(str(moved["agent_id"]))
+            assert target.title
+            assert target.summary
             assert gate.max_active == 1
     finally:
         gate.release_all.set()
@@ -510,7 +516,8 @@ async def test_cancel_stops_agent(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
                     }
                 ]
             )
-            await _send(client, bot["id"], "stop")
+            consumed = await _send(client, bot["id"], "stop")
+            await _assert_consumed_turn_done(tmp_path, client, consumed["job_id"])
             agent = await poll_agent(tmp_path, str(first["agent_id"]), "done")
             assert agent == "done"
             stopped = await AgentService().get(str(first["agent_id"]))
@@ -686,6 +693,14 @@ async def test_idle_ttl_to_done_then_archived(
                 bind(host.hub)
                 bot = await _create_bot(client)
                 sent = await _send(client, bot["id"], "one note")
+                # A newly spawned agent is already idle before its pump starts.
+                # Wait for this job to finish before advancing its idle clock.
+                await poll_rows(
+                    tmp_path,
+                    "SELECT status FROM jobs WHERE id = ?",
+                    (sent["job_id"],),
+                    lambda rows: bool(rows) and rows[0]["status"] == "done",
+                )
                 await poll_agent(tmp_path, str(sent["agent_id"]), "idle")
                 # idle_since is stamped after the turn ends, on a ticking clock, so
                 # leave a wide margin past each deadline instead of one second.
@@ -860,6 +875,15 @@ async def test_reroute_while_running_cancels_and_requeues(
             assert turns
             assert turns[0]["status"] == "cancelled"
             assert _events(tmp_path, "route.corrected")
+            gate.release_all.set()
+            await poll_rows(
+                tmp_path,
+                "SELECT status FROM jobs WHERE id = ?",
+                (sent["job_id"],),
+                lambda rows: bool(rows) and rows[0]["status"] == "done",
+            )
+            users = fetch_all(tmp_path, "SELECT id, agent_id FROM messages WHERE role = 'user'")
+            assert [(row["id"], row["agent_id"]) for row in users] == [(message_id, target.id)]
     finally:
         gate.release_all.set()
         _clear()
@@ -991,6 +1015,8 @@ async def test_reroute_while_waiting_cancels_the_waiting_turn(
             assert all(row["status"] == "resolved" for row in pending)
             old = fetch_all(tmp_path, "SELECT status FROM agents WHERE id = ?", (sent["agent_id"],))
             assert old[0]["status"] != "waiting"
+            users = fetch_all(tmp_path, "SELECT id, agent_id FROM messages WHERE role = 'user'")
+            assert [(row["id"], row["agent_id"]) for row in users] == [(message_id, target.id)]
     finally:
         _clear()
 
@@ -1041,3 +1067,17 @@ async def test_user_ask_question_is_in_the_thread(
             )
     finally:
         _clear()
+
+
+async def _assert_consumed_turn_done(home: Path, client: object, job_id: object) -> None:
+    turns = fetch_all(home, "SELECT id, job_ids, status, finished_at FROM turns")
+    turn = next(row for row in turns if job_id in json.loads(row["job_ids"]))
+    assert turn["status"] == "done"
+    assert turn["finished_at"] is not None
+    snapshot = ok((await request(client, "turns.snapshot", {"turn_id": turn["id"]}))[0])
+    assert snapshot["status"] == "done"
+    cancelled = ok(
+        (await request(client, "turns.cancel", {"turn_id": turn["id"], "op_id": mint_id("op_")}))[0]
+    )
+    assert cancelled["status"] == "done"
+    assert fetch_all(home, "SELECT status FROM jobs WHERE id=?", (job_id,))[0]["status"] == "done"

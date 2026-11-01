@@ -14,7 +14,9 @@ from sevn.domain.errors import DomainError
 from sevn.domain.ids import new_id
 from sevn.domain.session import open_session
 from sevn.domain.workspace import open_place, scratch_dir
+from sevn.log import redact_string
 from sevn.sandbox.env import child_env
+from sevn.sandbox.paths import directory
 from sevn.sandbox.policy import (
     allow_all_enabled,
     approval_required,
@@ -61,6 +63,7 @@ class _Target:
     approval_policy: str
     network_on: bool
     root: Path
+    git_metadata: Path | None = None
 
 
 async def execute(
@@ -101,20 +104,20 @@ async def execute(
     )
     env = child_env(docker=target.access == "isolated" and not host_allow_all)
     if target.access == "workspace" and not host_allow_all:
-        tmp = await _scratch_tmp(target.root.resolve(), agent_id)
+        tmp = await _scratch_tmp(target.root, agent_id)
         for name in ("TMPDIR", "TMP", "TEMP"):
             env[name] = str(tmp)
         if sys.platform == "darwin":
             shims = await asyncio.to_thread(install_shims, tmp.parent / ".bin")
             env["PATH"] = f"{shims}{os.pathsep}{env.get('PATH', '')}"
-    ran = await _run(argv, target.root.resolve(), env)
+    ran = await _run(argv, target.root, env)
     return ShellResult(
         executed=True,
         risk=risk,
         pending_id=None,
         returncode=ran.returncode,
-        stdout=ran.stdout,
-        stderr=ran.stderr,
+        stdout=redact_string(ran.stdout),
+        stderr=redact_string(ran.stderr),
         timed_out=ran.timed_out,
         truncated=ran.truncated,
     )
@@ -131,7 +134,7 @@ def tool_output(result: ShellResult) -> str:
         lines.extend(["stdout:", result.stdout.rstrip("\n")])
     if result.stderr:
         lines.extend(["stderr:", result.stderr.rstrip("\n")])
-    return "\n".join(lines)
+    return redact_string("\n".join(lines))
 
 
 def shell_toolset(deps: TurnDeps) -> dict[str, object]:
@@ -168,6 +171,7 @@ async def _load(bot_id: str, agent_id: str) -> _Target:
             approval_policy=row.approval_policy,
             network_on=row.network == "on",
             root=place.root,
+            git_metadata=place.git_metadata,
         )
 
 
@@ -178,16 +182,25 @@ async def _scratch_tmp(root: Path, agent_id: str) -> Path:
     tmpfs under bubblewrap. The agent's scratch folder is writable on both.
     """
     tmp = scratch_dir(root, agent_id) / ".tmp"
-    await asyncio.to_thread(tmp.mkdir, parents=True, exist_ok=True)
+    await asyncio.to_thread(_make_tmp, tmp)
     return tmp
+
+
+def _make_tmp(path: Path) -> None:
+    with directory(path, create=True):
+        pass
 
 
 def _argv(command: str, target: _Target, *, host_allow_all: bool) -> list[str]:
     if host_allow_all or target.access == "full":
         return direct_argv(command)
     if target.access == "isolated":
-        return isolated_command(command, root=target.root, network=target.network_on)
-    return workspace_argv(command, root=target.root, network=target.network_on)
+        return isolated_command(
+            command, root=target.root, network=target.network_on, git_metadata=target.git_metadata
+        )
+    return workspace_argv(
+        command, root=target.root, network=target.network_on, git_metadata=target.git_metadata
+    )
 
 
 async def _ask(agent_id: str, command: str, risk: Risk) -> str:

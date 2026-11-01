@@ -12,7 +12,14 @@ _IMAGE = "alpine:3.20"
 _SHELL = "/bin/sh"
 
 
-def argv(command: str, *, workspace: Path, shared: Path, network: bool) -> list[str]:
+def argv(
+    command: str,
+    *,
+    workspace: Path,
+    shared: Path,
+    network: bool,
+    git_metadata: Path | None = None,
+) -> list[str]:
     """``docker run --rm`` with the workspace mounted and the command as pid 1."""
     binary = shutil.which("docker")
     if binary is None or not Path(binary).is_absolute():
@@ -37,6 +44,8 @@ def argv(command: str, *, workspace: Path, shared: Path, network: bool) -> list[
         "-v",
         f"{shared}:{shared}",
     ]
+    if git_metadata is not None:
+        args.extend(["-v", f"{git_metadata}:{git_metadata}"])
     if not network:
         args.extend(["--network", "none"])
     args.extend([_IMAGE, _SHELL, "-c", command])

@@ -9,9 +9,10 @@ from dataclasses import dataclass, field
 from typing import Literal, cast
 
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import select, text
+from sqlalchemy import event, select, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session, SessionTransaction
 
 from sevn.config import Settings
 from sevn.domain.errors import DomainError
@@ -47,6 +48,7 @@ class _Batch:
 
 _locks: dict[str, asyncio.Lock] = {}
 _pending: dict[str, _Batch] = {}
+_writing: dict[str, _Batch] = {}
 
 
 @asynccontextmanager
@@ -125,11 +127,7 @@ class MemoryStore:
         _pending.pop(turn_id, None)
 
     async def write(self, session: AsyncSession, turn_id: str) -> None:
-        """Insert the staged batch into ``session`` and remove it from the stage.
-
-        The caller commits ``session``. A failed commit has already dropped the
-        batch, so a failed turn keeps none of its memory writes.
-        """
+        """Write staged rows, retaining their reservation until the transaction ends."""
         batch = _pending.get(turn_id)
         if batch is None:
             return
@@ -137,6 +135,13 @@ class MemoryStore:
             current = _pending.pop(turn_id, None)
             if current is None:
                 return
+            _writing[turn_id] = current
+
+            def release(_session: Session, transaction: SessionTransaction) -> None:
+                if transaction.parent is None and _writing.get(turn_id) is current:
+                    _writing.pop(turn_id, None)
+
+            event.listen(session.sync_session, "after_transaction_end", release)
             await _apply(session, current)
 
     async def set_tier(
@@ -154,7 +159,9 @@ class MemoryStore:
             fresh = await self._require(memory_id)
             _guard_tier(fresh.origin, fresh.revision, actor=actor, revision=revision)
             if wanted == "pinned" and fresh.tier != "pinned":
-                await _reject_over_budget(fresh.bot_id, len(fresh.text.encode("utf-8")))
+                await _reject_over_budget(
+                    fresh.bot_id, len(fresh.text.encode("utf-8")), replacing=memory_id
+                )
             async with open_session() as session:
                 row = await session.get(MemoryRow, memory_id)
                 if row is None:
@@ -273,7 +280,9 @@ class MemoryStore:
                 if staged is not None:
                     _guard_tier(staged.origin, staged.revision, actor=actor, revision=revision)
                     if wanted == "pinned" and staged.tier != "pinned":
-                        await _reject_over_budget(staged.bot_id, len(staged.text.encode("utf-8")))
+                        await _reject_over_budget(
+                            staged.bot_id, len(staged.text.encode("utf-8")), replacing=memory_id
+                        )
                     updated = staged.model_copy(update={"tier": wanted, "revision": revision + 1})
                     index = batch.inserts.index(staged)
                     batch.inserts[index] = updated
@@ -281,7 +290,9 @@ class MemoryStore:
             current = await self._require(memory_id)
             _guard_tier(current.origin, current.revision, actor=actor, revision=revision)
             if wanted == "pinned" and current.tier != "pinned":
-                await _reject_over_budget(current.bot_id, len(current.text.encode("utf-8")))
+                await _reject_over_budget(
+                    current.bot_id, len(current.text.encode("utf-8")), replacing=memory_id
+                )
             _batch(turn_id, current.bot_id).tiers.append((memory_id, wanted, revision))
             return current.model_copy(update={"tier": wanted, "revision": revision + 1})
 
@@ -360,29 +371,33 @@ async def _replace_fts(session: AsyncSession, memory_id: str, body: str) -> None
     )
 
 
-async def _reject_over_budget(bot_id: str, extra: int) -> None:
-    if await _pinned_bytes(bot_id) + extra > _budget():
+async def _reject_over_budget(bot_id: str, extra: int, *, replacing: str | None = None) -> None:
+    if await _pinned_bytes(bot_id, excluding=replacing) + extra > _budget():
         raise DomainError("pinned_budget", "pinned memory budget exceeded")
 
 
-async def _pinned_bytes(bot_id: str) -> int:
+async def _pinned_bytes(bot_id: str, *, excluding: str | None = None) -> int:
+    # Snapshot before yielding: a commit may release a reservation while this
+    # read still sees the preceding database snapshot.
+    batches = (*_pending.values(), *_writing.values())
     async with open_session() as session:
-        texts = list(
-            await session.scalars(
-                select(MemoryRow.text).where(
-                    MemoryRow.bot_id == bot_id,
-                    MemoryRow.tier == "pinned",
-                )
-            )
-        )
-    total = sum(len(body.encode("utf-8")) for body in texts)
-    for batch in _pending.values():
+        rows = list(await session.scalars(select(MemoryRow).where(MemoryRow.bot_id == bot_id)))
+    pinned = {row.id: row.text for row in rows if row.tier == "pinned"}
+    texts = {row.id: row.text for row in rows}
+    for batch in batches:
         if batch.bot_id != bot_id:
             continue
         for record in batch.inserts:
             if record.tier == "pinned":
-                total += len(record.text.encode("utf-8"))
-    return total
+                pinned[record.id] = record.text
+        # Reserve promotions across all staged turns; do not credit uncommitted
+        # demotions/deletes, since that turn may still fail or be cancelled.
+        for memory_id, tier, _revision in batch.tiers:
+            if tier == "pinned" and memory_id in texts:
+                pinned[memory_id] = texts[memory_id]
+    return sum(
+        len(body.encode("utf-8")) for memory_id, body in pinned.items() if memory_id != excluding
+    )
 
 
 def _budget() -> int:

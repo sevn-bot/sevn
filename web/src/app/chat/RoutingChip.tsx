@@ -58,7 +58,6 @@ export function RoutingChip({
 }
 
 export function AskChips({
-  botId,
   messageId,
   agents,
   choices,
@@ -68,48 +67,67 @@ export function AskChips({
   agents: readonly LaneRef[];
   choices: string;
 }) {
-  const items = choices.split("|").filter((item) => item !== "");
+  const items = routeChoices(choices, agents);
   if (items.length === 0) {
     return null;
   }
-  const choose = (choice: string): void => {
-    if (choice === "New task") {
-      void call("messages.reroute", {
-        message_id: messageId,
-        new: true,
-      }).catch(() => undefined);
-      return;
-    }
-    const prefix = "Continue: ";
-    const title = choice.startsWith(prefix) ? choice.slice(prefix.length) : "";
-    const agent = agents.find((item) => item.title === title);
-    if (agent !== undefined) {
-      void call("messages.reroute", {
-        message_id: messageId,
-        agent_id: agent.id,
-      }).catch(() => undefined);
-      return;
-    }
-    void call("messages.send", { bot_id: botId, text: choice }).catch(
-      () => undefined,
-    );
+  const choose = (choice: RouteChoice): void => {
+    void call(
+      "messages.reroute",
+      choice.agentId === null
+        ? { message_id: messageId, new: true }
+        : { message_id: messageId, agent_id: choice.agentId },
+    ).catch(() => undefined);
   };
   return (
     <div className="flex flex-wrap gap-2">
       {items.map((choice) => (
         <button
-          key={choice}
+          key={choice.agentId ?? "new"}
           type="button"
           className="rounded border border-zinc-700 px-2 py-1 text-sm"
           onClick={() => {
             choose(choice);
           }}
         >
-          {choice}
+          {choice.label}
         </button>
       ))}
     </div>
   );
+}
+
+type RouteChoice = { label: string; agentId: string | null };
+
+function routeChoices(raw: string, agents: readonly LaneRef[]): RouteChoice[] {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((item: unknown): RouteChoice[] => {
+      if (
+        typeof item !== "object" ||
+        item === null ||
+        !("label" in item) ||
+        !("agent_id" in item)
+      )
+        return [];
+      if (
+        typeof item.label !== "string" ||
+        (item.agent_id !== null && typeof item.agent_id !== "string")
+      )
+        return [];
+      return [{ label: item.label, agentId: item.agent_id }];
+    });
+  } catch {
+    // Old stored chips have titles only. Offer a choice only when it identifies
+    // exactly one lane; ambiguity must not send a new message or choose a sibling.
+    return raw.split("|").flatMap((label): RouteChoice[] => {
+      if (label === "New task") return [{ label, agentId: null }];
+      if (!label.startsWith("Continue: ")) return [];
+      const matches = agents.filter((agent) => agent.title === label.slice(10));
+      return matches.length === 1 ? [{ label, agentId: matches[0].id }] : [];
+    });
+  }
 }
 
 function routingLabel(intent: string, title: string): string | null {

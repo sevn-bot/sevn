@@ -5,6 +5,7 @@ Plugins add rules here and do not edit this module's rule list.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -20,7 +21,7 @@ from sevn.domain.agents import AgentRecord, AgentService, apply_lifecycle, lane_
 from sevn.domain.bots import BotRecord, BotService
 from sevn.domain.errors import DomainError
 from sevn.domain.ids import new_id
-from sevn.domain.jobs import JobService, park_job
+from sevn.domain.jobs import JobService, job_lock, park_job
 from sevn.domain.session import open_session
 from sevn.log import logger
 from sevn.protocol.hub import Hub
@@ -153,44 +154,47 @@ async def deliver(
     agent, origin, consumed = await _act(message, decision, job_id)
     held = await _over_cap(bot.id, decision.intent, agent)
     job_status = "waiting" if decision.ask_user else ("done" if consumed else "queued")
-    await JobService().enqueue(
-        job_id,
-        bot.id,
-        agent.id,
-        message.text,
-        origin=origin,
-        route_decision_id=decision_id,
-        status=job_status,
-    )
-    message_id, created = await _attach_user_message(job_id, agent, bot, message.text, decision)
-    payload: dict[str, object] = {
-        "job_id": job_id,
-        "agent_id": agent.id,
-        "bot_id": bot.id,
-        "status": job_status,
-    }
-    if held:
-        ahead = await _ahead(bot.id, job_id)
-        payload["ahead"] = ahead
-        payload["notice"] = f"queued: {ahead} ahead"
-    # The open chat refreshes on message.created. A message that waits for the
-    # user's choice, or behind the bot's cap, starts no turn, so nothing else
-    # would show it (or its choice buttons) until a reload.
-    await hub.emit("message.created", message_id, created)
-    await hub.emit(
-        "route.decided",
-        message_id,
-        {
-            "message_id": message_id,
+    async with job_lock(job_id):
+        await JobService().enqueue(
+            job_id,
+            bot.id,
+            agent.id,
+            message.text,
+            origin=origin,
+            route_decision_id=decision_id,
+            status=job_status,
+        )
+        message_id, created = await _attach_user_message(
+            job_id, agent, bot, message.text, decision, consumed=consumed
+        )
+        payload: dict[str, object] = {
             "job_id": job_id,
             "agent_id": agent.id,
             "bot_id": bot.id,
-            "intent": decision.intent,
-            "path": decision.path,
-        },
-    )
-    await hub.emit("job.queued", job_id, payload)
-    logger.info("route decided {intent} via {path}", intent=decision.intent, path=decision.path)
+            "status": job_status,
+        }
+        if held:
+            ahead = await _ahead(bot.id, job_id)
+            payload["ahead"] = ahead
+            payload["notice"] = f"queued: {ahead} ahead"
+        # The open chat refreshes on message.created. A message that waits for the
+        # user's choice, or behind the bot's cap, starts no turn, so nothing else
+        # would show it (or its choice buttons) until a reload.
+        await hub.emit("message.created", message_id, created)
+        await hub.emit(
+            "route.decided",
+            message_id,
+            {
+                "message_id": message_id,
+                "job_id": job_id,
+                "agent_id": agent.id,
+                "bot_id": bot.id,
+                "intent": decision.intent,
+                "path": decision.path,
+            },
+        )
+        await hub.emit("job.queued", job_id, payload)
+        logger.info("route decided {intent} via {path}", intent=decision.intent, path=decision.path)
     if not held and not consumed and not decision.ask_user:
         await _start(agent.id)
     return job_id, agent.id
@@ -209,12 +213,19 @@ async def reroute(
         # Moving an ended job would run the message (and its side effects) again.
         raise DomainError("invalid_params", "message already finished")
     if start_new:
-        target = await AgentService().spawn(bot_id, origin_job_id=job_id)
+        async with open_session() as session:
+            job = await session.get(JobRow, job_id)
+            if job is None:
+                raise DomainError("not_found", "job not found")
+            title, summary = lane_text(job.text)
+        target = await AgentService().spawn(
+            bot_id, origin_job_id=job_id, title=title, summary=summary
+        )
     else:
         if agent_id is None:
             raise DomainError("invalid_params", "agent_id or new is required")
         target = await _agent_on_bot(bot_id, agent_id)
-    await _requeue(job_id, target.id)
+    await _requeue(job_id, target.id, start_new=start_new)
     # Requeueing cancelled any turn the job had, so its slot is free again. The
     # moved job then takes a slot like a new lane or a follow-up would in deliver.
     target = await AgentService().get(target.id)
@@ -310,28 +321,31 @@ async def _steer(agent_id: str, text: str) -> bool:
     return await worker.steer(agent_id, text)
 
 
-async def _requeue(job_id: str, agent_id: str) -> None:
+async def _requeue(job_id: str, agent_id: str, *, start_new: bool = False) -> None:
     from sevn.runtime.worker import current
 
     worker = current()
     if worker is not None:
-        await worker.interrupt_and_requeue(job_id, agent_id)
+        await worker.interrupt_and_requeue(job_id, agent_id, start_new=start_new)
         return
-    await park_job(job_id, agent_id)
+    await park_job(job_id, agent_id, start_new=start_new)
 
 
 async def _cancel_agent(agent_id: str) -> None:
     from sevn.runtime.worker import current
 
-    turn_id = await _running_turn(agent_id)
     worker = current()
-    if worker is not None and turn_id is not None:
-        await worker.cancel(turn_id)
-    await AgentService().set_status(agent_id, "done")
+    if worker is not None:
+        await worker.cancel_agent(agent_id)
+    else:
+        await AgentService().set_status(agent_id, "done")
 
 
 async def _resolve_answer(agent_id: str, text: str) -> None:
+    from sevn.domain.pending import PendingService
+    from sevn.runtime.base import ToolDecision
     from sevn.runtime.turn_end import close_question_turns
+    from sevn.runtime.worker import current
 
     now = utcnow()
     answer: dict[str, object] = {"text": text}
@@ -348,6 +362,7 @@ async def _resolve_answer(agent_id: str, text: str) -> None:
             row.status = "resolved"
             row.answer = answer
             row.resolved_at = now
+        turn_ids = {row.turn_id for row in rows}
         # Close the paused turn and its job. The answer is delivered as the
         # next user message by ``deliver``; leaving the turn waiting wedges
         # the agent because ``Worker._pump`` returns while a turn is waiting.
@@ -356,9 +371,9 @@ async def _resolve_answer(agent_id: str, text: str) -> None:
         agent = await session.get(AgentRow, agent_id)
         if agent is not None and agent.status == "waiting":
             still = await session.scalar(
-                select(PendingRow.id)
-                .where(PendingRow.agent_id == agent_id)
-                .where(PendingRow.status == "waiting")
+                select(TurnRow.id)
+                .where(TurnRow.agent_id == agent_id)
+                .where(TurnRow.status == "waiting")
                 .limit(1)
             )
             if still is None:
@@ -366,6 +381,20 @@ async def _resolve_answer(agent_id: str, text: str) -> None:
                 agent.last_activity_at = now
                 apply_lifecycle(agent, "idle", now)
         await session.commit()
+    worker = current()
+    if worker is not None:
+        pending = PendingService()
+        for turn_id in turn_ids:
+            if not await pending.has_waiting(turn_id):
+                pairs = await pending.decisions(turn_id)
+                if pairs:
+                    worker.start_resume(
+                        agent_id,
+                        turn_id,
+                        tuple(
+                            ToolDecision(tool_call_id=call_id, approved=ok) for call_id, ok in pairs
+                        ),
+                    )
 
 
 async def _agent_on_bot(bot_id: str, agent_id: str) -> AgentRecord:
@@ -462,6 +491,8 @@ async def _attach_user_message(
     bot: BotRecord,
     text: str,
     decision: RouteDecision,
+    *,
+    consumed: bool = False,
 ) -> tuple[str, dict[str, object]]:
     """Store the user message and its queued turn. Returns the id and its event payload."""
     now = utcnow()
@@ -475,12 +506,12 @@ async def _attach_user_message(
                 agent_id=agent.id,
                 thread_id=agent.thread_id,
                 job_ids=[job_id],
-                status="queued",
+                status="done" if consumed else "queued",
                 model=bot.model,
                 usage={},
                 model_messages=None,
                 started_at=now,
-                finished_at=None,
+                finished_at=now if consumed else None,
             )
         )
         await session.flush()
@@ -522,16 +553,6 @@ async def _job_for_message(message_id: str) -> tuple[str, str, str | None, str]:
         return job.id, job.to_bot_id, job.route_decision_id, job.status
 
 
-async def _running_turn(agent_id: str) -> str | None:
-    async with open_session() as session:
-        return await session.scalar(
-            select(TurnRow.id)
-            .where(TurnRow.agent_id == agent_id)
-            .where(TurnRow.status.in_(("running", "waiting")))
-            .limit(1)
-        )
-
-
 async def _ahead(bot_id: str, job_id: str) -> int:
     async with open_session() as session:
         rows = list(
@@ -555,7 +576,11 @@ def _message_parts(text: str, decision: RouteDecision, title: str) -> list[dict[
     """Text plus the chip the chat reads from ``part.type``."""
     parts: list[dict[str, str]] = [{"type": "text", "text": text}]
     if decision.ask_user:
-        parts.append({"type": "routing_ask", "choices": "|".join(decision.choices)})
+        choices = [
+            {"label": label, "agent_id": target}
+            for label, target in zip(decision.choices, decision.choice_targets, strict=False)
+        ]
+        parts.append({"type": "routing_ask", "choices": json.dumps(choices)})
         return parts
     parts.append({"type": "routing", "intent": decision.intent, "title": title})
     return parts
