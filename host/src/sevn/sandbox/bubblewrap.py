@@ -54,6 +54,11 @@ def argv(command: str, *, workspace: Path, shared: Path, network: bool) -> list[
             "/tmp",  # noqa: S108  # writable tmp inside the container, not a host file
         ]
     )
+    # A read-only bind still permits connecting to filesystem UNIX sockets.
+    # Hide host service sockets even when IP networking is explicitly allowed.
+    for runtime_dir in (Path("/run"), Path("/var/run")):
+        if runtime_dir.is_dir():
+            args.extend(["--tmpfs", str(runtime_dir.resolve())])
     paths = Paths.from_env()
     home = Path(os.environ.get("HOME", str(Path.home()))).expanduser().resolve()
     masked_home = home != Path("/") and home.is_dir()

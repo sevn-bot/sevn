@@ -346,10 +346,18 @@ function lanesFor(
 function aheadByAgent(events: ProtocolEvent[]): ReadonlyMap<string, number> {
   const found = new Map<string, number>();
   for (const event of events) {
+    const agentId = event.d.agent_id;
+    if (
+      typeof agentId === "string" &&
+      (event.k === "job.started" ||
+        event.k === "job.done" ||
+        event.k === "turn.finished")
+    ) {
+      found.delete(agentId);
+    }
     if (event.k !== "job.queued") {
       continue;
     }
-    const agentId = event.d.agent_id;
     const ahead = event.d.ahead;
     if (typeof agentId !== "string" || typeof ahead !== "number") {
       continue;
@@ -370,7 +378,10 @@ function chronological(rows: ListedMessage[]): ListedMessage[] {
 }
 
 function messageText(parts: Record<string, string>[]): string {
-  return parts.map((part) => part.text ?? "").join("");
+  return parts
+    .filter((part) => part.type !== "question")
+    .map((part) => part.text ?? "")
+    .join("");
 }
 
 function botTicks(

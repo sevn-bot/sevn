@@ -140,7 +140,7 @@ class TurnRunner:
 
     async def resume(self, turn_id: str, decisions: tuple[ToolDecision, ...]) -> None:
         loaded = await _load_resume(turn_id)
-        if loaded.status == "cancelled":
+        if loaded.status not in {"waiting", "running"}:
             return
         await _mark_running(turn_id)
         if self._watch is not None:
@@ -529,6 +529,7 @@ async def _mark_running(turn_id: str) -> None:
         if row is None or row.status != "waiting":
             return
         row.status = "running"
+        await set_agent(session, row.agent_id, "running", utcnow())
         await session.commit()
 
 

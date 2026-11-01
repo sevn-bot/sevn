@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 
 from sevn.paths import Paths
+from sevn.sandbox.paths import write_text
 
 _PROFILE = Path(__file__).resolve().parent / "profiles" / "sevn-workspace.sb"
 _SANDBOX_EXEC = "/usr/bin/sandbox-exec"
@@ -89,9 +90,6 @@ def install_shims(folder: Path) -> Path:
     ``folder`` must be inside the workspace: the profile denies reads of the home,
     where a development checkout of the package lives.
     """
-    folder.mkdir(parents=True, exist_ok=True)
     shim = folder / "mktemp"
-    if not shim.is_file() or shim.read_text(encoding="utf-8") != _MKTEMP_SHIM:
-        shim.write_text(_MKTEMP_SHIM, encoding="utf-8")
-    shim.chmod(0o755)
+    write_text(shim, _MKTEMP_SHIM, executable=True)
     return folder

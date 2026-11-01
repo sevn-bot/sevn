@@ -24,6 +24,7 @@ from sevn.runtime.turn_end import (
     persist_running_cancel,
     record_turn_failure,
 )
+from sevn.store.models import Agent as AgentRow
 from sevn.store.models import Job as JobRow
 from sevn.store.models import Turn as TurnRow
 
@@ -75,6 +76,8 @@ class Worker:
         self._resumes: set[asyncio.Task[None]] = set()
         self._again: set[str] = set()
         self._interrupted: set[asyncio.Task[None]] = set()
+        self._admission = asyncio.Lock()
+        self._reserved: set[str] = set()
         self._board = _Board()
         self._closed = False
 
@@ -219,15 +222,42 @@ class Worker:
                     if agent_id in self._again:
                         continue
                     return
-                await self._slots.acquire()
+                if not await self._reserve(agent_id):
+                    return
                 try:
-                    stuck = await self._run(job_id)
+                    async with self._slots:
+                        stuck = await self._run(job_id)
                 finally:
-                    self._slots.release()
+                    self._reserved.discard(agent_id)
                 if stuck:
                     logger.error("job stayed queued after its turn")
                     return
                 await self._open_slots(agent_id)
+
+    async def _reserve(self, agent_id: str) -> bool:
+        """Serialize admission until the runner persists the running status."""
+        async with self._admission:
+            agent = await AgentService().get(agent_id)
+            async with open_session() as session:
+                active = set(
+                    await session.scalars(
+                        select(AgentRow.id).where(
+                            AgentRow.bot_id == agent.bot_id,
+                            AgentRow.status.in_(("running", "waiting")),
+                        )
+                    )
+                )
+                reserved = set(
+                    await session.scalars(
+                        select(AgentRow.id).where(
+                            AgentRow.bot_id == agent.bot_id, AgentRow.id.in_(self._reserved)
+                        )
+                    )
+                )
+            if len((active | reserved) - {agent_id}) >= Settings.load().bots.max_parallel_agents:
+                return False
+            self._reserved.add(agent_id)
+            return True
 
     def _after_pump(self, agent_id: str, task: asyncio.Task[None]) -> None:
         """An interrupted turn cancels its pump before the pump's own wake-ups run.

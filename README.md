@@ -23,7 +23,7 @@ Each agent owns one thread. Statuses are `running`, `waiting`, `idle`, `done`, a
 
 Every agent gets its own `tasks/<agent_id>/` folder inside the bot workspace. The folder stays when the agent is archived. A write outside that folder takes an advisory lock for ten minutes, refreshed on each write. A second agent that writes the same path gets `path_locked`, with the holder's id and title. Locks are released when the turn finishes and when the agent is done. Writes inside the agent's own scratch folder are not locked.
 
-New agents start with isolation `shared`, so file tools and the shell use the bot workspace. When an agent's isolation is `worktree` and that workspace is a git repository, those tools use a git worktree at `.sevn/worktrees/<agent_id>` on branch `sevn/<agent_id>`. A workspace that is not a git repository stays on the scratch folder.
+New agents start with isolation `shared`, so file tools and the shell use the bot workspace. When an agent's isolation is `worktree` and that workspace is a git repository, those tools use a git worktree at `<sevn-home>/worktrees/<agent_id>` on branch `sevn/<agent_id>`. Its parent is host-managed, outside bot-writable workspaces, so a sibling cannot replace the checkout root. A workspace that is not a git repository stays on the scratch folder.
 
 ## Routing
 

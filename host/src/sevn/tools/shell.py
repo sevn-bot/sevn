@@ -15,6 +15,7 @@ from sevn.domain.ids import new_id
 from sevn.domain.session import open_session
 from sevn.domain.workspace import open_place, scratch_dir
 from sevn.sandbox.env import child_env
+from sevn.sandbox.paths import directory
 from sevn.sandbox.policy import (
     allow_all_enabled,
     approval_required,
@@ -101,13 +102,13 @@ async def execute(
     )
     env = child_env(docker=target.access == "isolated" and not host_allow_all)
     if target.access == "workspace" and not host_allow_all:
-        tmp = await _scratch_tmp(target.root.resolve(), agent_id)
+        tmp = await _scratch_tmp(target.root, agent_id)
         for name in ("TMPDIR", "TMP", "TEMP"):
             env[name] = str(tmp)
         if sys.platform == "darwin":
             shims = await asyncio.to_thread(install_shims, tmp.parent / ".bin")
             env["PATH"] = f"{shims}{os.pathsep}{env.get('PATH', '')}"
-    ran = await _run(argv, target.root.resolve(), env)
+    ran = await _run(argv, target.root, env)
     return ShellResult(
         executed=True,
         risk=risk,
@@ -178,8 +179,13 @@ async def _scratch_tmp(root: Path, agent_id: str) -> Path:
     tmpfs under bubblewrap. The agent's scratch folder is writable on both.
     """
     tmp = scratch_dir(root, agent_id) / ".tmp"
-    await asyncio.to_thread(tmp.mkdir, parents=True, exist_ok=True)
+    await asyncio.to_thread(_make_tmp, tmp)
     return tmp
+
+
+def _make_tmp(path: Path) -> None:
+    with directory(path, create=True):
+        pass
 
 
 def _argv(command: str, target: _Target, *, host_allow_all: bool) -> list[str]:

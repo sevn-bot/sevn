@@ -15,7 +15,9 @@ from sevn.domain.errors import DomainError
 from sevn.domain.ids import new_id
 from sevn.domain.session import open_session
 from sevn.log import logger
+from sevn.paths import Paths
 from sevn.sandbox.env import child_env
+from sevn.sandbox.paths import directory
 from sevn.store.db import utcnow
 from sevn.store.models import Agent as AgentRow
 from sevn.store.models import AgentLock, Message
@@ -44,7 +46,7 @@ def scratch_dir(root: Path, agent_id: str) -> Path:
 async def make_scratch(workspace: Path, agent_id: str) -> Path:
     """Create ``tasks/<agent_id>/`` and keep it across archive."""
     path = scratch_dir(workspace, agent_id)
-    await asyncio.to_thread(path.mkdir, parents=True, exist_ok=True)
+    await asyncio.to_thread(_make_directory, path)
     return path
 
 
@@ -56,7 +58,8 @@ async def ensure(agent_id: str) -> str:
         return ""
     if not await asyncio.to_thread(_is_git, workspace):
         return _IGNORED
-    worktree = _worktree_path(workspace, agent_id)
+    worktree = _worktree_path(agent_id)
+    await asyncio.to_thread(_check_worktree_path, worktree)
     if await asyncio.to_thread(_is_worktree, worktree):
         await make_scratch(worktree, agent_id)
         return ""
@@ -69,10 +72,28 @@ async def open_place(agent_id: str) -> WorkspacePlace:
     """Root for file tools: the worktree when isolation is active, else the workspace."""
     note = await ensure(agent_id)
     bot_id, isolation, workspace = await _load(agent_id)
+    workspace = workspace.resolve()
     root = workspace
     if isolation == "worktree" and note == "":
-        root = _worktree_path(workspace, agent_id)
+        root = _worktree_path(agent_id)
     return WorkspacePlace(bot_id=bot_id, agent_id=agent_id, root=root)
+
+
+def _make_directory(path: Path) -> None:
+    with directory(path, create=True):
+        pass
+
+
+def _check_worktree_path(worktree: Path) -> None:
+    # The parent lives outside every bot workspace. A confined shell cannot
+    # replace it between this check and git/sandbox setup.
+    if worktree.resolve() != worktree:
+        raise DomainError("path_outside_workspace", "path is outside the workspace")
+    ancestor = worktree
+    while not ancestor.exists():
+        ancestor = ancestor.parent
+    with directory(ancestor):
+        pass
 
 
 async def release_turn(agent_id: str) -> None:
@@ -175,9 +196,9 @@ def _check_id(agent_id: str) -> None:
         raise DomainError("invalid_params", "invalid agent id")
 
 
-def _worktree_path(workspace: Path, agent_id: str) -> Path:
+def _worktree_path(agent_id: str) -> Path:
     _check_id(agent_id)
-    return workspace / ".sevn" / "worktrees" / agent_id
+    return Paths.from_env().home.expanduser().resolve() / "worktrees" / agent_id
 
 
 def _is_git(workspace: Path) -> bool:
@@ -189,7 +210,7 @@ def _is_worktree(path: Path) -> bool:
 
 
 async def _add_worktree(workspace: Path, worktree: Path, agent_id: str) -> None:
-    await asyncio.to_thread(worktree.parent.mkdir, parents=True, exist_ok=True)
+    await asyncio.to_thread(_make_directory, worktree.parent)
     code = await _git(
         workspace,
         "worktree",

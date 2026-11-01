@@ -368,3 +368,47 @@ test("close 4001 surfaces Unauthorized and does not retry", async () => {
     vi.unstubAllGlobals();
   }
 });
+
+test("slow-consumer reconnect replays from the delivered cursor", async () => {
+  const { connect } = await loadClient();
+  const { Server, WebSocket } = await loadMock();
+  vi.stubGlobal("WebSocket", WebSocket);
+  const server = new Server(url);
+  const hellos: Frame[] = [];
+  const syncs: Frame[] = [];
+  let generation = 0;
+  server.on("connection", (socket) => {
+    const current = ++generation;
+    socket.on("message", (data) => {
+      const frame = frameOf(data);
+      if (frame.t === "hello") {
+        hellos.push(frame);
+        socket.send(welcome(100));
+      }
+      if (frame.t === "req" && frame.m === "sync.since") {
+        syncs.push(frame);
+        if (current === 1) {
+          socket.close({ code: 4008, reason: "slow", wasClean: false });
+        } else {
+          socket.send(
+            JSON.stringify({ t: "res", id: frame.id, r: { events: [] } }),
+          );
+        }
+      }
+    });
+  });
+  try {
+    const connection = await connect({ url, token: "tok", lastSeq: 7 });
+    await vi.waitFor(() => {
+      expect(syncs.length).toBeGreaterThanOrEqual(2);
+    });
+    expect(hellos.slice(0, 2).map((frame) => frame.last_seq)).toEqual([7, 7]);
+    expect(
+      syncs.slice(0, 2).map((frame) => (frame.p as { seq: number }).seq),
+    ).toEqual([7, 7]);
+    connection.close();
+  } finally {
+    server.stop();
+    vi.unstubAllGlobals();
+  }
+});

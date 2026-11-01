@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextvars import ContextVar, Token
+from dataclasses import replace
 
 from sevn.config import Settings
 from sevn.decisions.base import Attempt, RouteDecision, attempt_for, redact_text
@@ -79,16 +80,22 @@ async def decide(
             path="rule",
         )
     if settings.provider != "llm":
-        chosen = await _keep(state, await JevDecider().attempt(context, state), record=record)
+        chosen = await _keep(
+            state, await JevDecider().attempt(context, state), record=record, context=context
+        )
         if chosen is not None:
             return chosen
-    chosen = await _keep(state, await LLMDecider().attempt(state), record=record)
+    chosen = await _keep(state, await LLMDecider().attempt(state), record=record, context=context)
     if chosen is not None:
         return chosen
-    chosen = await _keep(state, await OllamaDecider().attempt(state), record=record)
+    chosen = await _keep(
+        state, await OllamaDecider().attempt(state), record=record, context=context
+    )
     if chosen is not None:
         return chosen
-    chosen = await _keep(state, await CliOneShotDecider().attempt(context, state), record=record)
+    chosen = await _keep(
+        state, await CliOneShotDecider().attempt(context, state), record=record, context=context
+    )
     if chosen is not None:
         return chosen
     fallback = DefaultDecider().decide(context)
@@ -145,9 +152,15 @@ async def _keep(
     attempt: Attempt | None,
     *,
     record: bool,
+    context: RouterContext,
 ) -> RouteDecision | None:
     if attempt is None:
         return None
+    decision = attempt.decision
+    targets = {agent.id for agent in context.open_agents}
+    targeted = decision.intent in {"follow_up", "steer", "answer", "cancel"}
+    if targeted and decision.target_agent_id not in targets:
+        attempt = replace(attempt, accepted=False)
     if record:
         await record_attempt(state, attempt)
     if attempt.accepted:

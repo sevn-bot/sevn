@@ -157,7 +157,7 @@ async def test_worktree_isolation_in_git_repo(
     assert note == ""
     await write_file(bot.id, agent.id, "f.txt", "from-agent")
     assert not (repo / "f.txt").exists()
-    worktree = repo / ".sevn" / "worktrees" / agent.id / "f.txt"
+    worktree = tmp_path / "worktrees" / agent.id / "f.txt"
     assert worktree.read_text(encoding="utf-8") == "from-agent"
     branch = _git(repo, "rev-parse", "--verify", f"sevn/{agent.id}")
     assert branch.returncode == 0, branch.stderr
@@ -182,7 +182,7 @@ async def test_worktree_isolation_ignored_outside_git(
     assert note == "worktree ignored: workspace is not a git repo"
     scratch = Path(str(bot.workspace_path)) / "tasks" / agent.id
     assert scratch.is_dir()
-    assert not (Path(str(bot.workspace_path)) / ".sevn" / "worktrees" / agent.id).exists()
+    assert not (tmp_path / "worktrees" / agent.id).exists()
 
 
 def _ran_filters(marker: Path) -> list[str]:
@@ -230,6 +230,6 @@ async def test_worktree_checkout_runs_no_bot_filter(
     note = await ensure(agent.id)
     assert note == ""
     assert _ran_filters(marker) == []
-    worktree = repo / ".sevn" / "worktrees" / agent.id
+    worktree = tmp_path / "worktrees" / agent.id
     assert (worktree / "README").read_text(encoding="utf-8") == "base\n"
     assert (worktree / "notes.txt").read_text(encoding="utf-8") == "notes\n"

@@ -5,6 +5,7 @@ Plugins add rules here and do not edit this module's rule list.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -331,7 +332,10 @@ async def _cancel_agent(agent_id: str) -> None:
 
 
 async def _resolve_answer(agent_id: str, text: str) -> None:
+    from sevn.domain.pending import PendingService
+    from sevn.runtime.base import ToolDecision
     from sevn.runtime.turn_end import close_question_turns
+    from sevn.runtime.worker import current
 
     now = utcnow()
     answer: dict[str, object] = {"text": text}
@@ -348,6 +352,7 @@ async def _resolve_answer(agent_id: str, text: str) -> None:
             row.status = "resolved"
             row.answer = answer
             row.resolved_at = now
+        turn_ids = {row.turn_id for row in rows}
         # Close the paused turn and its job. The answer is delivered as the
         # next user message by ``deliver``; leaving the turn waiting wedges
         # the agent because ``Worker._pump`` returns while a turn is waiting.
@@ -356,9 +361,9 @@ async def _resolve_answer(agent_id: str, text: str) -> None:
         agent = await session.get(AgentRow, agent_id)
         if agent is not None and agent.status == "waiting":
             still = await session.scalar(
-                select(PendingRow.id)
-                .where(PendingRow.agent_id == agent_id)
-                .where(PendingRow.status == "waiting")
+                select(TurnRow.id)
+                .where(TurnRow.agent_id == agent_id)
+                .where(TurnRow.status == "waiting")
                 .limit(1)
             )
             if still is None:
@@ -366,6 +371,20 @@ async def _resolve_answer(agent_id: str, text: str) -> None:
                 agent.last_activity_at = now
                 apply_lifecycle(agent, "idle", now)
         await session.commit()
+    worker = current()
+    if worker is not None:
+        pending = PendingService()
+        for turn_id in turn_ids:
+            if not await pending.has_waiting(turn_id):
+                pairs = await pending.decisions(turn_id)
+                if pairs:
+                    worker.start_resume(
+                        agent_id,
+                        turn_id,
+                        tuple(
+                            ToolDecision(tool_call_id=call_id, approved=ok) for call_id, ok in pairs
+                        ),
+                    )
 
 
 async def _agent_on_bot(bot_id: str, agent_id: str) -> AgentRecord:
@@ -555,7 +574,11 @@ def _message_parts(text: str, decision: RouteDecision, title: str) -> list[dict[
     """Text plus the chip the chat reads from ``part.type``."""
     parts: list[dict[str, str]] = [{"type": "text", "text": text}]
     if decision.ask_user:
-        parts.append({"type": "routing_ask", "choices": "|".join(decision.choices)})
+        choices = [
+            {"label": label, "agent_id": target}
+            for label, target in zip(decision.choices, decision.choice_targets, strict=False)
+        ]
+        parts.append({"type": "routing_ask", "choices": json.dumps(choices)})
         return parts
     parts.append({"type": "routing", "intent": decision.intent, "title": title})
     return parts

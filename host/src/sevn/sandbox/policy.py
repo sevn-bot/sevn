@@ -14,6 +14,7 @@ from sevn.paths import Paths
 from sevn.protocol.registry import Ctx, method
 from sevn.sandbox.bubblewrap import argv as bwrap_argv
 from sevn.sandbox.isolated import argv as isolated_argv
+from sevn.sandbox.paths import directory
 from sevn.sandbox.risk import Risk
 from sevn.sandbox.seatbelt import argv as seatbelt_argv
 
@@ -45,7 +46,9 @@ def shared_dir() -> Path:
 
 def workspace_argv(command: str, *, root: Path, network: bool) -> list[str]:
     """Seatbelt on macOS, bubblewrap on Linux. Other platforms do not run the command."""
-    workspace = root.resolve()
+    workspace = root.absolute()
+    with directory(workspace):
+        pass
     shared = shared_dir()
     shared.mkdir(parents=True, exist_ok=True)
     if sys.platform == "darwin":
@@ -62,7 +65,9 @@ def direct_argv(command: str) -> list[str]:
 
 def isolated_command(command: str, *, root: Path, network: bool) -> list[str]:
     """Prepare the isolated docker argv and the shared mount."""
-    workspace = root.resolve()
+    workspace = root.absolute()
+    with directory(workspace):
+        pass
     shared = shared_dir()
     shared.mkdir(parents=True, exist_ok=True)
     return isolated_argv(command, workspace=workspace, shared=shared, network=network)

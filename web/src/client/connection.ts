@@ -311,7 +311,6 @@ export function connect(options: ConnectOptions): Promise<Connection> {
   const token = options.token;
   let lastSeq = options.lastSeq ?? 0;
   let nextSeq = lastSeq + 1;
-  let knownHostSeq = lastSeq;
   // Only the first welcome may skip ahead to the host's seq. After a
   // reconnect, a zero cursor still means "replay from the start": events can
   // land while we are offline, before we ever saw one.
@@ -513,7 +512,6 @@ export function connect(options: ConnectOptions): Promise<Connection> {
       succeed();
       const hostSeq =
         typeof frame.host_seq === "number" ? frame.host_seq : lastSeq;
-      knownHostSeq = hostSeq;
       if (hostSeq < lastSeq) {
         lastSeq = 0;
         nextSeq = 1;
@@ -551,11 +549,8 @@ export function connect(options: ConnectOptions): Promise<Connection> {
       stopped = true;
       return;
     }
-    if (code === 4008 && knownHostSeq > lastSeq) {
-      lastSeq = knownHostSeq;
-      nextSeq = knownHostSeq + 1;
-      buffered.clear();
-    }
+    // A slow-consumer close does not acknowledge queued or replayed events.
+    // Reconnect from the last contiguous event actually delivered.
     if (reconnecting) {
       return;
     }
@@ -690,9 +685,6 @@ export function connect(options: ConnectOptions): Promise<Connection> {
           continue;
         }
         throw error;
-      }
-      if (typeof page.host_seq === "number") {
-        knownHostSeq = page.host_seq;
       }
       if (
         page.more === true &&

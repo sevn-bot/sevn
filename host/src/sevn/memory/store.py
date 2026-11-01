@@ -367,22 +367,21 @@ async def _reject_over_budget(bot_id: str, extra: int) -> None:
 
 async def _pinned_bytes(bot_id: str) -> int:
     async with open_session() as session:
-        texts = list(
-            await session.scalars(
-                select(MemoryRow.text).where(
-                    MemoryRow.bot_id == bot_id,
-                    MemoryRow.tier == "pinned",
-                )
-            )
-        )
-    total = sum(len(body.encode("utf-8")) for body in texts)
+        rows = list(await session.scalars(select(MemoryRow).where(MemoryRow.bot_id == bot_id)))
+    pinned = {row.id: row.text for row in rows if row.tier == "pinned"}
+    texts = {row.id: row.text for row in rows}
     for batch in _pending.values():
         if batch.bot_id != bot_id:
             continue
         for record in batch.inserts:
             if record.tier == "pinned":
-                total += len(record.text.encode("utf-8"))
-    return total
+                pinned[record.id] = record.text
+        # Reserve promotions across all staged turns; do not credit uncommitted
+        # demotions/deletes, since that turn may still fail or be cancelled.
+        for memory_id, tier, _revision in batch.tiers:
+            if tier == "pinned" and memory_id in texts:
+                pinned[memory_id] = texts[memory_id]
+    return sum(len(body.encode("utf-8")) for body in pinned.values())
 
 
 def _budget() -> int:
