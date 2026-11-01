@@ -435,6 +435,37 @@ test("a question card answers with one click on an option", async () => {
   }
 });
 
+test("an answered card locks so a second click cannot report a failure", async () => {
+  const harness = await startHarness({
+    "fleet.overview": overview({
+      waiting: [
+        question({
+          options: [
+            { id: "opt_1", label: "Monday" },
+            { id: "opt_2", label: "Tuesday" },
+          ],
+        }),
+      ],
+    }),
+    "pending.answer": { id: "pend_q", status: "resolved", job_id: "job_1" },
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Dashboard = await loadDashboard();
+    testing.render(createElement(Dashboard));
+    (await testing.screen.findByRole("button", { name: "Monday" })).click();
+    await testing.screen.findByRole("status");
+    expect(testing.screen.getByRole("status").textContent).toBe("Answered");
+    expect(
+      testing.screen.queryByRole("button", { name: "Tuesday" }),
+    ).toBeNull();
+    expect(testing.screen.queryByText("Could not send the answer")).toBeNull();
+    expect(requestParams(harness.requests, "pending.answer").length).toBe(1);
+  } finally {
+    harness.stop();
+  }
+});
+
 test("a question card answers with typed text", async () => {
   const harness = await startHarness({
     "fleet.overview": overview({ waiting: [question({})] }),

@@ -396,3 +396,157 @@ async def test_fleet_cards_sort_by_blocking_priority_then_age(
     assert approval["blocking"] is True
     assert approval["options"] == []
     assert approval["due_by"] is None
+
+
+async def _two_questions(home: Path) -> tuple[Any, str, str, str]:
+    from sevn.domain.agents import AgentService
+    from sevn.domain.bots import BotService
+    from sevn.tools.user import ask
+
+    bot = await BotService().create("Nimbus")
+    agent = await AgentService().spawn(bot.id)
+    turn_id = await insert_turn(
+        home,
+        agent_id=agent.id,
+        thread_id=agent.thread_id,
+        job_id=mint_id("job_"),
+        status="running",
+        model_messages=[],
+    )
+    day = await ask(agent.id, turn_id, "Which day?", options=["Monday", "Tuesday"])
+    audience = await ask(agent.id, turn_id, "Which audience?")
+    return agent, turn_id, day, audience
+
+
+def _pending(home: Path, pending_id: str) -> dict[str, Any]:
+    rows = fetch_all(
+        home, "SELECT status, answer FROM pending_requests WHERE id = ?", (pending_id,)
+    )
+    answer = rows[0]["answer"]
+    return {"status": rows[0]["status"], "answer": None if answer is None else json.loads(answer)}
+
+
+def _turn_status(home: Path, turn_id: str) -> str:
+    return str(fetch_all(home, "SELECT status FROM turns WHERE id = ?", (turn_id,))[0]["status"])
+
+
+async def test_answering_one_card_keeps_the_other_question_waiting(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    load_modules("sevn.api.pending")
+    async with connected(tmp_path, monkeypatch) as (_host, client):
+        agent, turn_id, day, audience = await _two_questions(tmp_path)
+        frame, _earlier = await request(
+            client,
+            "pending.answer",
+            {"pending_id": day, "option_id": "opt_1", "op_id": mint_id("op_")},
+        )
+        ok(frame)
+        assert _pending(tmp_path, day) == {
+            "status": "resolved",
+            "answer": {"option_id": "opt_1", "text": "Monday"},
+        }
+        assert _pending(tmp_path, audience) == {"status": "waiting", "answer": None}
+        assert _turn_status(tmp_path, turn_id) == "waiting"
+        agents = fetch_all(tmp_path, "SELECT status FROM agents WHERE id = ?", (agent.id,))
+        assert agents[0]["status"] == "waiting"
+        frame, _earlier = await request(
+            client,
+            "pending.answer",
+            {"pending_id": audience, "text": "Owners", "op_id": mint_id("op_")},
+        )
+        ok(frame)
+        assert _pending(tmp_path, audience) == {"status": "resolved", "answer": {"text": "Owners"}}
+        assert _turn_status(tmp_path, turn_id) == "done"
+        agents = fetch_all(tmp_path, "SELECT status FROM agents WHERE id = ?", (agent.id,))
+        assert agents[0]["status"] != "waiting"
+        jobs = fetch_all(
+            tmp_path, "SELECT text FROM jobs WHERE agent_id = ? AND status = 'queued'", (agent.id,)
+        )
+        assert sorted(row["text"] for row in jobs) == ["Monday", "Owners"]
+
+
+async def test_a_nonblocking_question_does_not_pause_the_turn(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sevn.domain.pending import PendingService
+    from sevn.tools.user import ask
+
+    _bot, agent, turn_id = await _lane(tmp_path, monkeypatch)
+    await ask(agent.id, turn_id, "Any notes?", blocking=False)
+    assert _turn_status(tmp_path, turn_id) == "running"
+    agents = fetch_all(tmp_path, "SELECT status FROM agents WHERE id = ?", (agent.id,))
+    assert agents[0]["status"] != "waiting"
+    assert await PendingService().has_waiting(turn_id) is False
+    await ask(agent.id, turn_id, "Which day?")
+    assert _turn_status(tmp_path, turn_id) == "waiting"
+    assert await PendingService().has_waiting(turn_id) is True
+
+
+async def test_a_nonblocking_question_survives_its_finished_turn(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The turn ends done; the card still answers and queues the reply."""
+    from sevn.runtime.worker import bind
+
+    load_modules("sevn.api.bots", "sevn.api.messages", "sevn.api.pending")
+    _install({"question": "Any notes?", "blocking": False})
+    try:
+        async with connected(tmp_path, monkeypatch) as (host, client):
+            bind(host.hub)
+            frame, _earlier = await request(
+                client, "bots.create", {"name": "Nimbus", "op_id": mint_id("op_")}
+            )
+            bot = ok(frame)
+            frame, _earlier = await request(
+                client,
+                "messages.send",
+                {"bot_id": bot["id"], "text": "draft it", "op_id": mint_id("op_")},
+            )
+            sent = ok(frame)
+            await poll_rows(
+                tmp_path,
+                "SELECT status FROM jobs WHERE id = ?",
+                (sent["job_id"],),
+                lambda rows: bool(rows) and rows[0]["status"] == "done",
+            )
+            pending = fetch_all(
+                tmp_path,
+                "SELECT id, status FROM pending_requests WHERE agent_id = ?",
+                (sent["agent_id"],),
+            )
+            assert pending[0]["status"] == "waiting"
+            frame, _earlier = await request(
+                client,
+                "pending.answer",
+                {"pending_id": pending[0]["id"], "text": "none", "op_id": mint_id("op_")},
+            )
+            await _answered_run(tmp_path, sent["agent_id"], ok(frame)["job_id"])
+    finally:
+        _clear()
+
+
+async def test_concurrent_answers_claim_the_question_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import asyncio
+
+    from sevn.domain.errors import DomainError
+    from sevn.domain.routing import answer_question
+
+    async with connected(tmp_path, monkeypatch) as (host, _client):
+        agent, _turn_id, day, _audience = await _two_questions(tmp_path)
+        results = await asyncio.gather(
+            answer_question(day, option_id="opt_1", text=None, hub=host.hub),
+            answer_question(day, option_id="opt_2", text=None, hub=host.hub),
+            return_exceptions=True,
+        )
+        won = [item for item in results if isinstance(item, tuple)]
+        lost = [item for item in results if isinstance(item, DomainError)]
+        assert len(won) == 1, results
+        assert len(lost) == 1 and lost[0].code == "pending_resolved", results
+        jobs = fetch_all(tmp_path, "SELECT text FROM jobs WHERE agent_id = ?", (agent.id,))
+        answers = [row["text"] for row in jobs if row["text"] in {"Monday", "Tuesday"}]
+        assert len(answers) == 1
+        stored = _pending(tmp_path, day)["answer"]
+        assert stored["text"] == answers[0]
