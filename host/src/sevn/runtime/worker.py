@@ -315,6 +315,9 @@ class Worker:
         for other in await queued_agent_ids(agent.bot_id):
             if other == agent_id or slots <= 0:
                 continue
+            candidate = await AgentService().get(other)
+            if candidate.status in {"running", "waiting"} or other in self._reserved:
+                continue
             self.kick(other)
             slots -= 1
 

@@ -837,6 +837,15 @@ async def test_reroute_while_running_cancels_and_requeues(
             assert turns
             assert turns[0]["status"] == "cancelled"
             assert _events(tmp_path, "route.corrected")
+            gate.release_all.set()
+            await poll_rows(
+                tmp_path,
+                "SELECT status FROM jobs WHERE id = ?",
+                (sent["job_id"],),
+                lambda rows: bool(rows) and rows[0]["status"] == "done",
+            )
+            users = fetch_all(tmp_path, "SELECT id, agent_id FROM messages WHERE role = 'user'")
+            assert [(row["id"], row["agent_id"]) for row in users] == [(message_id, target.id)]
     finally:
         gate.release_all.set()
         _clear()
@@ -968,6 +977,8 @@ async def test_reroute_while_waiting_cancels_the_waiting_turn(
             assert all(row["status"] == "resolved" for row in pending)
             old = fetch_all(tmp_path, "SELECT status FROM agents WHERE id = ?", (sent["agent_id"],))
             assert old[0]["status"] != "waiting"
+            users = fetch_all(tmp_path, "SELECT id, agent_id FROM messages WHERE role = 'user'")
+            assert [(row["id"], row["agent_id"]) for row in users] == [(message_id, target.id)]
     finally:
         _clear()
 

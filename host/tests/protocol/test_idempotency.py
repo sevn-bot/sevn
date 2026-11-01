@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -68,3 +69,31 @@ async def test_response_carries_caused_seq(tmp_path: Path, monkeypatch: pytest.M
         assert response["r"]["seq"] == event["s"]
         assert event["k"] == "system.ping"
         assert event["d"]["note"] == "hi"
+
+
+@pytest.mark.parametrize("pending", [False, True])
+async def test_expired_op_can_run_and_cache_a_fresh_result(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, pending: bool
+) -> None:
+    from sevn.domain.session import open_session
+    from sevn.store.db import utcnow
+    from sevn.store.models import OpLogEntry
+
+    async with memory_host(tmp_path, monkeypatch) as host:
+        await host.hub.oplog.record("op-expired", "old-method", {"_pending": pending})
+        async with open_session() as session:
+            row = await session.get(OpLogEntry, "op-expired")
+            assert row is not None
+            row.created_at = utcnow() - timedelta(hours=25)
+            await session.commit()
+        calls = 0
+
+        async def work():
+            nonlocal calls
+            calls += 1
+            return {"calls": calls}
+
+        first = await host.hub.claim_op("op-expired", "new-method", "hash", work)
+        again = await host.hub.claim_op("op-expired", "new-method", "hash", work)
+        assert first == again == {"calls": 1}
+        assert calls == 1

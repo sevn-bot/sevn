@@ -379,3 +379,106 @@ async def test_user_pin_credits_an_existing_staged_promotion(
         await store.commit("turn_pin")
     assert caught.value.code == "revision_conflict"
     assert (await store.list_for(bot.id))[0].tier == "pinned"
+
+
+async def test_free_slot_starts_idle_lane_while_busy_lane_has_followup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    arm_configured(monkeypatch, tmp_path)
+    monkeypatch.setenv("SEVN_BOTS__MAX_PARALLEL_AGENTS", "2")
+    await upgrade_home(tmp_path)
+    bot = await BotService().create("Proof")
+    releases = [asyncio.Event() for _ in range(4)]
+    started = asyncio.Queue()
+    calls = 0
+
+    async def respond(messages, _info):
+        nonlocal calls
+        index = calls
+        calls += 1
+        started.put_nowait(str(messages))
+        await releases[index].wait()
+        return ModelResponse(parts=[TextPart("ok")])
+
+    use_model(FunctionModel(respond))
+    load_modules("sevn.api.bots", "sevn.api.messages")
+    try:
+        async with connected(tmp_path, monkeypatch) as (host, client):
+            bind(host.hub)
+
+            async def send(text, agent_id=None):
+                params = {"bot_id": bot.id, "text": text, "op_id": mint_id("op_")}
+                if agent_id:
+                    params["agent_id"] = agent_id
+                return ok((await request(client, "messages.send", params))[0])
+
+            first = await send("first lane")
+            await asyncio.wait_for(started.get(), 5)
+            await send("/new second lane")
+            await asyncio.wait_for(started.get(), 5)
+            await send("queued followup", first["agent_id"])
+            third = await send("/new third lane")
+            releases[1].set()
+            next_prompt = await asyncio.wait_for(started.get(), 5)
+            assert "third lane" in next_prompt
+            running = fetch_all(
+                tmp_path, "SELECT status FROM agents WHERE id = ?", (third["agent_id"],)
+            )
+            assert running[0]["status"] == "running"
+            assert not releases[0].is_set()
+    finally:
+        for release in releases:
+            release.set()
+        use_model(None)
+
+
+async def test_answered_question_releases_shared_path_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fakes.models import function_model
+    from sevn.domain.agents import AgentService
+    from sevn.domain.routing import _resolve_answer
+    from sevn.domain.workspace import acquire_write
+
+    arm_configured(monkeypatch, tmp_path)
+    await upgrade_home(tmp_path)
+    bot = await BotService().create("Proof")
+    use_model(
+        function_model(
+            [
+                [{"kind": "tool", "name": "user.ask", "args": {"question": "When?"}}],
+                [{"kind": "text", "text": "Waiting for your answer"}],
+            ]
+        )
+    )
+    load_modules("sevn.api.bots", "sevn.api.messages")
+    try:
+        async with connected(tmp_path, monkeypatch) as (host, client):
+            bind(host.hub)
+            sent = ok(
+                (
+                    await request(
+                        client,
+                        "messages.send",
+                        {"bot_id": bot.id, "text": "schedule this", "op_id": mint_id("op_")},
+                    )
+                )[0]
+            )
+            await poll_rows(
+                tmp_path,
+                "SELECT model_messages FROM turns WHERE agent_id = ? AND status = 'waiting'",
+                (sent["agent_id"],),
+                lambda rows: bool(rows) and rows[0]["model_messages"] is not None,
+            )
+            path = str(Path(bot.workspace_path) / "shared" / "fixture.txt")
+            await acquire_write(sent["agent_id"], path)
+            sibling = await AgentService().spawn(bot.id)
+            with pytest.raises(DomainError) as caught:
+                await acquire_write(sibling.id, path)
+            assert caught.value.code == "path_locked"
+            await _resolve_answer(sent["agent_id"], "Tomorrow")
+            await acquire_write(sibling.id, path)
+            locks = fetch_all(tmp_path, "SELECT agent_id FROM agent_locks WHERE path = ?", (path,))
+            assert locks[0]["agent_id"] == sibling.id
+    finally:
+        use_model(None)

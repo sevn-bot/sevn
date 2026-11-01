@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Replace expired operation records before retries, wake idle queued lanes ahead of already-active lanes, release locks after answered question turns, and preserve the original user message when rerouting a started job.
+
 - Preserve worker wake-ups during capacity checks, purge host-managed worktrees with their bot, and retain Linux DNS configuration while hiding service sockets. Avoid double-counting reserved memory promotions and clear moved jobs from their former lane’s queue notice.
 
 - Harden host-side file access against replaced symlinks and keep worktree roots outside bot-writable directories. Hide Linux host service sockets, preserve memory deletion notices across failed turns and restarts, enforce pinned-memory and agent limits, and finish mixed question/approval turns in either answer order. Routing choices use agent ids, invalid fallback targets are rejected, reconnects replay every unprocessed event, and chat clears stale queue labels without duplicating questions.

@@ -285,6 +285,7 @@ async def close_question_turns(session: AsyncSession, agent_id: str, now: dateti
         turn.status = "done"
         turn.finished_at = now
         await MemoryStore().write(session, turn.id)
+        await drop_locks(session, agent_id)
         for job_id in turn.job_ids or ():
             job = await session.get(JobRow, job_id)
             if job is not None and job.status in ("queued", "started"):

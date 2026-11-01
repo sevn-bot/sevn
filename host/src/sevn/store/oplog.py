@@ -37,6 +37,8 @@ class OpLog:
             if found is None:
                 return None
             if _aware(found.created_at) < utcnow() - _RETENTION:
+                await session.delete(found)
+                await session.commit()
                 return None
             session.expunge(found)
             return found
