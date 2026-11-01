@@ -822,3 +822,76 @@ test("the bot filter clears when that bot is gone", async () => {
     harness.stop();
   }
 });
+
+test("an overdue routine says so", async () => {
+  const harness = await startHarness({
+    "fleet.overview": overview({
+      bots: [bot("bot_atlas", "Atlas", "idle")],
+      upcoming: [
+        routine({
+          next_run: new Date(now.getTime() - 10 * 60_000).toISOString(),
+        }),
+      ],
+    }),
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Dashboard = await loadDashboard();
+    testing.render(createElement(Dashboard));
+    const scan = (await testing.screen.findByText("Mentions scan")).closest(
+      "li",
+    );
+    expect(scan?.textContent).toContain("overdue 10m");
+    expect(scan?.textContent).not.toContain("next in");
+    expect(scan?.getAttribute("data-overdue")).toBe("true");
+  } finally {
+    harness.stop();
+  }
+});
+
+test("a resumed routine stays in the list after the refresh", async () => {
+  const paused = routine({
+    id: "rtn_weekly",
+    name: "Weekly report",
+    status: "paused",
+    paused_reason: "user",
+    next_run: null,
+  });
+  const resumed = routine({
+    id: "rtn_weekly",
+    name: "Weekly report",
+    next_run: new Date(now.getTime() + 3 * 24 * hour).toISOString(),
+  });
+  const harness = await startHarness({
+    "fleet.overview": (_params, nth) =>
+      overview({
+        bots: [bot("bot_atlas", "Atlas", "idle")],
+        upcoming: [nth === 1 ? paused : resumed],
+      }),
+    "routines.resume": resumed,
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Dashboard = await loadDashboard();
+    testing.render(createElement(Dashboard));
+    (await testing.screen.findByRole("button", { name: "Resume" })).click();
+    await testing.waitFor(() => {
+      expect(requestParams(harness.requests, "routines.resume").length).toBe(1);
+    });
+    harness.event("routine.updated", { routine_id: "rtn_weekly" });
+    await testing.waitFor(() => {
+      expect(
+        requestParams(harness.requests, "fleet.overview").length,
+      ).toBeGreaterThan(1);
+    });
+    const row = (await testing.screen.findByText("Weekly report")).closest(
+      "li",
+    );
+    await testing.waitFor(() => {
+      expect(row?.getAttribute("data-status")).toBe("active");
+    });
+    expect(row?.textContent).toContain("next in 3d");
+  } finally {
+    harness.stop();
+  }
+});

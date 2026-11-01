@@ -175,6 +175,59 @@ async def test_scheduler_runs_a_due_routine_once_on_a_new_lane(
     assert len(runs) == 1 and routine["id"] in runs[0]
 
 
+async def test_a_retried_occurrence_queues_one_job(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A sweep that stops after the job but before the cursor moves runs the slot once."""
+    from sevn.domain.routines import run_due
+
+    load_modules(*_MODULES)
+    async with connected(tmp_path, monkeypatch) as (host, client):
+        bot_id = await _bot(client)
+        routine = await _create(client, bot_id)
+        now = datetime.now(UTC)
+        slot = now - timedelta(minutes=5)
+        await _make_due(tmp_path, routine["id"], slot)
+        first = await run_due(host.hub, now=now)
+        assert len(first) == 1
+        # The host stopped before the cursor update: the slot is due again.
+        await _make_due(tmp_path, routine["id"], slot)
+        assert await run_due(host.hub, now=now + timedelta(seconds=30)) == []
+        jobs = fetch_all(tmp_path, "SELECT id FROM jobs WHERE routine_id = ?", (routine["id"],))
+        assert [row["id"] for row in jobs] == first
+        stored = fetch_all(tmp_path, "SELECT next_run FROM routines WHERE id = ?", (routine["id"],))
+        assert datetime.fromisoformat(stored[0]["next_run"]) > now
+
+
+async def test_a_stop_while_announcing_the_run_does_not_run_it_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import asyncio
+
+    from sevn.domain.routines import run_due
+
+    load_modules(*_MODULES)
+    async with connected(tmp_path, monkeypatch) as (host, client):
+        bot_id = await _bot(client)
+        routine = await _create(client, bot_id)
+        now = datetime.now(UTC)
+        await _make_due(tmp_path, routine["id"], now - timedelta(minutes=5))
+        emit = host.hub.emit
+
+        async def stopping(kind: str, *args: object, **kwargs: object) -> object:
+            if kind == "routine.run":
+                raise asyncio.CancelledError
+            return await emit(kind, *args, **kwargs)
+
+        monkeypatch.setattr(host.hub, "emit", stopping)
+        with pytest.raises(asyncio.CancelledError):
+            await run_due(host.hub, now=now)
+        monkeypatch.setattr(host.hub, "emit", emit)
+        await run_due(host.hub, now=now + timedelta(seconds=30))
+        jobs = fetch_all(tmp_path, "SELECT id FROM jobs WHERE routine_id = ?", (routine["id"],))
+        assert len(jobs) == 1
+
+
 async def test_paused_cancelled_and_paused_bot_do_not_run(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -339,6 +392,60 @@ async def test_a_run_can_say_it_was_silent(tmp_path: Path, monkeypatch: pytest.M
             assert item["last_useful_at"] is not None
     finally:
         _clear()
+
+
+async def test_a_claude_run_says_silent_with_its_reply(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Claude bots have no routine.silent tool; a reply starting with [silent] counts."""
+    from fakes.fake_claude import FakeClaudeClient
+    from sevn.domain.routines import run_due
+    from sevn.runtime.runtimes.claude import use_client
+    from sevn.runtime.worker import bind
+
+    load_modules(*_MODULES)
+    use_client(
+        FakeClaudeClient(
+            script=[{"type": "result", "subtype": "success", "result": "[silent] nothing new"}]
+        )
+    )
+    try:
+        async with connected(tmp_path, monkeypatch) as (host, client):
+            worker = bind(host.hub)
+            try:
+                frame, _earlier = await request(
+                    client,
+                    "bots.create",
+                    {"name": "Claude", "runtime": "claude", "op_id": mint_id("op_")},
+                )
+                bot_id = ok(frame)["id"]
+                routine = await _create(client, bot_id)
+                now = datetime.now(UTC)
+                await _make_due(tmp_path, routine["id"], now - timedelta(minutes=1))
+                job_id = (await run_due(host.hub, now=now))[0]
+                await poll_rows(
+                    tmp_path,
+                    "SELECT status FROM jobs WHERE id = ?",
+                    (job_id,),
+                    lambda rows: bool(rows) and rows[0]["status"] == "done",
+                )
+                rows = fetch_all(tmp_path, "SELECT text, silent FROM jobs WHERE id = ?", (job_id,))
+                assert "routine.silent" not in rows[0]["text"]
+                assert "[silent]" in rows[0]["text"]
+                assert rows[0]["silent"] == 1
+            finally:
+                await worker.aclose()
+    finally:
+        use_client(None)
+
+
+def test_only_a_leading_marker_is_silent() -> None:
+    from sevn.tools.routine import is_silent_reply
+
+    assert is_silent_reply("[silent] nothing new")
+    assert is_silent_reply("  [SILENT]")
+    assert not is_silent_reply("Found two. Not [silent].")
+    assert not is_silent_reply("")
 
 
 async def test_silent_outside_a_routine_run_changes_nothing(
