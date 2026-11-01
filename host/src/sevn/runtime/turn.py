@@ -174,7 +174,11 @@ class TurnRunner:
                             ToolDecision(tool_call_id=call.tool_call_id, approved=True)
                             for call in outcome.approvals
                         )
-                        outcome = await self._drive(turn_id, agent, bot, job, history, auto)
+                        # The approvals answer the calls on the latest response,
+                        # so the next drive needs the history that ends with it.
+                        outcome = await self._drive(
+                            turn_id, agent, bot, job, outcome.model_messages, auto
+                        )
                 except asyncio.CancelledError:
                     if self._watch is not None and self._watch.cancelled(turn_id):
                         await MemoryStore().rollback(turn_id)
@@ -1012,6 +1016,7 @@ async def persist_running_cancel(hub: Hub, turn_id: str) -> bool:
         for owned_id in turn.job_ids:
             await _finish_job(session, owned_id, "cancelled", finished_at)
         await _set_agent(session, turn.agent_id, "idle", finished_at)
+        await drop_locks(session, turn.agent_id)
         events.append(_turn_event("turn.finished", turn.id, turn.agent_id, "cancelled"))
         events.extend(
             _job_event("job.done", owned_id, turn.agent_id, "cancelled")
@@ -1071,6 +1076,7 @@ async def cancel_persisted_waiting(hub: Hub, turn_id: str) -> bool:
         for job_id in turn.job_ids:
             await _finish_job(session, job_id, "cancelled", finished_at)
         await _set_agent(session, turn.agent_id, "idle", finished_at)
+        await drop_locks(session, turn.agent_id)
         events: list[Event] = [
             _turn_event("turn.finished", turn.id, turn.agent_id, "cancelled"),
         ]
