@@ -291,3 +291,122 @@ async def test_shell_caps_output_and_reports_stderr(
     assert text.startswith("exit code: 3")
     assert "stdout:\nout" in text
     assert "stderr:\noops" in text
+
+
+def _outside_tmp_home() -> Path | None:
+    """A sevn home outside ``/tmp``, which the sandbox already hides."""
+    import tempfile
+
+    # mkdtemp makes a private 0700 directory, so the shared /var/tmp is safe here.
+    root = Path("/var/tmp")  # noqa: S108
+    if not root.is_dir() or not os.access(root, os.W_OK):
+        return None
+    return Path(tempfile.mkdtemp(prefix="sevn-sibling-", dir=root))
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="bubblewrap is Linux-only")
+async def test_shell_cannot_read_another_bots_workspace(monkeypatch: pytest.MonkeyPatch) -> None:
+    import shutil
+
+    from sevn.domain.agents import AgentService
+    from sevn.domain.bots import BotService
+    from sevn.tools.shell import execute
+
+    home = _outside_tmp_home()
+    if home is None:
+        pytest.skip("no writable directory outside /tmp")
+    try:
+        arm_configured(monkeypatch, home)
+        await upgrade_home(home)
+        owner = await BotService().create("Owner")
+        other = await BotService().create("Other")
+        agent = await AgentService().spawn(other.id)
+        secret = Path(owner.workspace_path) / "private.txt"
+        secret.write_text(_HOSTS_MARKER, encoding="utf-8")
+        shown = await execute(other.id, agent.id, f'cat "{secret}"')
+        assert shown.executed is True
+        assert shown.returncode != 0
+        assert _HOSTS_MARKER not in shown.stdout
+        listed = await execute(other.id, agent.id, f'ls "{Path(owner.workspace_path).parent}"')
+        assert Path(owner.workspace_path).name not in listed.stdout
+        wrote = await execute(other.id, agent.id, "printf hi > note.txt")
+        assert wrote.returncode == 0
+        assert _note(other.workspace_path) == "hi"
+    finally:
+        shutil.rmtree(home, ignore_errors=True)
+
+
+def test_bwrap_argv_masks_sevn_home_and_workspaces(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import shutil
+
+    from sevn.sandbox.bubblewrap import argv
+
+    user_home = tmp_path / "user"
+    user_home.mkdir()
+    sevn_home = tmp_path / "data"
+    workspaces = sevn_home / "workspaces"
+    workspace = workspaces / "bot_a"
+    shared = sevn_home / "Shared"
+    for path in (workspace, workspaces / "bot_b", shared):
+        path.mkdir(parents=True)
+    monkeypatch.setenv("HOME", str(user_home))
+    monkeypatch.setenv("SEVN_HOME", str(sevn_home))
+    monkeypatch.setenv("SEVN_WORKSPACES", str(workspaces))
+    monkeypatch.setattr(shutil, "which", lambda _name: "/usr/bin/bwrap")
+    args = argv("true", workspace=workspace, shared=shared, network=False)
+    mask = args.index(str(sevn_home))
+    assert args[mask - 1] == "--tmpfs"
+    bind = args.index(str(workspace))
+    assert args[bind - 1] == "--bind"
+    assert bind > mask
+    assert args.index(str(shared)) > mask
+
+
+def test_bwrap_argv_masks_workspaces_outside_sevn_home(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import shutil
+
+    from sevn.sandbox.bubblewrap import argv
+
+    user_home = tmp_path / "user"
+    user_home.mkdir()
+    workspaces = tmp_path / "Sevn"
+    workspace = workspaces / "bot_a"
+    shared = tmp_path / "Shared"
+    workspace.mkdir(parents=True)
+    shared.mkdir()
+    monkeypatch.setenv("HOME", str(user_home))
+    monkeypatch.setenv("SEVN_HOME", str(tmp_path / "data"))
+    monkeypatch.setenv("SEVN_WORKSPACES", str(workspaces))
+    monkeypatch.setattr(shutil, "which", lambda _name: "/usr/bin/bwrap")
+    args = argv("true", workspace=workspace, shared=shared, network=False)
+    mask = args.index(str(workspaces))
+    assert args[mask - 1] == "--tmpfs"
+    assert args.index(str(workspace)) > mask
+
+
+def test_seatbelt_denies_sevn_home_and_workspaces(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sevn.sandbox import seatbelt
+
+    monkeypatch.setenv("SEVN_HOME", str(tmp_path / "data"))
+    monkeypatch.setenv("SEVN_WORKSPACES", str(tmp_path / "data" / "workspaces"))
+    args = seatbelt.argv(
+        "true",
+        workspace=tmp_path / "data" / "workspaces" / "bot_a",
+        shared=tmp_path / "data" / "Shared",
+        network=False,
+    )
+    assert f"SEVN_HOME={tmp_path / 'data'}" in args
+    assert f"SEVN_WORKSPACES={tmp_path / 'data' / 'workspaces'}" in args
+    profile = Path(seatbelt.__file__).parent / "profiles" / "sevn-workspace.sb"
+    text = profile.read_text(encoding="utf-8")
+    home_deny = text.index('(deny file-read* (subpath (param "SEVN_HOME")))')
+    workspaces_deny = text.index('(deny file-read* (subpath (param "SEVN_WORKSPACES")))')
+    workspace_allow = text.index('(subpath (param "WORKSPACE"))')
+    assert home_deny < workspace_allow
+    assert workspaces_deny < workspace_allow
