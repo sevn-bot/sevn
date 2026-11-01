@@ -1,6 +1,6 @@
 # Plan: fleet dashboards
 
-Status: phase 1 in review (PR #11), phase 2 in review (PR #12), phase 3 in review. Integration branch: `wave/fleet-dashboards`, cut from `wave/0020-bot-core` (PR #9). Every PR for this plan targets `wave/fleet-dashboards`, not `test` or `main`.
+Status: phase 1 in review (PR #11), phase 2 in review (PR #12), phase 3 in review (PR #14), phase 4 in review. Integration branch: `wave/fleet-dashboards`, cut from `wave/0020-bot-core` (PR #9). Every PR for this plan targets `wave/fleet-dashboards`, not `test` or `main`.
 
 Source: the "Agent Fleet Dashboards" playbook, which restates ideas from Alex Finn's video on running a fleet of about 20 agents. This plan maps those ideas onto sevn.
 
@@ -83,15 +83,16 @@ Done when:
 
 ## Phase 4: routines
 
-Follow spec §7 where it covers routines. The decision point `routine.silent` already exists.
+Built from this plan; spec §7 was not available.
 
-- Migration `0004_routines`: `routines` (bot, name, cron, timezone, text, status, `paused_reason`, `next_run`, `last_run`, `last_outcome`, `last_useful_at`) and `jobs.routine_id`.
-- A scheduler task in `sevn serve` queues a job with `origin="routine"` and emits `routine.run`. After downtime it runs once, not once per missed slot.
-- `routines.list`, `create`, `update`, `pause`, `resume`, `cancel`. Owner only, with `op_id`.
-- A run is useful unless `routine.silent` says it had nothing to report.
-- Dashboard column "Upcoming": next run, cost per run, 30-day cost, last useful run, a "candidate to cancel" flag after 14 days with nothing useful, 7-day projection, Pause and Cancel (Cancel confirms).
-- Budgets per bot and per host. Warn at 80 percent. At 100 percent pause routines with `paused_reason="budget"`.
-- Notifications follow `notify.priority`: a blocking question near its due time, a failure that needs action, or a budget breach.
+- Migration `0004_routines`: `routines` (bot, name, five-field cron `schedule`, IANA `timezone`, prompt `text`, `status`, `paused_reason`, `next_run`, `last_run`) and `jobs.routine_id` and `jobs.silent`. Last outcome, last useful run and costs are read from jobs and turns, not stored.
+- `domain/cron.py` evaluates the schedule on the routine's wall clock: a time daylight saving skips does not run, a repeated time runs once.
+- `routines.list`, `create`, `update`, `pause`, `resume`, `cancel`. Writes are owner only, with `op_id`, and emit `routine.updated`.
+- `sevn serve` checks every 30 seconds. A due routine runs on a new lane named after it, with `origin="routine"`, and emits `routine.run`. After downtime it runs once. A paused bot skips the slot. Resume starts from the next slot.
+- A run is useful unless it calls the `routine.silent` tool. The prompt reminds the bot of that tool.
+- Budgets: `budgets.daily_usd_per_bot` and `budgets.daily_usd_host` (USD, priced turns since 00:00 UTC). At the cap, routines pause with `paused_reason="budget"`. The spend tile shows the host budget and turns amber at 80 percent, red at 100.
+- Dashboard column "Upcoming": next run, cost per run and over 30 days, last useful run, "candidate to cancel" after 14 days with nothing useful, the next 7 days' projected cost (routines with no known cost are counted apart), Pause, Resume, Cancel with a confirm, and a New routine form.
+- Not done: notifications (`notify.priority`); sevn has no notification channel yet. Bots cannot create routines themselves yet. A per-bot budget warning at 80 percent is not shown yet; only the host budget level is.
 
 ## Phase 5: coordinator
 
