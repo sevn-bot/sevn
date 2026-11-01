@@ -137,6 +137,16 @@ export async function loadDashboard(): Promise<Component> {
   return named(modules, "Dashboard");
 }
 
+export async function loadBriefPage(): Promise<Component> {
+  const modules = import.meta.glob("../../src/app/fleet/BriefPage.tsx");
+  return named(modules, "BriefPage");
+}
+
+export async function loadSharePage(): Promise<Component> {
+  const modules = import.meta.glob("../../src/app/fleet/SharePage.tsx");
+  return named(modules, "SharePage");
+}
+
 async function named(
   modules: Record<string, () => Promise<unknown>>,
   exportName: string,
