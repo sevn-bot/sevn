@@ -105,7 +105,9 @@ class Worker:
             return False
         return self._pydantic.enqueue(agent_id, text)
 
-    async def interrupt_and_requeue(self, job_id: str, agent_id: str) -> None:
+    async def interrupt_and_requeue(
+        self, job_id: str, agent_id: str, *, start_new: bool = False
+    ) -> None:
         """Cancel the open turn for ``job_id`` and leave that job queued on ``agent_id``.
 
         A waiting turn is cancelled too, so its pending requests are resolved
@@ -122,7 +124,7 @@ class Worker:
             if turn_id is not None:
                 if await self._cancel(turn_id) != "cancelled":
                     raise DomainError("invalid_params", "message already finished")
-            await park_job(job_id, agent_id)
+            await park_job(job_id, agent_id, start_new=start_new)
 
     def kick(self, agent_id: str) -> None:
         """Wake the agent's pump. Safe to call again while a turn is running."""

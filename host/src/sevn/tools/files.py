@@ -10,13 +10,14 @@ from pathlib import Path
 from sevn.decisions.registry import screen_inbound
 from sevn.domain.errors import DomainError
 from sevn.domain.workspace import WorkspacePlace, acquire_write, open_place, scratch_dir
+from sevn.log import redact_string
 from sevn.paths import Paths
 from sevn.sandbox.paths import directory, regular_file
 from sevn.sandbox.paths import write_text as safe_write_text
 from sevn.tools.registry import TurnDeps, register_toolset
 
 _OUTSIDE = "path is outside the workspace"
-_SKIP = frozenset({".git", ".sevn"})
+_SKIP = frozenset({".git", ".sevn", ".sevn-git-backup"})
 _MATCH_LIMIT = 50
 _FILE_LIMIT = 200
 
@@ -35,7 +36,7 @@ async def write_file(bot_id: str, agent_id: str, path: str, content: str) -> str
     if locked:
         await acquire_write(agent_id, str(resolved))
     await asyncio.to_thread(_write_text, resolved, content)
-    return path
+    return redact_string(path)
 
 
 async def edit_file(bot_id: str, agent_id: str, path: str, old: str, new: str) -> str:
@@ -51,14 +52,14 @@ async def edit_file(bot_id: str, agent_id: str, path: str, old: str, new: str) -
     if old not in current:
         raise DomainError("invalid_params", "edit text was not found")
     await write_file(bot_id, agent_id, path, current.replace(old, new, 1))
-    return path
+    return redact_string(path)
 
 
 async def list_dir(bot_id: str, agent_id: str, path: str = ".") -> str:
     """List one directory inside the workspace or Shared."""
     located = await _owned(bot_id, agent_id)
     names = await asyncio.to_thread(_list_names, located.root, path)
-    return "\n".join(names)
+    return redact_string("\n".join(names))
 
 
 async def grep(bot_id: str, agent_id: str, pattern: str, path: str = ".") -> str:
@@ -69,7 +70,7 @@ async def grep(bot_id: str, agent_id: str, pattern: str, path: str = ".") -> str
         raise DomainError("invalid_params", "invalid pattern") from exc
     located = await _owned(bot_id, agent_id)
     hits = await asyncio.to_thread(_search, located.root, path, compiled)
-    return "\n".join(hits)
+    return await screen_inbound("\n".join(hits))
 
 
 async def attach(bot_id: str, agent_id: str, path: str) -> str:
@@ -79,7 +80,7 @@ async def attach(bot_id: str, agent_id: str, path: str) -> str:
     is_file = await asyncio.to_thread(resolved.is_file)
     if not is_file:
         raise DomainError("not_found", "file not found")
-    return str(resolved)
+    return redact_string(str(resolved))
 
 
 def files_toolset(deps: TurnDeps) -> dict[str, object]:

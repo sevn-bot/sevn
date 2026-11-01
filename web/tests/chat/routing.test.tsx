@@ -417,3 +417,113 @@ test("rerouting clears only the moved job's queue notice", async () => {
     harness.stop();
   }
 });
+
+test("route.corrected replaces the routing choice without a new turn", async () => {
+  let corrected = false;
+  const harness = await startHarness({
+    "messages.list": () => ({
+      messages: [
+        message(
+          "msg_choice",
+          corrected
+            ? [
+                { type: "text", text: "move me" },
+                { type: "routing", intent: "follow_up", title: "Invoice fix" },
+              ]
+            : [
+                {
+                  type: "routing_ask",
+                  choices: "New task|Continue: Invoice fix",
+                },
+              ],
+        ),
+      ],
+      next_cursor: null,
+    }),
+    "agents.list": agents,
+    "pending.list": { pending: [] },
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Chat = await loadChat();
+    testing.render(createElement(Chat, { botId }));
+    await testing.screen.findByRole("button", {
+      name: "Continue: Invoice fix",
+    });
+    corrected = true;
+    harness.event("route.corrected", {
+      message_id: "msg_choice",
+      agent_id: "agent_invoice",
+    });
+    await testing.screen.findByText("→ continues: Invoice fix");
+    expect(
+      testing.screen.queryByRole("button", { name: "Continue: Invoice fix" }),
+    ).toBeNull();
+  } finally {
+    testing.cleanup();
+    harness.stop();
+  }
+});
+
+test("sandbox mode audit refreshes the mounted warning in both directions", async () => {
+  let allowed = false;
+  const harness = await startHarness({
+    "messages.list": { messages: [], next_cursor: null },
+    "agents.list": agents,
+    "pending.list": { pending: [] },
+    "system.info": () => ({ caps: { allow_all: allowed } }),
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Chat = await loadChat();
+    testing.render(createElement(Chat, { botId }));
+    await testing.screen.findByText("Lisbon");
+    expect(testing.screen.queryByText(/allow all/i)).toBeNull();
+    allowed = true;
+    harness.event("audit", { setting: "sandbox.mode", mode: "allow_all" });
+    await testing.screen.findByText(/allow all/i);
+    allowed = false;
+    harness.event("audit", { setting: "sandbox.mode", mode: "enforced" });
+    await testing.waitFor(() =>
+      expect(testing.screen.queryByText(/allow all/i)).toBeNull(),
+    );
+  } finally {
+    testing.cleanup();
+    harness.stop();
+  }
+});
+
+test("rejected sandbox changes keep the confirmed level and network", async () => {
+  const harness = await startHarness({
+    "messages.list": { messages: [], next_cursor: null },
+    "agents.list": agents,
+    "pending.list": { pending: [] },
+    "bots.get": { access: "full", network: "on" },
+    "bots.update": {
+      __error: { code: "forbidden", message: "fixture rejection" },
+    },
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Chat = await loadChat();
+    testing.render(createElement(Chat, { botId }));
+    testing.fireEvent.click(await testing.screen.findByText("Settings"));
+    const level =
+      await testing.screen.findByLabelText<HTMLSelectElement>("Level");
+    const network =
+      await testing.screen.findByLabelText<HTMLSelectElement>("Network");
+    testing.fireEvent.change(level, { target: { value: "workspace" } });
+    await testing.screen.findByRole("alert");
+    expect(level.value).toBe("full");
+    await testing.waitFor(() => expect(network.disabled).toBe(false));
+    testing.fireEvent.change(network, { target: { value: "off" } });
+    await testing.waitFor(() =>
+      expect(requestParams(harness.requests, "bots.update")).toHaveLength(2),
+    );
+    await testing.screen.findByRole("alert");
+    expect(network.value).toBe("on");
+  } finally {
+    testing.cleanup();
+    harness.stop();
+  }
+});

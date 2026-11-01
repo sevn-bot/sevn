@@ -323,6 +323,8 @@ export function connect(options: ConnectOptions): Promise<Connection> {
   let stopped = false;
   let settled = false;
   let reconnecting = false;
+  let catchingUp: Promise<void> | null = null;
+  let catchUpAgain = false;
   let nextId = 1;
   const buffered = new Map<number, ProtocolEvent>();
   let pending = new Map<string, Pending>();
@@ -668,12 +670,25 @@ export function connect(options: ConnectOptions): Promise<Connection> {
     }
   }
 
-  async function catchUp(start: number): Promise<void> {
+  function catchUp(start: number): Promise<void> {
+    if (catchingUp !== null) {
+      catchUpAgain = true;
+      return catchingUp;
+    }
+    const flight = replay(start).finally(() => {
+      if (catchingUp === flight) catchingUp = null;
+    });
+    catchingUp = flight;
+    return flight;
+  }
+
+  async function replay(start: number): Promise<void> {
     let seq = start;
     for (;;) {
       if (stopped) {
         return;
       }
+      catchUpAgain = false;
       let page: MethodResult["sync.since"];
       try {
         page = await request("sync.since", { seq, limit: SYNC_LIMIT });
@@ -698,6 +713,10 @@ export function connect(options: ConnectOptions): Promise<Connection> {
         page.next_seq > seq
       ) {
         seq = page.next_seq;
+        continue;
+      }
+      if (catchUpAgain) {
+        seq = lastSeq;
         continue;
       }
       return;

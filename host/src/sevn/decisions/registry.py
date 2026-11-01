@@ -136,6 +136,7 @@ def end_inbound(token: Token[list[str] | None]) -> None:
 
 async def screen_inbound(text: str) -> str:
     """Score a file read. At 0.7 the model sees a wrap and the chat can show a chip."""
+    text = redact_text(text)
     if text == "":
         return text
     score = await noul_score("inbound.injection", _INJECTION, text)

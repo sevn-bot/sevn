@@ -448,3 +448,54 @@ test("welcome timeouts retry until the host becomes available", async () => {
     vi.unstubAllGlobals();
   }
 });
+
+test("welcome and a burst of gaps share one replay request", async () => {
+  const { connect } = await loadClient();
+  const { Server, WebSocket } = await loadMock();
+  vi.stubGlobal("WebSocket", WebSocket);
+  const server = new Server(url);
+  let socket: MockSocket | undefined;
+  const replays: Frame[] = [];
+  server.on("connection", (next) => {
+    socket = next;
+    next.on("message", (data) => {
+      const frame = frameOf(data);
+      if (frame.t === "hello") next.send(welcome());
+      if (frame.m === "sync.since") replays.push(frame);
+    });
+  });
+  let connection: Connection | undefined;
+  try {
+    connection = await connect({ url });
+    const seen: number[] = [];
+    connection.onEvent((event) => seen.push(event.s));
+    await vi.waitFor(() => expect(replays).toHaveLength(1));
+    for (let seq = 2; seq <= 101; seq++)
+      socket?.send(JSON.stringify({ t: "evt", s: seq, k: "fixture", d: {} }));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(replays).toHaveLength(1);
+    socket?.send(JSON.stringify({ t: "evt", s: 1, k: "fixture", d: {} }));
+    socket?.send(
+      JSON.stringify({
+        t: "res",
+        id: replays[0].id,
+        r: { more: false, next_seq: 101 },
+      }),
+    );
+    await vi.waitFor(() => expect(replays).toHaveLength(2));
+    expect(replays[1].p).toMatchObject({ seq: 101 });
+    socket?.send(
+      JSON.stringify({
+        t: "res",
+        id: replays[1].id,
+        r: { more: false, next_seq: 101 },
+      }),
+    );
+    await vi.waitFor(() => expect(seen).toHaveLength(101));
+    expect(seen).toEqual(Array.from({ length: 101 }, (_, i) => i + 1));
+  } finally {
+    connection?.close();
+    server.stop();
+    vi.unstubAllGlobals();
+  }
+});

@@ -181,7 +181,7 @@ class BotService:
             await session.execute(delete(BotRow).where(BotRow.id == bot_id))
             await session.commit()
         if purge:
-            await asyncio.to_thread(purge_worktrees, agent_ids)
+            await asyncio.to_thread(purge_worktrees, agent_ids, bot_id)
             await asyncio.to_thread(_remove_workspace, workspace)
         return bot_id
 

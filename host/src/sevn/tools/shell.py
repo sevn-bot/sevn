@@ -14,6 +14,7 @@ from sevn.domain.errors import DomainError
 from sevn.domain.ids import new_id
 from sevn.domain.session import open_session
 from sevn.domain.workspace import open_place, scratch_dir
+from sevn.log import redact_string
 from sevn.sandbox.env import child_env
 from sevn.sandbox.paths import directory
 from sevn.sandbox.policy import (
@@ -62,6 +63,7 @@ class _Target:
     approval_policy: str
     network_on: bool
     root: Path
+    git_metadata: Path | None = None
 
 
 async def execute(
@@ -114,8 +116,8 @@ async def execute(
         risk=risk,
         pending_id=None,
         returncode=ran.returncode,
-        stdout=ran.stdout,
-        stderr=ran.stderr,
+        stdout=redact_string(ran.stdout),
+        stderr=redact_string(ran.stderr),
         timed_out=ran.timed_out,
         truncated=ran.truncated,
     )
@@ -132,7 +134,7 @@ def tool_output(result: ShellResult) -> str:
         lines.extend(["stdout:", result.stdout.rstrip("\n")])
     if result.stderr:
         lines.extend(["stderr:", result.stderr.rstrip("\n")])
-    return "\n".join(lines)
+    return redact_string("\n".join(lines))
 
 
 def shell_toolset(deps: TurnDeps) -> dict[str, object]:
@@ -169,6 +171,7 @@ async def _load(bot_id: str, agent_id: str) -> _Target:
             approval_policy=row.approval_policy,
             network_on=row.network == "on",
             root=place.root,
+            git_metadata=place.git_metadata,
         )
 
 
@@ -192,8 +195,12 @@ def _argv(command: str, target: _Target, *, host_allow_all: bool) -> list[str]:
     if host_allow_all or target.access == "full":
         return direct_argv(command)
     if target.access == "isolated":
-        return isolated_command(command, root=target.root, network=target.network_on)
-    return workspace_argv(command, root=target.root, network=target.network_on)
+        return isolated_command(
+            command, root=target.root, network=target.network_on, git_metadata=target.git_metadata
+        )
+    return workspace_argv(
+        command, root=target.root, network=target.network_on, git_metadata=target.git_metadata
+    )
 
 
 async def _ask(agent_id: str, command: str, risk: Risk) -> str:

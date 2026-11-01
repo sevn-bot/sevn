@@ -250,6 +250,13 @@ def _writes_by_argument(program: str, args: list[str]) -> bool:
         flag = arg.split("=", 1)[0]
         if flag in blocked or flag.startswith("--output"):
             return True
+        # getopt-style long options may accept any unambiguous prefix.
+        if (
+            flag.startswith("--")
+            and len(flag) > 2
+            and any(option.startswith(flag) for option in blocked if option.startswith("--"))
+        ):
+            return True
         if arg.startswith("-") and not arg.startswith("--") and short & set(arg[1:]):
             return True
     # Every non-option word counts as an operand, option values included. That

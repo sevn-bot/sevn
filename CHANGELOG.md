@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Close shell option-abbreviation approval bypasses, redact tool results before model history, serialize message publication, support confined Git commands in linked worktrees, refresh resolved routing chips and sandbox warnings, coalesce event replay, and retain confirmed sandbox settings after failed updates.
+
 - Fix lane cancellation, crash retry message identity, purge ordering, reroute labels, connection retries, compaction fallback, and confined Git worktree creation.
 
 - Claim jobs atomically on their selected lane, serialize reroutes with turn startup, retain pinned-memory reservations until commit or rollback, and stop live question streams before releasing locks. Claude requires explicit full access and networking; consumed routing messages finish their turns, and numeric output filenames require approval.

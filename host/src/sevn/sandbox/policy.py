@@ -44,7 +44,9 @@ def shared_dir() -> Path:
     return (Paths.from_env().workspaces.parent / "Shared").resolve()
 
 
-def workspace_argv(command: str, *, root: Path, network: bool) -> list[str]:
+def workspace_argv(
+    command: str, *, root: Path, network: bool, git_metadata: Path | None = None
+) -> list[str]:
     """Seatbelt on macOS, bubblewrap on Linux. Other platforms do not run the command."""
     workspace = root.absolute()
     with directory(workspace):
@@ -52,9 +54,13 @@ def workspace_argv(command: str, *, root: Path, network: bool) -> list[str]:
     shared = shared_dir()
     shared.mkdir(parents=True, exist_ok=True)
     if sys.platform == "darwin":
-        return seatbelt_argv(command, workspace=workspace, shared=shared, network=network)
+        return seatbelt_argv(
+            command, workspace=workspace, shared=shared, network=network, git_metadata=git_metadata
+        )
     if sys.platform == "linux":
-        return bwrap_argv(command, workspace=workspace, shared=shared, network=network)
+        return bwrap_argv(
+            command, workspace=workspace, shared=shared, network=network, git_metadata=git_metadata
+        )
     raise DomainError("invalid_params", "sandbox is unavailable")
 
 
@@ -63,14 +69,18 @@ def direct_argv(command: str) -> list[str]:
     return ["/bin/sh", "-c", command]
 
 
-def isolated_command(command: str, *, root: Path, network: bool) -> list[str]:
+def isolated_command(
+    command: str, *, root: Path, network: bool, git_metadata: Path | None = None
+) -> list[str]:
     """Prepare the isolated docker argv and the shared mount."""
     workspace = root.absolute()
     with directory(workspace):
         pass
     shared = shared_dir()
     shared.mkdir(parents=True, exist_ok=True)
-    return isolated_argv(command, workspace=workspace, shared=shared, network=network)
+    return isolated_argv(
+        command, workspace=workspace, shared=shared, network=network, git_metadata=git_metadata
+    )
 
 
 @method(

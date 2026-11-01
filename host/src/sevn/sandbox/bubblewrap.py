@@ -32,7 +32,14 @@ _HOME_READABLE = (
 )
 
 
-def argv(command: str, *, workspace: Path, shared: Path, network: bool) -> list[str]:
+def argv(
+    command: str,
+    *,
+    workspace: Path,
+    shared: Path,
+    network: bool,
+    git_metadata: Path | None = None,
+) -> list[str]:
     """Run ``command`` with a read-only system and a writable workspace.
 
     Every namespace is new, so the command cannot see or signal host processes
@@ -91,6 +98,8 @@ def argv(command: str, *, workspace: Path, shared: Path, network: bool) -> list[
             "/proc",
         ]
     )
+    if git_metadata is not None:
+        args.extend(["--bind", str(git_metadata), str(git_metadata)])
     # The host home holds the database, the secret store, the age key and the
     # run token. Under the user's home the tmpfs already hides them; SEVN_HOME
     # can move them anywhere, so mask them again.

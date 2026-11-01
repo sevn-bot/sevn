@@ -24,6 +24,7 @@ type LaneRef = { id: string; title: string };
 
 const refreshKinds = new Set([
   "message.created",
+  "route.corrected",
   "agent.updated",
   "pending.created",
   "pending.resolved",
@@ -98,13 +99,20 @@ function ChatView({ botId }: { botId: string }) {
     }
     const fresh = events.slice(seenEvents.current);
     seenEvents.current = events.length;
+    if (
+      fresh.some(
+        (event) => event.k === "audit" && event.d.setting === "sandbox.mode",
+      )
+    ) {
+      void infoQuery.refetch();
+    }
     if (!fresh.some((event) => refreshKinds.has(event.k))) {
       return;
     }
     void messagesQuery.refetch();
     void agentsQuery.refetch();
     void pendingQuery.refetch();
-  }, [agentsQuery, events, messagesQuery, pendingQuery]);
+  }, [agentsQuery, events, infoQuery, messagesQuery, pendingQuery]);
 
   async function loadOlder(): Promise<void> {
     const cursor = olderCursor.current;

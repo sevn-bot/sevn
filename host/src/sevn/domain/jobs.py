@@ -141,7 +141,7 @@ async def page_messages(bot_id: str, cursor: str | None) -> MessagePage:
     return MessagePage(messages=[_message(row) for row in page], next_cursor=next_cursor)
 
 
-async def park_job(job_id: str, agent_id: str) -> None:
+async def park_job(job_id: str, agent_id: str, *, start_new: bool = False) -> None:
     """Queue ``job_id`` on ``agent_id``, preserving its original user message."""
     async with open_session() as session:
         job = await session.get(JobRow, job_id)
@@ -199,6 +199,18 @@ async def park_job(job_id: str, agent_id: str) -> None:
                 message.turn_id = turn.id
                 message.agent_id = agent_id
                 message.thread_id = agent.thread_id
+                message.parts = [
+                    part
+                    for part in message.parts
+                    if not isinstance(part, dict)
+                    or cast("dict[str, object]", part).get("type") not in {"routing", "routing_ask"}
+                ] + [
+                    {
+                        "type": "routing",
+                        "intent": "new_request" if start_new else "follow_up",
+                        "title": agent.title,
+                    }
+                ]
         await session.commit()
 
 

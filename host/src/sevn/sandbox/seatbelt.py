@@ -42,7 +42,14 @@ exec "$real" $flags "${TMPDIR%/}/$prefix.XXXXXXXXXX"
 """
 
 
-def argv(command: str, *, workspace: Path, shared: Path, network: bool) -> list[str]:
+def argv(
+    command: str,
+    *,
+    workspace: Path,
+    shared: Path,
+    network: bool,
+    git_metadata: Path | None = None,
+) -> list[str]:
     """Run ``command`` under ``sevn-workspace.sb``."""
     paths = Paths.from_env()
     home = Path(os.environ.get("HOME", str(Path.home()))).expanduser().resolve()
@@ -56,6 +63,8 @@ def argv(command: str, *, workspace: Path, shared: Path, network: bool) -> list[
         f"WORKSPACE={workspace}",
         "-D",
         f"SHARED={shared}",
+        "-D",
+        f"GIT_METADATA={git_metadata or workspace}",
         "-D",
         f"NETWORK={'on' if network else 'off'}",
         "-D",

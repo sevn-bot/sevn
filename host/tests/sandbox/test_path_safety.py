@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 from pathlib import Path
 
@@ -120,6 +121,7 @@ async def test_worktree_shell_cannot_change_host_parent(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     import shutil
+    import subprocess
     import sys
 
     from sevn.domain.session import open_session
@@ -132,9 +134,26 @@ async def test_worktree_shell_cannot_change_host_parent(
     await upgrade_home(tmp_path)
     bot = await BotService().create("Proof")
     agent = await AgentService().spawn(bot.id)
-    (Path(bot.workspace_path) / ".git").mkdir()
     root = tmp_path / "worktrees" / agent.id
-    (root / ".git").mkdir(parents=True)
+    root.parent.mkdir(parents=True)
+    for args in (
+        ["init"],
+        [
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "fixture",
+        ],
+        ["worktree", "add", "-b", "fixture", str(root)],
+    ):
+        await asyncio.to_thread(
+            subprocess.run, ["git", *args], cwd=bot.workspace_path, check=True, capture_output=True
+        )
+
     async with open_session() as session:
         row = await session.get(Agent, agent.id)
         assert row is not None
