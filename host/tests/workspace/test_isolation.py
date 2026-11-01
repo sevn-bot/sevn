@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
+import shlex
 import sqlite3
 import subprocess
 from datetime import UTC, datetime, timedelta
@@ -284,7 +286,8 @@ async def test_new_filter_after_config_read_is_confined(tmp_path: Path, monkeypa
     async def change_config(git, cwd, env):
         names = await original(git, cwd, env)
         with (repo / ".git" / "config").open("a") as config:
-            config.write(f'[filter "late"]\n\tsmudge = touch {marker}; cat\n')
+            command = f"touch {shlex.quote(str(marker))}; cat"
+            config.write(f'[filter "late"]\n\tsmudge = {json.dumps(command)}\n')
         return names
 
     monkeypatch.setattr(workspace, "_filter_drivers", change_config)
