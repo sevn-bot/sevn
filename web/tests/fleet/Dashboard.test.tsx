@@ -41,6 +41,9 @@ function overview(extra: Record<string, unknown> = {}) {
     days: days(),
     kpis: [],
     bots: [],
+    upcoming: [],
+    projection_7d_usd: 0,
+    projection_unpriced: 0,
     waiting: [],
     finished: [],
     activity: [],
@@ -502,6 +505,236 @@ test("question cards show priority, due time and non-blocking", async () => {
       (node) => node.getAttribute("data-pending"),
     );
     expect(order).toEqual(["pend_due", "pend_late", "pend_fyi"]);
+  } finally {
+    harness.stop();
+  }
+});
+
+function routine(extra: Record<string, unknown>) {
+  return {
+    id: "rtn_scan",
+    bot_id: "bot_atlas",
+    bot_name: "Atlas",
+    name: "Mentions scan",
+    schedule: "0 */2 * * *",
+    timezone: "UTC",
+    status: "active",
+    paused_reason: null,
+    next_run: new Date(now.getTime() + 2 * hour).toISOString(),
+    last_run: iso(2 * hour),
+    last_outcome: "ok",
+    last_useful_at: iso(3 * 24 * hour),
+    runs_30d: 12,
+    cost_30d_usd: 0.48,
+    cost_per_run_usd: 0.04,
+    unpriced_runs_30d: 0,
+    runs_next_7d: 84,
+    candidate_to_cancel: false,
+    ...extra,
+  };
+}
+
+const withRoutines = overview({
+  bots: [bot("bot_atlas", "Atlas", "idle")],
+  upcoming: [
+    routine({}),
+    routine({
+      id: "rtn_weekly",
+      name: "Weekly report",
+      next_run: new Date(now.getTime() + 3 * 24 * hour).toISOString(),
+    }),
+    routine({
+      id: "rtn_stale",
+      name: "Stale scan",
+      next_run: new Date(now.getTime() + 5 * hour).toISOString(),
+      last_outcome: "noop",
+      last_useful_at: null,
+      cost_per_run_usd: null,
+      cost_30d_usd: 0,
+      unpriced_runs_30d: 3,
+      candidate_to_cancel: true,
+    }),
+    routine({
+      id: "rtn_paused",
+      name: "Budget victim",
+      status: "paused",
+      paused_reason: "budget",
+      next_run: null,
+    }),
+  ],
+  projection_7d_usd: 3.36,
+  projection_unpriced: 1,
+});
+
+test("Upcoming shows the next 24 hours, costs and cancel candidates", async () => {
+  const harness = await startHarness({ "fleet.overview": withRoutines });
+  const testing = await import("@testing-library/react");
+  try {
+    const Dashboard = await loadDashboard();
+    testing.render(createElement(Dashboard));
+    const scan = (await testing.screen.findByText("Mentions scan")).closest(
+      "li",
+    );
+    expect(scan?.textContent).toContain("next in 2h");
+    expect(scan?.textContent).toContain("$0.04/run");
+    expect(scan?.textContent).toContain("$0.48 in 30 days");
+    expect(scan?.textContent).toContain("0 */2 * * * UTC");
+    expect(scan?.textContent).toContain("useful 3d ago");
+    const stale = (await testing.screen.findByText("Stale scan")).closest("li");
+    expect(stale?.getAttribute("data-candidate")).toBe("true");
+    expect(stale?.textContent).toContain("candidate to cancel");
+    expect(stale?.textContent).toContain("3 unpriced");
+    expect(stale?.textContent).toContain("nothing useful in 30 days");
+    expect(testing.screen.queryByText("Weekly report")).toBeNull();
+    const paused = (await testing.screen.findByText("Budget victim")).closest(
+      "li",
+    );
+    expect(paused?.textContent).toContain("paused by budget");
+    const footer = await testing.screen.findByTestId("projection");
+    expect(footer.textContent).toContain("Next 7 days");
+    expect(footer.textContent).toContain("$3.36");
+    expect(footer.textContent).toContain("1 routine unpriced");
+    (
+      await testing.screen.findByRole("button", { name: "Show all (4)" })
+    ).click();
+    await testing.screen.findByText("Weekly report");
+  } finally {
+    harness.stop();
+  }
+});
+
+test("pause, resume and a confirmed cancel", async () => {
+  const harness = await startHarness({
+    "fleet.overview": withRoutines,
+    "routines.pause": routine({ status: "paused" }),
+    "routines.resume": routine({}),
+    "routines.cancel": routine({ status: "cancelled" }),
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Dashboard = await loadDashboard();
+    testing.render(createElement(Dashboard));
+    const scan = (await testing.screen.findByText("Mentions scan")).closest(
+      "li",
+    );
+    const within = testing.within(scan as HTMLElement);
+    within.getByRole("button", { name: "Pause" }).click();
+    await testing.waitFor(() => {
+      expect(
+        requestParams(harness.requests, "routines.pause")[0]?.routine_id,
+      ).toBe("rtn_scan");
+    });
+    const paused = (await testing.screen.findByText("Budget victim")).closest(
+      "li",
+    );
+    testing
+      .within(paused as HTMLElement)
+      .getByRole("button", { name: "Resume" })
+      .click();
+    await testing.waitFor(() => {
+      expect(
+        requestParams(harness.requests, "routines.resume")[0]?.routine_id,
+      ).toBe("rtn_paused");
+    });
+    within.getByRole("button", { name: "Cancel" }).click();
+    (await within.findByRole("button", { name: "Keep it" })).click();
+    await within.findByRole("button", { name: "Cancel" });
+    expect(within.queryByRole("button", { name: "Yes, cancel" })).toBeNull();
+    expect(requestParams(harness.requests, "routines.cancel")).toEqual([]);
+    within.getByRole("button", { name: "Cancel" }).click();
+    (await within.findByRole("button", { name: "Yes, cancel" })).click();
+    await testing.waitFor(() => {
+      expect(
+        requestParams(harness.requests, "routines.cancel")[0]?.routine_id,
+      ).toBe("rtn_scan");
+    });
+  } finally {
+    harness.stop();
+  }
+});
+
+test("a new routine is created from the form", async () => {
+  const harness = await startHarness({
+    "fleet.overview": withRoutines,
+    "routines.create": routine({ id: "rtn_new", name: "Morning brief" }),
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Dashboard = await loadDashboard();
+    testing.render(createElement(Dashboard));
+    (await testing.screen.findByText("New routine")).click();
+    const change = (label: string, value: string) => {
+      testing.fireEvent.change(testing.screen.getByLabelText(label), {
+        target: { value },
+      });
+    };
+    change("Bot", "bot_atlas");
+    change("Name", "Morning brief");
+    change("Schedule", "30 7 * * 1-5");
+    change("Timezone", "Europe/Amsterdam");
+    change("Prompt", "Summarize what needs me today.");
+    (
+      await testing.screen.findByRole("button", { name: "Create routine" })
+    ).click();
+    await testing.waitFor(() => {
+      expect(requestParams(harness.requests, "routines.create").length).toBe(1);
+    });
+    const sent = requestParams(harness.requests, "routines.create")[0];
+    expect(sent).toMatchObject({
+      bot_id: "bot_atlas",
+      name: "Morning brief",
+      schedule: "30 7 * * 1-5",
+      timezone: "Europe/Amsterdam",
+      text: "Summarize what needs me today.",
+    });
+  } finally {
+    harness.stop();
+  }
+});
+
+test("the spend tile shows the budget level", async () => {
+  const harness = await startHarness({
+    "fleet.overview": overview({
+      kpis: [
+        {
+          key: "spend_today",
+          label: "Spend today",
+          value: 0.85,
+          unit: "USD",
+          source: "turn usage",
+          note: "",
+          budget_usd: 1,
+          level: "warn",
+        },
+      ],
+    }),
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Dashboard = await loadDashboard();
+    testing.render(createElement(Dashboard));
+    const spend = await testing.screen.findByTestId("kpi-spend_today");
+    expect(spend.getAttribute("data-level")).toBe("warn");
+    expect(spend.textContent).toContain("of $1.00 a day");
+  } finally {
+    harness.stop();
+  }
+});
+
+test("a routine event refreshes the overview", async () => {
+  const harness = await startHarness({ "fleet.overview": overview() });
+  const testing = await import("@testing-library/react");
+  try {
+    const Dashboard = await loadDashboard();
+    testing.render(createElement(Dashboard));
+    await testing.screen.findByText("Nothing needs you right now");
+    const before = requestParams(harness.requests, "fleet.overview").length;
+    harness.event("routine.updated", { routine_id: "rtn_scan" });
+    await testing.waitFor(() => {
+      expect(
+        requestParams(harness.requests, "fleet.overview").length,
+      ).toBeGreaterThan(before);
+    });
   } finally {
     harness.stop();
   }
