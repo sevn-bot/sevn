@@ -92,8 +92,12 @@ class Worker:
         return self._pydantic.enqueue(agent_id, text)
 
     async def interrupt_and_requeue(self, job_id: str, agent_id: str) -> None:
-        """Cancel a running turn for ``job_id`` and leave that job queued on ``agent_id``."""
-        turn_id = await _running_turn_for_job(job_id)
+        """Cancel the open turn for ``job_id`` and leave that job queued on ``agent_id``.
+
+        A waiting turn is cancelled too, so its pending requests are resolved
+        and the old agent is not left waiting on a job it no longer owns.
+        """
+        turn_id = await _open_turn_for_job(job_id)
         if turn_id is not None:
             await self.cancel(turn_id)
         await park_job(job_id, agent_id)
@@ -339,9 +343,11 @@ async def _agent_id_for_job(job_id: str) -> str | None:
         return row.agent_id
 
 
-async def _running_turn_for_job(job_id: str) -> str | None:
+async def _open_turn_for_job(job_id: str) -> str | None:
     async with open_session() as session:
-        rows = list(await session.scalars(select(TurnRow).where(TurnRow.status == "running")))
+        rows = list(
+            await session.scalars(select(TurnRow).where(TurnRow.status.in_(("running", "waiting"))))
+        )
         for row in rows:
             if job_id in row.job_ids:
                 return row.id

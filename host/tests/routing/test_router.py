@@ -739,3 +739,171 @@ def _user_message_id(home: Path, text: str) -> str:
         if text in str(row["parts"]):
             return str(row["id"])
     raise AssertionError(f"no user message containing {text!r}")
+
+
+def _ask_then_ok(question: str) -> None:
+    from fakes.fake_jev import FakeJev
+    from sevn.decisions.jev import use_client
+    from sevn.runtime.models import use_model
+
+    use_client(FakeJev(answers={}))
+    use_model(
+        function_model(
+            [
+                [{"kind": "tool", "name": "user.ask", "args": {"question": question}}],
+                [{"kind": "text", "text": "ok"}],
+            ]
+        )
+    )
+
+
+async def test_reroute_of_a_finished_message_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sevn.domain.agents import AgentService
+    from sevn.runtime.worker import bind
+
+    reset_model_requests()
+    load_modules("sevn.api.bots", "sevn.api.messages")
+    _install([{"message.intent": ("new_request", 0.95), "message.target_agent": ("none", 0.9)}])
+    try:
+        async with connected(tmp_path, monkeypatch) as (host, client):
+            bind(host.hub)
+            bot = await _create_bot(client)
+            sent = await _send(client, bot["id"], "send the invoice")
+            await poll_rows(
+                tmp_path,
+                "SELECT status FROM jobs WHERE id = ?",
+                (sent["job_id"],),
+                lambda rows: bool(rows) and rows[0]["status"] == "done",
+            )
+            target = await AgentService().spawn(bot_id=str(bot["id"]))
+            message_id = _user_message_id(tmp_path, "send the invoice")
+            for params in (
+                {"agent_id": target.id},
+                {"new": True},
+            ):
+                moved, _earlier = await request(
+                    client,
+                    "messages.reroute",
+                    {"message_id": message_id, "op_id": mint_id("op_"), **params},
+                )
+                assert moved.get("e", {}).get("code") == "invalid_params", moved
+            await asyncio.sleep(0.2)
+            jobs = fetch_all(
+                tmp_path,
+                "SELECT agent_id, status FROM jobs WHERE id = ?",
+                (sent["job_id"],),
+            )
+            assert jobs[0]["agent_id"] == sent["agent_id"]
+            assert jobs[0]["status"] == "done"
+            assert (
+                fetch_all(tmp_path, "SELECT id FROM turns WHERE agent_id = ?", (target.id,)) == []
+            )
+            assert not _events(tmp_path, "route.corrected")
+    finally:
+        _clear()
+
+
+async def test_reroute_while_waiting_cancels_the_waiting_turn(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sevn.domain.agents import AgentService
+    from sevn.runtime.worker import bind
+
+    reset_model_requests()
+    load_modules("sevn.api.bots", "sevn.api.messages")
+    _ask_then_ok("Which day?")
+    try:
+        async with connected(tmp_path, monkeypatch) as (host, client):
+            bind(host.hub)
+            bot = await _create_bot(client)
+            sent = await _send(client, bot["id"], "book the room")
+            await poll_rows(
+                tmp_path,
+                "SELECT id FROM pending_requests WHERE agent_id = ? AND status = 'waiting'",
+                (sent["agent_id"],),
+                lambda rows: bool(rows),
+            )
+            target = await AgentService().spawn(bot_id=str(bot["id"]))
+            message_id = _user_message_id(tmp_path, "book the room")
+            moved, _earlier = await request(
+                client,
+                "messages.reroute",
+                {"message_id": message_id, "agent_id": target.id, "op_id": mint_id("op_")},
+            )
+            assert ok(moved)["agent_id"] == target.id
+            await poll_rows(
+                tmp_path,
+                "SELECT agent_id, status FROM jobs WHERE id = ?",
+                (sent["job_id"],),
+                lambda rows: (
+                    bool(rows) and rows[0]["agent_id"] == target.id and rows[0]["status"] == "done"
+                ),
+            )
+            old_turns = fetch_all(
+                tmp_path,
+                "SELECT status FROM turns WHERE agent_id = ?",
+                (sent["agent_id"],),
+            )
+            assert old_turns
+            assert all(row["status"] != "waiting" for row in old_turns)
+            pending = fetch_all(
+                tmp_path,
+                "SELECT status FROM pending_requests WHERE agent_id = ?",
+                (sent["agent_id"],),
+            )
+            assert pending
+            assert all(row["status"] == "resolved" for row in pending)
+            old = fetch_all(tmp_path, "SELECT status FROM agents WHERE id = ?", (sent["agent_id"],))
+            assert old[0]["status"] != "waiting"
+    finally:
+        _clear()
+
+
+async def test_user_ask_question_is_in_the_thread(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sevn.runtime.worker import bind
+
+    reset_model_requests()
+    load_modules("sevn.api.bots", "sevn.api.messages")
+    _ask_then_ok("Which day works for you?")
+    try:
+        async with connected(tmp_path, monkeypatch) as (host, client):
+            bind(host.hub)
+            bot = await _create_bot(client)
+            sent = await _send(client, bot["id"], "book the room")
+            await poll_rows(
+                tmp_path,
+                "SELECT id FROM pending_requests WHERE agent_id = ? AND status = 'waiting'",
+                (sent["agent_id"],),
+                lambda rows: bool(rows),
+            )
+            # The tool writes the pending row mid-turn; the turn stores its
+            # messages when it ends as waiting.
+            await poll_rows(
+                tmp_path,
+                "SELECT id FROM messages WHERE agent_id = ? AND role = 'assistant'",
+                (sent["agent_id"],),
+                lambda rows: bool(rows),
+            )
+            listed, _earlier = await request(client, "messages.list", {"bot_id": bot["id"]})
+            messages = ok(listed)["messages"]
+            questions = [
+                item
+                for item in messages
+                if item["role"] == "assistant"
+                and item["agent_id"] == sent["agent_id"]
+                and any(part.get("type") == "question" for part in item["parts"])
+            ]
+            assert len(questions) == 1
+            part = next(p for p in questions[0]["parts"] if p.get("type") == "question")
+            assert part["text"] == "Which day works for you?"
+            assert part["pending_id"].startswith("pend_")
+            assert any(
+                p.get("type") == "text" and p.get("text") == "Which day works for you?"
+                for p in questions[0]["parts"]
+            )
+    finally:
+        _clear()
