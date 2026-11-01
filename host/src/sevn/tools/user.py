@@ -29,7 +29,7 @@ async def ask(
     due_by: str | None = None,
     blocking: bool = True,
 ) -> str:
-    """Record a question and leave the turn waiting. Returns the pending id.
+    """Record a question. A blocking one leaves the turn waiting. Returns the pending id.
 
     ``options`` become one-click answers with ids ``opt_1``... ``priority`` is
     low, normal or high. ``due_by`` is ISO 8601 with a timezone. ``blocking``
@@ -70,10 +70,11 @@ async def ask(
                 resolved_at=None,
             )
         )
-        turn.status = "waiting"
-        agent.status = "waiting"
-        agent.last_activity_at = now
-        apply_lifecycle(agent, "waiting", now)
+        if blocking:
+            turn.status = "waiting"
+            agent.status = "waiting"
+            agent.last_activity_at = now
+            apply_lifecycle(agent, "waiting", now)
         await session.commit()
     return pending_id
 
@@ -112,12 +113,13 @@ def user_toolset(deps: TurnDeps) -> dict[str, object]:
         due_by: str | None = None,
         blocking: bool = True,
     ) -> str:
-        """Ask the user a question. The turn waits for the answer.
+        """Ask the user a question. By default the turn waits for the answer.
 
         Give ``options`` when the answer is one of a few choices; the user can
         pick one with a click. ``priority`` is low, normal or high. ``due_by``
         is an ISO 8601 time with a timezone. Set ``blocking`` to false when
-        the work does not stop for the answer.
+        the work does not stop for the answer: the turn goes on, and the
+        answer arrives later as the user's next message.
         """
         try:
             return await ask(

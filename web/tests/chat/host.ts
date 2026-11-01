@@ -19,6 +19,16 @@ type MockServer = {
   stop: () => void;
 };
 
+const errorKey = "__error";
+
+/** A reply that makes the harness answer with an `e` frame instead of `r`. */
+export function rpcError(
+  code: string,
+  message: string,
+): Record<string, unknown> {
+  return { [errorKey]: { code, message } };
+}
+
 export type Harness = {
   requests: Frame[];
   tick: (kind: string, data: Record<string, unknown>) => void;
@@ -71,7 +81,14 @@ export async function startHarness(
       const reply = replies[method];
       const body =
         typeof reply === "function" ? reply(params, nth) : (reply ?? {});
-      socket.send(JSON.stringify({ t: "res", id: frame.id, r: body }));
+      const failure = body[errorKey];
+      socket.send(
+        JSON.stringify(
+          isRecord(failure)
+            ? { t: "res", id: frame.id, e: failure }
+            : { t: "res", id: frame.id, r: body },
+        ),
+      );
     });
   });
   const clientName = "../../src/client/index.ts";

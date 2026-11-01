@@ -71,19 +71,63 @@ Done when:
 - KPI strip: spend today (priced turns only, with unpriced and subscription counts beside it), tokens today, waiting requests, running turns against `runtime.max_running_turns`. Each tile names its source. A missing value reads unavailable.
 - The heat map can switch to cost.
 - Not done yet: router spend. `decision_log` has no usage or bot id, so jev, the LLM step and the Claude CLI step are not counted. The spend tile says so. This needs a column on `decision_log` and usage from each decider.
+- No migration: the usage shape lives in the existing `turns.usage` JSON column.
 
 ## Phase 3: questions with options
 
 - `user.ask` takes optional `options` (up to six, ids `opt_1` on), `priority` (low, normal, high), `due_by` (ISO 8601 with a timezone) and `blocking` (default true). A bad value goes back to the model as `invalid_params`.
 - `pending.answer` takes `option_id` or `text` for a question. An approval keeps `approve` and `deny`. A mismatch is `invalid_params`.
-- Answering from a card closes the question like a chat answer and queues the answer on the same lane as the user's next message, with an answer chip. It does not go through routing.
+- Answering from a card resolves only that question and queues the answer on the same lane as the user's next message, with an answer chip. It does not go through routing. The paused turn closes once no approval or blocking question is left on the lane; other questions keep their cards. The first answer claims the question; a second one gets `pending_resolved` and queues nothing.
+- A question asked with `blocking` false does not pause the turn. It stays on the dashboard after the turn ends, and its answer runs as the lane's next message.
 - Cards sort by blocking, then priority, then age. An approval is blocking and normal priority.
 - Cards show priority, due time or overdue, and not blocking.
 - Cancelling a turn expires its open questions (`{"expired": true}`).
+- No migration: `options`, `priority`, `due_by` and `blocking` live in the existing `pending_requests.payload` JSON column, and the answer in `pending_requests.answer`.
 
-## Phase 4: routines
+## Phase 4: routines on the dashboard
 
-Built from this plan; spec §7 was not available.
+**Depends on plan 0050 (routines, webhooks, notifications), which builds routines.** This phase builds no routine model, scheduler or migration of its own. The spec text is §5 (Routines), Appendix A.1 (`Routine`, `RoutineRun`, `Budget`) and Appendix A.7, which spec 0001 draft 6 extends with useful runs and budgets. §7 only defines the `routine.silent` decision point.
+
+Owned by 0050, in its migration `0006_routines.py`. This phase does not create them:
+
+- `routines`: cron, interval, once and webhook triggers, `tz`, `next_run_at`, `missed_policy` (`run_once` | `skip`), `continue_agent_id`.
+- `routine_runs`: `job_id`, `agent_id`, `scheduled_for`, `status`, `silent`.
+- The scheduler and missed-run handling (0050 D3–D4), and `routine.run` / `routine.failed`.
+- Silent runs: `routine.no_update`, or jev `routine.silent` (0050 D5).
+- Notifications through `notify.priority` (0050 D7).
+
+Fields that spec draft 6 adds, also in 0050's `0006_routines.py`:
+
+- `routines.last_run_at`, `routines.last_useful_at`, and `routines.paused_reason` (`user` | `budget` | null).
+- `routine_runs.useful`, which is `status = done` and not `silent`, and `routine_runs.cost_usd`, which is the sum of the run's `turns.usage.cost_usd` and is null when any of them is unknown.
+- The `budgets` table: `scope` (`host` | `bot`), `bot_id`, `period` (`day` | `month`), `limit_usd`, `warn_at` (default 0.8).
+
+If 0050 merges before draft 6 is applied to it, these fields go into a follow-up migration that 0050's owner numbers under K-MIG. This plan still owns no migration.
+
+This phase builds:
+
+- `fleet.overview` gains `upcoming`. For each enabled routine: its next run, cost per run (the median `routine_runs.cost_usd` over the last 10 runs, or null), 30-day cost, the last useful run, a "candidate to cancel" flag (enabled 14 days or more with no useful run), and a 7-day projection (cost per run × runs due in 7 days, or null). Each value carries `as_of`, and an unknown value is null, never guessed.
+- The dashboard's "Upcoming" column, with Pause and Cancel buttons:
+  - **Pause** calls 0050's `routines.update` with `enabled = false, paused_reason = "user"`. **Resume** sets `enabled = true` and clears `paused_reason`.
+  - **Cancel** calls 0050's `routines.delete`, after a confirm.
+  - Both are owner-only and take an `op_id`. This phase adds no routine methods of its own. 0050 names `routines.create` and the bot tools `routine.update` / `routine.delete`, but not the owner-side update and delete methods. If its `api/routines.py` names them differently, use those names.
+- Budgets:
+  - `budgets.list` and `budgets.set` (owner only, with `op_id`).
+  - Spend is counted from `turns.usage.cost_usd` where `cost_source` is not `subscription` or `unknown`.
+  - At 80 percent: a `notify.priority` warning.
+  - At 100 percent: the scope's routines pause with `paused_reason = "budget"` (routine runs only). They resume at the next period or when the owner resumes them. User-started work is never blocked; it only shows the breach.
+- Notifications follow 0050's `notify.priority`. This phase adds three triggers: a blocking question near its `due_by`, a failed run that needs action (`routine.failed`), and a budget warning or breach.
+
+Done when:
+
+- "Upcoming" lists every enabled routine from 0050's tables, and Pause / Cancel act through 0050's methods.
+- A routine with 14 days of silent runs is flagged as a candidate to cancel.
+- Crossing 100 percent of a bot budget pauses that bot's routines with `paused_reason = "budget"`, and user messages to the bot still run.
+- Host tests cover the cost-per-run median, the null rules for unknown cost, the 14-day flag and the budget pause. They run against fixture rows in 0050's tables.
+
+### What PR #15 built ahead of plan 0050
+
+PR #15 was written before this section named plan 0050 as the owner of the routine tables. It ships a smaller routine model of its own, which has to move onto 0050's tables (or be replaced by them) before this phase is done:
 
 - Migration `0004_routines`: `routines` (bot, name, five-field cron `schedule`, IANA `timezone`, prompt `text`, `status`, `paused_reason`, `next_run`, `last_run`) and `jobs.routine_id` and `jobs.silent`. Last outcome, last useful run and costs are read from jobs and turns, not stored.
 - `domain/cron.py` evaluates the schedule on the routine's wall clock: a time daylight saving skips does not run, a repeated time runs once.
@@ -112,6 +156,6 @@ Depends on bot-to-bot delegation (`route.owner`, `delegate.needed`) and A2UI (pl
 
 ## Open questions
 
-- Is there a spec text for routines that phase 4 must match?
+- ~~Is there a spec text for routines that phase 4 must match?~~ Yes: spec §5, Appendix A.1 and A.7, and plan 0050. Phase 4 builds on them (see above).
 - Should subscription turns show tokens only, or an estimate labelled as one?
 - Should coordinator panels wait for plan 0040, or start as a fixed set the coordinator can switch on and off?

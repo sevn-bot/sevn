@@ -295,6 +295,49 @@ test("reconnect calls sync.since with the last seen seq", async () => {
   }
 });
 
+test("a reconnect from a zero cursor replays what happened offline", async () => {
+  const { connect } = await loadClient();
+  const { Server, WebSocket } = await loadMock();
+  vi.stubGlobal("WebSocket", WebSocket);
+  const server = new Server(url);
+  const syncs: Frame[] = [];
+  let generation = 0;
+  server.on("connection", (socket) => {
+    generation += 1;
+    const current = generation;
+    socket.on("message", (data) => {
+      const frame = frameOf(data);
+      if (frame.t === "hello") {
+        // Empty host first; events 1-3 happen while the client is offline.
+        socket.send(welcome(current === 1 ? 0 : 3));
+      }
+      if (frame.t === "req" && frame.m === "sync.since") {
+        syncs.push(frame);
+        socket.send(
+          JSON.stringify({ t: "res", id: frame.id, r: { events: [] } }),
+        );
+        if (current === 1) {
+          socket.close();
+        }
+      }
+    });
+  });
+  try {
+    const connection = await connect({ url, token: "tok", lastSeq: 0 });
+    await vi.waitFor(() => {
+      if (syncs.length < 2) {
+        throw new Error("waiting for the reconnect sync");
+      }
+    });
+    const seqs = syncs.map((frame) => (frame.p as { seq?: number }).seq);
+    expect(seqs.slice(0, 2)).toEqual([0, 0]);
+    connection.close();
+  } finally {
+    server.stop();
+    vi.unstubAllGlobals();
+  }
+});
+
 test("close 4001 surfaces Unauthorized and does not retry", async () => {
   const { connect } = await loadClient();
   const { Unauthorized } = await loadErrors();

@@ -150,7 +150,7 @@ def test_nested_extra_is_redacted(captured_log: tuple[list[object], Path]) -> No
     logger.bind(nested={"token": value}).warning("nested")
     logger.complete()
     text = log_path.read_text(encoding="utf-8")
-    extra = str(found[-1].record["extra"])  # type: ignore[attr-defined]
+    extra = str(found[-1].record["extra"])  # type: ignore[attr-defined]  # loguru Message
     assert value not in text
     assert value not in extra
     assert "«redacted:opencode/api_key»" in text

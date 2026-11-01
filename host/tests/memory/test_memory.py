@@ -115,6 +115,92 @@ async def test_pinned_block_in_user_turn_not_instructions(
     assert "always open with the date" in messages
 
 
+async def test_pinned_memory_reaches_every_turn_of_a_lane(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The block is saved in the turn's history, so a later turn's diff has a base."""
+    from fakes.fake_jev import FakeJev
+    from fakes.models import function_model
+    from sevn.decisions.jev import use_client
+    from sevn.memory.store import MemoryStore
+    from sevn.runtime.models import use_model
+    from sevn.runtime.worker import bind
+
+    reset_model_requests()
+    bot_id = await _bot(tmp_path, monkeypatch)
+    store = MemoryStore()
+    turn_id = mint_id("turn_")
+    await store.save(
+        bot_id, "always open with the date", tier="pinned", origin="user", turn_id=turn_id
+    )
+    await store.commit(turn_id)
+    load_modules("sevn.api.bots", "sevn.api.messages")
+    use_client(
+        FakeJev(
+            answers={
+                "message.intent": ("new_request", 0.95),
+                "message.target_agent": ("none", 0.9),
+            }
+        )
+    )
+    use_model(function_model([{"kind": "text", "text": "ok"}]))
+    try:
+        async with connected(tmp_path, monkeypatch) as (host, client):
+            bind(host.hub)
+            from support.chat import ok, request
+
+            first = ok(
+                (
+                    await request(
+                        client,
+                        "messages.send",
+                        {"bot_id": bot_id, "text": "draft the note", "op_id": mint_id("op_")},
+                    )
+                )[0]
+            )
+            await poll_rows(
+                tmp_path,
+                "SELECT status FROM jobs WHERE id = ?",
+                (first["job_id"],),
+                lambda rows: bool(rows) and rows[0]["status"] == "done",
+            )
+            second = ok(
+                (
+                    await request(
+                        client,
+                        "messages.send",
+                        {
+                            "bot_id": bot_id,
+                            "agent_id": first["agent_id"],
+                            "text": "now shorten it",
+                            "op_id": mint_id("op_"),
+                        },
+                    )
+                )[0]
+            )
+            await poll_rows(
+                tmp_path,
+                "SELECT status FROM jobs WHERE id = ?",
+                (second["job_id"],),
+                lambda rows: bool(rows) and rows[0]["status"] == "done",
+            )
+    finally:
+        use_client(None)
+        use_model(None)
+    payloads = model_request_payloads()
+    assert len(payloads) >= 2
+    assert ["always open with the date" in str(item.get("messages")) for item in payloads] == [
+        True
+    ] * len(payloads)
+    histories = fetch_all(
+        tmp_path,
+        "SELECT model_messages FROM turns WHERE agent_id = ? ORDER BY started_at",
+        (first["agent_id"],),
+    )
+    assert len(histories) == 2
+    assert all("always open with the date" in str(row["model_messages"]) for row in histories)
+
+
 async def test_pinned_budget_enforced(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from sevn.domain.errors import DomainError
     from sevn.memory.store import MemoryStore
@@ -276,6 +362,26 @@ async def test_diff_sent_on_later_turns(tmp_path: Path, monkeypatch: pytest.Monk
     assert "<sevn_memories_diff>" in diff
     assert "<sevn_memories>" not in diff
     assert "second fact" in diff
+
+
+async def test_diff_names_a_deleted_memory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The lane's history still holds the full block, so the next diff must retract it."""
+    from sevn.memory.context import render_user_block
+    from sevn.memory.store import MemoryStore
+
+    bot_id = await _bot(tmp_path, monkeypatch)
+    store = MemoryStore()
+    first = mint_id("turn_")
+    saved = await store.save(bot_id, "the office is in Lyon", tier="pinned", turn_id=first)
+    await store.commit(first)
+    opening = await render_user_block(bot_id, prior=False, agent_id="agt_a")
+    assert "the office is in Lyon" in opening
+    await store.delete(saved.id)
+    diff = await render_user_block(bot_id, prior=True, agent_id="agt_a")
+    assert "<sevn_memories_diff>" in diff
+    assert "removed" in diff
+    assert "the office is in Lyon" in diff
+    assert await render_user_block(bot_id, prior=True, agent_id="agt_a") == ""
 
 
 async def test_capture_hint_after_high_noul(
