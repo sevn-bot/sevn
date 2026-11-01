@@ -725,6 +725,78 @@
       "title": "BotsUpdateParams",
       "type": "object"
     },
+    "BriefIssue": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/IssueKind"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "text"
+      ],
+      "title": "BriefIssue",
+      "type": "object"
+    },
+    "BriefRoutine": {
+      "additionalProperties": false,
+      "properties": {
+        "bot_name": {
+          "title": "Bot Name",
+          "type": "string"
+        },
+        "cost_per_run_usd": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Cost Per Run Usd"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "next_run": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Next Run"
+        },
+        "runs": {
+          "title": "Runs",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "bot_name",
+        "next_run",
+        "runs",
+        "cost_per_run_usd"
+      ],
+      "title": "BriefRoutine",
+      "type": "object"
+    },
     "Challenge": {
       "properties": {
         "host": {
@@ -869,6 +941,107 @@
         "quiet"
       ],
       "type": "string"
+    },
+    "FleetBrief": {
+      "additionalProperties": false,
+      "description": "What needs the owner, what finished, what runs today, and what broke.",
+      "properties": {
+        "broken": {
+          "items": {
+            "$ref": "#/$defs/BriefIssue"
+          },
+          "title": "Broken",
+          "type": "array"
+        },
+        "built_at": {
+          "format": "date-time",
+          "title": "Built At",
+          "type": "string"
+        },
+        "decisions": {
+          "items": {
+            "$ref": "#/$defs/FleetWaiting"
+          },
+          "title": "Decisions",
+          "type": "array"
+        },
+        "decisions_total": {
+          "title": "Decisions Total",
+          "type": "integer"
+        },
+        "finished_done": {
+          "title": "Finished Done",
+          "type": "integer"
+        },
+        "finished_failed": {
+          "title": "Finished Failed",
+          "type": "integer"
+        },
+        "finished_top": {
+          "items": {
+            "$ref": "#/$defs/FleetFinished"
+          },
+          "title": "Finished Top",
+          "type": "array"
+        },
+        "kpis": {
+          "items": {
+            "$ref": "#/$defs/FleetKpi"
+          },
+          "title": "Kpis",
+          "type": "array"
+        },
+        "metric_changes": {
+          "items": {
+            "$ref": "#/$defs/FleetMetric"
+          },
+          "title": "Metric Changes",
+          "type": "array"
+        },
+        "routines_today": {
+          "items": {
+            "$ref": "#/$defs/BriefRoutine"
+          },
+          "title": "Routines Today",
+          "type": "array"
+        },
+        "routines_today_unpriced": {
+          "title": "Routines Today Unpriced",
+          "type": "integer"
+        },
+        "routines_today_usd": {
+          "title": "Routines Today Usd",
+          "type": "number"
+        },
+        "since": {
+          "format": "date-time",
+          "title": "Since",
+          "type": "string"
+        }
+      },
+      "required": [
+        "built_at",
+        "since",
+        "kpis",
+        "metric_changes",
+        "decisions",
+        "decisions_total",
+        "finished_done",
+        "finished_failed",
+        "finished_top",
+        "routines_today",
+        "routines_today_usd",
+        "routines_today_unpriced",
+        "broken"
+      ],
+      "title": "FleetBrief",
+      "type": "object"
+    },
+    "FleetBriefParams": {
+      "additionalProperties": false,
+      "properties": {},
+      "title": "FleetBriefParams",
+      "type": "object"
     },
     "FleetDay": {
       "additionalProperties": false,
@@ -1620,6 +1793,19 @@
       ],
       "title": "Hello",
       "type": "object"
+    },
+    "IssueKind": {
+      "enum": [
+        "failed_turns",
+        "failed_routine",
+        "overdue_question",
+        "paused_by_budget",
+        "stale_metric",
+        "error_metric",
+        "conflict_metric",
+        "ollama_down"
+      ],
+      "type": "string"
     },
     "JsonObject": {
       "additionalProperties": {
@@ -3314,6 +3500,11 @@
       "mutating": true,
       "params": "BotsUpdateParams",
       "result": "BotRecord"
+    },
+    "fleet.brief": {
+      "mutating": false,
+      "params": "FleetBriefParams",
+      "result": "FleetBrief"
     },
     "fleet.overview": {
       "mutating": false,

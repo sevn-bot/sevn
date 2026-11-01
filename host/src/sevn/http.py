@@ -74,6 +74,7 @@ _REGISTERED = (
     memory_api.memories_delete,
     memory_api.memories_pin,
     fleet_api.fleet_overview,
+    fleet_api.fleet_brief,
     routine_api.routines_list,
     routine_api.routines_create,
     routine_api.routines_update,

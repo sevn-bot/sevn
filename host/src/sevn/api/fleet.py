@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from sevn.contracts.methods import FleetOverviewParams
+from sevn.contracts.methods import FleetBriefParams, FleetOverviewParams
+from sevn.domain.brief import FleetBrief, brief
 from sevn.domain.fleet import FleetOverview, overview
 from sevn.protocol.registry import Ctx, method
 
@@ -10,3 +11,8 @@ from sevn.protocol.registry import Ctx, method
 @method("fleet.overview", params=FleetOverviewParams, result=FleetOverview, mutating=False)
 async def fleet_overview(_ctx: Ctx, params: FleetOverviewParams) -> FleetOverview:
     return await overview(bot_id=params.bot_id)
+
+
+@method("fleet.brief", params=FleetBriefParams, result=FleetBrief, mutating=False)
+async def fleet_brief(_ctx: Ctx, _params: FleetBriefParams) -> FleetBrief:
+    return await brief()

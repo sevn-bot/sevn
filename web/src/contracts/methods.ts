@@ -36,6 +36,11 @@ export const methods = {
     params: "BotsUpdateParams",
     result: "BotRecord",
   },
+  "fleet.brief": {
+    mutating: false,
+    params: "FleetBriefParams",
+    result: "FleetBrief",
+  },
   "fleet.overview": {
     mutating: false,
     params: "FleetOverviewParams",

@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sevn.contracts.kinds import AccessName, ApprovalPolicy, NetworkFlag, RuntimeName
 from sevn.domain.agents import AgentRecord
 from sevn.domain.bots import BotRecord
+from sevn.domain.brief import FleetBrief
 from sevn.domain.fleet import FleetOverview
 from sevn.domain.jobs import MessageRecord
 from sevn.domain.pending import PendingRecord
@@ -300,6 +301,10 @@ class TurnsCancelResult(BaseModel):
     status: str
 
 
+class FleetBriefParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
 class RoutinesListParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -440,6 +445,7 @@ METHODS: dict[str, MethodSpec] = {
         _spec("memories.delete", MemoriesDeleteParams, MemoriesDeleteResult, mutating=True),
         _spec("memories.pin", MemoriesPinParams, MemoryRecord, mutating=True),
         _spec("fleet.overview", FleetOverviewParams, FleetOverview, mutating=False),
+        _spec("fleet.brief", FleetBriefParams, FleetBrief, mutating=False),
         _spec("routines.list", RoutinesListParams, RoutinesListResult, mutating=False),
         _spec("routines.create", RoutinesCreateParams, RoutineRecord, mutating=True),
         _spec("routines.update", RoutinesUpdateParams, RoutineRecord, mutating=True),
