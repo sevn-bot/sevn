@@ -1039,6 +1039,26 @@
       "title": "FleetKpi",
       "type": "object"
     },
+    "FleetOption": {
+      "additionalProperties": false,
+      "description": "One answer a question offers.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "label"
+      ],
+      "title": "FleetOption",
+      "type": "object"
+    },
     "FleetOverview": {
       "additionalProperties": false,
       "description": "Everything the main dashboard shows, read at ``as_of``.",
@@ -1140,6 +1160,10 @@
           "title": "Args",
           "type": "object"
         },
+        "blocking": {
+          "title": "Blocking",
+          "type": "boolean"
+        },
         "bot_id": {
           "title": "Bot Id",
           "type": "string"
@@ -1153,6 +1177,18 @@
           "title": "Created At",
           "type": "string"
         },
+        "due_by": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Due By"
+        },
         "id": {
           "title": "Id",
           "type": "string"
@@ -1164,6 +1200,16 @@
         "name": {
           "title": "Name",
           "type": "string"
+        },
+        "options": {
+          "items": {
+            "$ref": "#/$defs/FleetOption"
+          },
+          "title": "Options",
+          "type": "array"
+        },
+        "priority": {
+          "$ref": "#/$defs/Priority"
         },
         "text": {
           "title": "Text",
@@ -1180,6 +1226,10 @@
         "text",
         "name",
         "args",
+        "options",
+        "priority",
+        "due_by",
+        "blocking",
         "bot_id",
         "bot_name",
         "agent_id",
@@ -1784,14 +1834,23 @@
     },
     "PendingAnswerParams": {
       "additionalProperties": false,
+      "description": "An approval takes ``answer``. A question takes ``option_id`` or ``text``.",
       "properties": {
         "answer": {
-          "enum": [
-            "approve",
-            "deny"
+          "anyOf": [
+            {
+              "enum": [
+                "approve",
+                "deny"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
           ],
-          "title": "Answer",
-          "type": "string"
+          "default": null,
+          "title": "Answer"
         },
         "op_id": {
           "anyOf": [
@@ -1805,14 +1864,37 @@
           "default": null,
           "title": "Op Id"
         },
+        "option_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Option Id"
+        },
         "pending_id": {
           "title": "Pending Id",
           "type": "string"
+        },
+        "text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Text"
         }
       },
       "required": [
-        "pending_id",
-        "answer"
+        "pending_id"
       ],
       "title": "PendingAnswerParams",
       "type": "object"
@@ -1823,6 +1905,18 @@
         "id": {
           "title": "Id",
           "type": "string"
+        },
+        "job_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Job Id"
         },
         "status": {
           "title": "Status",
@@ -1916,6 +2010,14 @@
       ],
       "title": "PendingRecord",
       "type": "object"
+    },
+    "Priority": {
+      "enum": [
+        "low",
+        "normal",
+        "high"
+      ],
+      "type": "string"
     },
     "Req": {
       "properties": {

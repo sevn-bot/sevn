@@ -49,6 +49,18 @@ class FleetBot(BaseModel):
     waiting: int
 
 
+type Priority = Literal["low", "normal", "high"]
+
+
+class FleetOption(BaseModel):
+    """One answer a question offers."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    label: str
+
+
 class FleetWaiting(BaseModel):
     """One request waiting on the owner."""
 
@@ -59,6 +71,10 @@ class FleetWaiting(BaseModel):
     text: str
     name: str
     args: dict[str, object]
+    options: list[FleetOption]
+    priority: Priority
+    due_by: datetime | None
+    blocking: bool
     bot_id: str
     bot_name: str
     agent_id: str
@@ -202,6 +218,7 @@ async def _waiting(session: AsyncSession, names: dict[str, str]) -> list[FleetWa
     items: list[FleetWaiting] = []
     for pending, agent in rows:
         name, args, text = _request_view(pending.kind, pending.payload)
+        body = _object_dict(pending.payload) or {}
         items.append(
             FleetWaiting(
                 id=pending.id,
@@ -209,6 +226,11 @@ async def _waiting(session: AsyncSession, names: dict[str, str]) -> list[FleetWa
                 text=text,
                 name=name,
                 args=args,
+                options=_options(body),
+                priority=_priority(body),
+                due_by=_due(body),
+                # An approval always stops its turn until it is answered.
+                blocking=pending.kind != "question" or body.get("blocking") is not False,
                 bot_id=agent.bot_id,
                 bot_name=names.get(agent.bot_id, ""),
                 agent_id=agent.id,
@@ -217,7 +239,54 @@ async def _waiting(session: AsyncSession, names: dict[str, str]) -> list[FleetWa
                 created_at=_utc(pending.created_at),
             )
         )
+    items.sort(key=_card_order)
     return items
+
+
+_PRIORITY_RANK: dict[str, int] = {"high": 0, "normal": 1, "low": 2}
+
+
+def _card_order(item: FleetWaiting) -> tuple[int, int, datetime, str]:
+    """Blocking first, then priority, then oldest first."""
+    return (0 if item.blocking else 1, _PRIORITY_RANK[item.priority], item.created_at, item.id)
+
+
+def _options(body: dict[str, object]) -> list[FleetOption]:
+    raw = body.get("options")
+    if not isinstance(raw, list):
+        return []
+    found: list[FleetOption] = []
+    for item in cast("list[object]", raw):
+        option = _object_dict(item)
+        if option is None:
+            continue
+        option_id = option.get("id")
+        label = option.get("label")
+        if isinstance(option_id, str) and isinstance(label, str):
+            found.append(FleetOption(id=option_id, label=label))
+    return found
+
+
+def _priority(body: dict[str, object]) -> Priority:
+    raw = body.get("priority")
+    if raw == "high":
+        return "high"
+    if raw == "low":
+        return "low"
+    return "normal"
+
+
+def _due(body: dict[str, object]) -> datetime | None:
+    raw = body.get("due_by")
+    if not isinstance(raw, str) or raw == "":
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(UTC)
 
 
 async def _finished(

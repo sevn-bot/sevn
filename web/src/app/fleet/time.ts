@@ -48,3 +48,11 @@ export function stamp(iso: string, nowIso: string): string {
   });
   return `${date} ${clock(iso)}`;
 }
+
+/** "due in 3h" or "overdue 2h", measured from ``nowIso``. */
+export function dueLabel(dueIso: string, nowIso: string): string {
+  if (Date.parse(dueIso) >= Date.parse(nowIso)) {
+    return `due in ${age(nowIso, dueIso)}`;
+  }
+  return `overdue ${age(dueIso, nowIso)}`;
+}

@@ -132,10 +132,10 @@ async def resolve_open_pendings(
         )
     )
     events: list[Event] = []
-    answer: dict[str, object] = {"decision": "failed"}
     for row in rows:
         row.status = "resolved"
-        row.answer = answer
+        # A question nobody will answer now expired; an approval failed.
+        row.answer = {"expired": True} if row.kind == "question" else {"decision": "failed"}
         row.resolved_at = now
         payload: dict[str, object] = {
             "pending_id": row.id,

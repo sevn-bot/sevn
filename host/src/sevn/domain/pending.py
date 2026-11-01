@@ -14,6 +14,11 @@ from sevn.store.models import PendingRequest
 from sevn.store.models import Turn as TurnRow
 
 
+def blocks_turn(kind: str, payload: dict[str, object]) -> bool:
+    """An approval always holds its turn; a question does unless asked non-blocking."""
+    return kind != "question" or payload.get("blocking") is not False
+
+
 class PendingRecord(BaseModel):
     """One request the user still has to answer, or has just answered."""
 
@@ -57,15 +62,26 @@ class PendingService:
             await session.commit()
             return _record(row)
 
-    async def has_waiting(self, turn_id: str) -> bool:
+    async def kind_of(self, pending_id: str) -> str:
+        """``approval`` or ``question``. ``not_found`` for an unknown id."""
         async with open_session() as session:
-            found = await session.scalar(
-                select(PendingRequest.id)
+            row = await session.get(PendingRequest, pending_id)
+            if row is None:
+                raise DomainError("not_found", "pending request not found")
+            return row.kind
+
+    async def has_waiting(self, turn_id: str) -> bool:
+        """True while a request that holds the turn is unanswered.
+
+        A non-blocking question stays open without pausing the turn.
+        """
+        async with open_session() as session:
+            rows = await session.execute(
+                select(PendingRequest.kind, PendingRequest.payload)
                 .where(PendingRequest.turn_id == turn_id)
                 .where(PendingRequest.status == "waiting")
-                .limit(1)
             )
-            return found is not None
+            return any(blocks_turn(kind, payload) for kind, payload in rows)
 
     async def decisions(self, turn_id: str) -> list[tuple[str, bool]]:
         """Resolved calls on the latest model response, as ``(tool_call_id, approved)``.

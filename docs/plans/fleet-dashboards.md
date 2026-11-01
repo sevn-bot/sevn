@@ -1,6 +1,6 @@
 # Plan: fleet dashboards
 
-Status: phase 1 in review (PR #11), phase 2 in review. Integration branch: `wave/fleet-dashboards`, cut from `wave/0020-bot-core` (PR #9). Every PR for this plan targets `wave/fleet-dashboards`, not `test` or `main`.
+Status: phase 1 in review (PR #11), phase 2 in review (PR #12), phase 3 in review. Integration branch: `wave/fleet-dashboards`, cut from `wave/0020-bot-core` (PR #9). Every PR for this plan targets `wave/fleet-dashboards`, not `test` or `main`.
 
 Source: the "Agent Fleet Dashboards" playbook, which restates ideas from Alex Finn's video on running a fleet of about 20 agents. This plan maps those ideas onto sevn.
 
@@ -75,10 +75,13 @@ Done when:
 
 ## Phase 3: questions with options
 
-- `user.ask` (from bot core) takes optional `options`, `priority`, `due_by` and `blocking`.
-- `pending.answer` accepts an `option_id` or text for a question. Approvals keep `approve` and `deny`.
-- Cards sort by blocking, then priority, then age.
-- A question closes as expired when its turn is cancelled, as approvals do now.
+- `user.ask` takes optional `options` (up to six, ids `opt_1` on), `priority` (low, normal, high), `due_by` (ISO 8601 with a timezone) and `blocking` (default true). A bad value goes back to the model as `invalid_params`.
+- `pending.answer` takes `option_id` or `text` for a question. An approval keeps `approve` and `deny`. A mismatch is `invalid_params`.
+- Answering from a card resolves only that question and queues the answer on the same lane as the user's next message, with an answer chip. It does not go through routing. The paused turn closes once no approval or blocking question is left on the lane; other questions keep their cards. The first answer claims the question; a second one gets `pending_resolved` and queues nothing.
+- A question asked with `blocking` false does not pause the turn. It stays on the dashboard after the turn ends, and its answer runs as the lane's next message.
+- Cards sort by blocking, then priority, then age. An approval is blocking and normal priority.
+- Cards show priority, due time or overdue, and not blocking.
+- Cancelling a turn expires its open questions (`{"expired": true}`).
 - No migration: `options`, `priority`, `due_by` and `blocking` live in the existing `pending_requests.payload` JSON column, and the answer in `pending_requests.answer`.
 
 ## Phase 4: routines on the dashboard
