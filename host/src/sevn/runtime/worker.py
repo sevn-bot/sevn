@@ -74,6 +74,7 @@ class Worker:
         self._tasks: dict[str, asyncio.Task[None]] = {}
         self._resumes: set[asyncio.Task[None]] = set()
         self._again: set[str] = set()
+        self._interrupted: set[str] = set()
         self._board = _Board()
         self._closed = False
 
@@ -111,6 +112,7 @@ class Worker:
         if task is None or task.done():
             started = asyncio.create_task(self._pump(agent_id))
             started.add_done_callback(_log_task)
+            started.add_done_callback(lambda done: self._after_pump(agent_id, done))
             self._tasks[agent_id] = started
 
     async def settle(self, agent_id: str) -> None:
@@ -184,6 +186,7 @@ class Worker:
             return await _turn_status(turn_id)
         await persist_running_cancel(self.hub, turn_id)
         runtime = await self._choose(live)
+        self._interrupted.add(live)
         await runtime.interrupt(live)
         self.kick(live)
         return "cancelled"
@@ -222,11 +225,28 @@ class Worker:
                     return
                 await self._open_slots(agent_id)
 
+    def _after_pump(self, agent_id: str, task: asyncio.Task[None]) -> None:
+        """An interrupted turn cancels its pump before the pump's own wake-ups run.
+
+        Release the agent from here instead, or jobs queued on it and lanes queued
+        behind the bot's cap stay queued until the next message or a restart.
+        """
+        interrupted = agent_id in self._interrupted
+        self._interrupted.discard(agent_id)
+        # Only a cancel() interrupt counts: loop shutdown cancels pumps too, and
+        # a new pump on a closing loop would outlive it.
+        if not task.cancelled() or not interrupted or self._closed:
+            return
+        released = asyncio.create_task(self._release(agent_id))
+        self._resumes.add(released)
+        released.add_done_callback(self._resumes.discard)
+
     async def _release(self, agent_id: str) -> None:
         """A turn outside the pump ended: wake this lane, then the lanes queued on its slot.
 
-        The pump frees a slot itself after an ordinary job. A resumed approval or a
-        cancelled waiting turn frees one without passing through it.
+        The pump frees a slot itself after an ordinary job. A resumed approval, a
+        cancelled waiting turn or an interrupted pump frees one without passing
+        through it.
         """
         self.kick(agent_id)
         if self._closed:
