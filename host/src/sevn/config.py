@@ -45,6 +45,13 @@ class BotsSettings(BaseModel):
     max_parallel_agents: int = 3
 
 
+class BudgetsSettings(BaseModel):
+    """Daily spend caps in USD for routines. Unset means no cap."""
+
+    daily_usd_per_bot: float | None = None
+    daily_usd_host: float | None = None
+
+
 class DecisionThresholds(BaseModel):
     """Confidence gates for the jev router questions (D4)."""
 
@@ -85,6 +92,7 @@ class Settings(BaseSettings):
     bots: BotsSettings = Field(default_factory=BotsSettings)
     memory: MemorySettings = Field(default_factory=MemorySettings)
     decisions: DecisionsSettings = Field(default_factory=DecisionsSettings)
+    budgets: BudgetsSettings = Field(default_factory=BudgetsSettings)
 
     @classmethod
     def settings_customise_sources(

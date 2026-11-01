@@ -333,42 +333,74 @@ async def answer_question(
     agent = await AgentService().get(agent_id)
     bot = await BotService().get(agent.bot_id)
     await _resolve_answer(agent_id, answer_text, chosen=(pending_id, answer))
+    job_id = await queue_on_lane(
+        bot, agent, answer_text, origin="user", intent="answer", path="card", hub=hub
+    )
+    return job_id, agent_id, turn_id
+
+
+async def queue_on_lane(
+    bot: BotRecord,
+    agent: AgentRecord,
+    text: str,
+    *,
+    origin: str,
+    intent: str,
+    path: str,
+    hub: Hub,
+    routine_id: str | None = None,
+) -> str:
+    """Queue ``text`` as the user's next message on ``agent``, without routing.
+
+    The message gets the same chip a routed one would. The job starts now
+    unless a new lane would go past the bot's parallel cap; then it waits
+    like any held job. Returns the job id.
+    """
     job_id = new_id("job_")
     decision = RouteDecision(
-        intent="answer",
-        target_agent_id=agent_id,
+        intent=intent,
+        target_agent_id=agent.id,
         confidence=1.0,
-        path="card",
+        path=path,
     )
     await JobService().enqueue(
         job_id,
         bot.id,
-        agent_id,
-        answer_text,
-        origin="user",
+        agent.id,
+        text,
+        origin=origin,
         route_decision_id=None,
         status="queued",
+        routine_id=routine_id,
     )
-    message_id = await _attach_user_message(job_id, agent, bot, answer_text, decision)
+    message_id = await _attach_user_message(job_id, agent, bot, text, decision)
+    held = await _over_cap(bot.id, intent, agent)
+    payload: dict[str, object] = {
+        "job_id": job_id,
+        "agent_id": agent.id,
+        "bot_id": bot.id,
+        "status": "queued",
+    }
+    if held:
+        ahead = await _ahead(bot.id, job_id)
+        payload["ahead"] = ahead
+        payload["notice"] = f"queued: {ahead} ahead"
     await hub.emit(
         "route.decided",
         message_id,
         {
             "message_id": message_id,
             "job_id": job_id,
-            "agent_id": agent_id,
+            "agent_id": agent.id,
             "bot_id": bot.id,
-            "intent": "answer",
-            "path": "card",
+            "intent": intent,
+            "path": path,
         },
     )
-    await hub.emit(
-        "job.queued",
-        job_id,
-        {"job_id": job_id, "agent_id": agent_id, "bot_id": bot.id, "status": "queued"},
-    )
-    await _start(agent_id)
-    return job_id, agent_id, turn_id
+    await hub.emit("job.queued", job_id, payload)
+    if not held:
+        await _start(agent.id)
+    return job_id
 
 
 def _question_answer(
