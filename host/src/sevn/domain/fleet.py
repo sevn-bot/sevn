@@ -16,6 +16,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sevn.config import Settings
+from sevn.domain.fleet_routines import FleetRoutine, upcoming
 from sevn.domain.session import open_session
 from sevn.runtime.usage import cost_of, cost_source_of, tokens_of
 from sevn.store.db import utcnow
@@ -27,6 +28,7 @@ from sevn.store.models import Turn as TurnRow
 type FleetBotStatus = Literal["running", "waiting", "idle", "quiet"]
 
 DAYS = 14
+_WARN_SHARE = 0.8
 FINISHED_LIMIT = 20
 PREVIEW_LIMIT = 160
 
@@ -124,6 +126,8 @@ class FleetKpi(BaseModel):
     limit: int | None = None
     unpriced: int | None = None
     subscription: int | None = None
+    budget_usd: float | None = None
+    level: Literal["ok", "warn", "over"] | None = None
 
 
 class FleetOverview(BaseModel):
@@ -135,6 +139,9 @@ class FleetOverview(BaseModel):
     days: list[str]
     kpis: list[FleetKpi]
     bots: list[FleetBot]
+    upcoming: list[FleetRoutine]
+    projection_7d_usd: float
+    projection_unpriced: int
     waiting: list[FleetWaiting]
     finished: list[FleetFinished]
     activity: list[FleetDay]
@@ -153,6 +160,7 @@ async def overview(*, bot_id: str | None = None) -> FleetOverview:
         statuses = await _agent_statuses(session)
         today = await _today(session, days[-1])
         running = await _running_turns(session)
+        routines, projection, unpriced = await upcoming(session, names, now)
     counts = Counter(item.bot_id for item in waiting)
     return FleetOverview(
         as_of=now,
@@ -162,6 +170,9 @@ async def overview(*, bot_id: str | None = None) -> FleetOverview:
         waiting=waiting,
         finished=finished,
         activity=activity,
+        upcoming=routines,
+        projection_7d_usd=projection,
+        projection_unpriced=unpriced,
     )
 
 
@@ -442,6 +453,12 @@ def _kpis(today: _Today, *, waiting: int, running: int) -> list[FleetKpi]:
         notes.append(f"{today.unpriced} unpriced")
     if today.subscription:
         notes.append(f"{today.subscription} on subscription")
+    budget = Settings.load().budgets.daily_usd_host
+    level: Literal["ok", "warn", "over"] | None = None
+    if budget is not None and budget > 0:
+        share = today.spend / budget
+        level = "over" if share >= 1 else "warn" if share >= _WARN_SHARE else "ok"
+        notes.append(f"host budget ${budget:.2f} a day")
     return [
         FleetKpi(
             key="spend_today",
@@ -452,6 +469,8 @@ def _kpis(today: _Today, *, waiting: int, running: int) -> list[FleetKpi]:
             note="; ".join(notes),
             unpriced=today.unpriced,
             subscription=today.subscription,
+            budget_usd=budget,
+            level=level,
         ),
         FleetKpi(
             key="tokens_today",

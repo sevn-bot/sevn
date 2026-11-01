@@ -960,6 +960,18 @@
       "additionalProperties": false,
       "description": "One tile on the KPI strip. ``value`` is null when it cannot be read.",
       "properties": {
+        "budget_usd": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Budget Usd"
+        },
         "key": {
           "title": "Key",
           "type": "string"
@@ -967,6 +979,23 @@
         "label": {
           "title": "Label",
           "type": "string"
+        },
+        "level": {
+          "anyOf": [
+            {
+              "enum": [
+                "ok",
+                "warn",
+                "over"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Level"
         },
         "limit": {
           "anyOf": [
@@ -1103,6 +1132,21 @@
           "title": "Kpis",
           "type": "array"
         },
+        "projection_7d_usd": {
+          "title": "Projection 7D Usd",
+          "type": "number"
+        },
+        "projection_unpriced": {
+          "title": "Projection Unpriced",
+          "type": "integer"
+        },
+        "upcoming": {
+          "items": {
+            "$ref": "#/$defs/FleetRoutine"
+          },
+          "title": "Upcoming",
+          "type": "array"
+        },
         "waiting": {
           "items": {
             "$ref": "#/$defs/FleetWaiting"
@@ -1116,6 +1160,9 @@
         "days",
         "kpis",
         "bots",
+        "upcoming",
+        "projection_7d_usd",
+        "projection_unpriced",
         "waiting",
         "finished",
         "activity"
@@ -1141,6 +1188,150 @@
         }
       },
       "title": "FleetOverviewParams",
+      "type": "object"
+    },
+    "FleetRoutine": {
+      "additionalProperties": false,
+      "description": "One routine on the Upcoming panel. Counts and costs cover 30 days.",
+      "properties": {
+        "bot_id": {
+          "title": "Bot Id",
+          "type": "string"
+        },
+        "bot_name": {
+          "title": "Bot Name",
+          "type": "string"
+        },
+        "candidate_to_cancel": {
+          "title": "Candidate To Cancel",
+          "type": "boolean"
+        },
+        "cost_30d_usd": {
+          "title": "Cost 30D Usd",
+          "type": "number"
+        },
+        "cost_per_run_usd": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Cost Per Run Usd"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "last_outcome": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Outcome"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "last_run": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Last Run"
+        },
+        "last_useful_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Last Useful At"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "next_run": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Next Run"
+        },
+        "paused_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Paused Reason"
+        },
+        "runs_30d": {
+          "title": "Runs 30D",
+          "type": "integer"
+        },
+        "runs_next_7d": {
+          "title": "Runs Next 7D",
+          "type": "integer"
+        },
+        "schedule": {
+          "title": "Schedule",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "timezone": {
+          "title": "Timezone",
+          "type": "string"
+        },
+        "unpriced_runs_30d": {
+          "title": "Unpriced Runs 30D",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "bot_id",
+        "bot_name",
+        "name",
+        "schedule",
+        "timezone",
+        "status",
+        "paused_reason",
+        "next_run",
+        "last_run",
+        "last_outcome",
+        "last_useful_at",
+        "runs_30d",
+        "cost_30d_usd",
+        "cost_per_run_usd",
+        "unpriced_runs_30d",
+        "runs_next_7d",
+        "candidate_to_cancel"
+      ],
+      "title": "FleetRoutine",
       "type": "object"
     },
     "FleetWaiting": {
@@ -1832,6 +2023,16 @@
       ],
       "type": "string"
     },
+    "Outcome": {
+      "enum": [
+        "ok",
+        "noop",
+        "failed",
+        "cancelled",
+        "running"
+      ],
+      "type": "string"
+    },
     "PendingAnswerParams": {
       "additionalProperties": false,
       "description": "An approval takes ``answer``. A question takes ``option_id`` or ``text``.",
@@ -2086,6 +2287,296 @@
         "id"
       ],
       "title": "Res",
+      "type": "object"
+    },
+    "RoutineIdParams": {
+      "additionalProperties": false,
+      "properties": {
+        "op_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op Id"
+        },
+        "routine_id": {
+          "title": "Routine Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "routine_id"
+      ],
+      "title": "RoutineIdParams",
+      "type": "object"
+    },
+    "RoutineRecord": {
+      "additionalProperties": false,
+      "description": "One routine as the protocol returns it.",
+      "properties": {
+        "bot_id": {
+          "title": "Bot Id",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "last_run": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Last Run"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "next_run": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Next Run"
+        },
+        "paused_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Paused Reason"
+        },
+        "schedule": {
+          "title": "Schedule",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/RoutineStatus"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "timezone": {
+          "title": "Timezone",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "bot_id",
+        "name",
+        "schedule",
+        "timezone",
+        "text",
+        "status",
+        "paused_reason",
+        "next_run",
+        "last_run",
+        "created_at",
+        "updated_at"
+      ],
+      "title": "RoutineRecord",
+      "type": "object"
+    },
+    "RoutineStatus": {
+      "enum": [
+        "active",
+        "paused",
+        "cancelled"
+      ],
+      "type": "string"
+    },
+    "RoutinesCreateParams": {
+      "additionalProperties": false,
+      "description": "``schedule`` is five-field cron, read in ``timezone`` (an IANA name).",
+      "properties": {
+        "bot_id": {
+          "title": "Bot Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "op_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op Id"
+        },
+        "schedule": {
+          "title": "Schedule",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "timezone": {
+          "default": "UTC",
+          "title": "Timezone",
+          "type": "string"
+        }
+      },
+      "required": [
+        "bot_id",
+        "name",
+        "schedule",
+        "text"
+      ],
+      "title": "RoutinesCreateParams",
+      "type": "object"
+    },
+    "RoutinesListParams": {
+      "additionalProperties": false,
+      "properties": {
+        "bot_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bot Id"
+        },
+        "include_cancelled": {
+          "default": false,
+          "title": "Include Cancelled",
+          "type": "boolean"
+        }
+      },
+      "title": "RoutinesListParams",
+      "type": "object"
+    },
+    "RoutinesListResult": {
+      "additionalProperties": false,
+      "properties": {
+        "routines": {
+          "items": {
+            "$ref": "#/$defs/RoutineRecord"
+          },
+          "title": "Routines",
+          "type": "array"
+        }
+      },
+      "required": [
+        "routines"
+      ],
+      "title": "RoutinesListResult",
+      "type": "object"
+    },
+    "RoutinesUpdateParams": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "op_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op Id"
+        },
+        "routine_id": {
+          "title": "Routine Id",
+          "type": "string"
+        },
+        "schedule": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Schedule"
+        },
+        "text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Text"
+        },
+        "timezone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timezone"
+        }
+      },
+      "required": [
+        "routine_id"
+      ],
+      "title": "RoutinesUpdateParams",
       "type": "object"
     },
     "RuntimeName": {
@@ -2474,6 +2965,9 @@
     "routine.run": {
       "durable": true
     },
+    "routine.updated": {
+      "durable": true
+    },
     "system.ping": {
       "durable": true
     },
@@ -2591,6 +3085,36 @@
       "mutating": false,
       "params": "PendingListParams",
       "result": "PendingListResult"
+    },
+    "routines.cancel": {
+      "mutating": true,
+      "params": "RoutineIdParams",
+      "result": "RoutineRecord"
+    },
+    "routines.create": {
+      "mutating": true,
+      "params": "RoutinesCreateParams",
+      "result": "RoutineRecord"
+    },
+    "routines.list": {
+      "mutating": false,
+      "params": "RoutinesListParams",
+      "result": "RoutinesListResult"
+    },
+    "routines.pause": {
+      "mutating": true,
+      "params": "RoutineIdParams",
+      "result": "RoutineRecord"
+    },
+    "routines.resume": {
+      "mutating": true,
+      "params": "RoutineIdParams",
+      "result": "RoutineRecord"
+    },
+    "routines.update": {
+      "mutating": true,
+      "params": "RoutinesUpdateParams",
+      "result": "RoutineRecord"
     },
     "sync.since": {
       "mutating": false,

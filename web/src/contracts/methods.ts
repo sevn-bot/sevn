@@ -96,6 +96,36 @@ export const methods = {
     params: "PendingListParams",
     result: "PendingListResult",
   },
+  "routines.cancel": {
+    mutating: true,
+    params: "RoutineIdParams",
+    result: "RoutineRecord",
+  },
+  "routines.create": {
+    mutating: true,
+    params: "RoutinesCreateParams",
+    result: "RoutineRecord",
+  },
+  "routines.list": {
+    mutating: false,
+    params: "RoutinesListParams",
+    result: "RoutinesListResult",
+  },
+  "routines.pause": {
+    mutating: true,
+    params: "RoutineIdParams",
+    result: "RoutineRecord",
+  },
+  "routines.resume": {
+    mutating: true,
+    params: "RoutineIdParams",
+    result: "RoutineRecord",
+  },
+  "routines.update": {
+    mutating: true,
+    params: "RoutinesUpdateParams",
+    result: "RoutineRecord",
+  },
   "sync.since": {
     mutating: false,
     params: "SyncSinceParams",

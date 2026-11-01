@@ -151,6 +151,46 @@ export type FleetKpi = {
   limit?: number | null;
   unpriced?: number | null;
   subscription?: number | null;
+  budget_usd?: number | null;
+  level?: "ok" | "warn" | "over" | null;
+};
+
+export type RoutineStatus = "active" | "paused" | "cancelled";
+
+export type Routine = {
+  id: string;
+  bot_id: string;
+  name: string;
+  schedule: string;
+  timezone: string;
+  text: string;
+  status: RoutineStatus;
+  paused_reason: string | null;
+  next_run: string | null;
+  last_run: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FleetRoutine = {
+  id: string;
+  bot_id: string;
+  bot_name: string;
+  name: string;
+  schedule: string;
+  timezone: string;
+  status: RoutineStatus;
+  paused_reason: string | null;
+  next_run: string | null;
+  last_run: string | null;
+  last_outcome: "ok" | "noop" | "failed" | "cancelled" | "running" | null;
+  last_useful_at: string | null;
+  runs_30d: number;
+  cost_30d_usd: number;
+  cost_per_run_usd: number | null;
+  unpriced_runs_30d: number;
+  runs_next_7d: number;
+  candidate_to_cancel: boolean;
 };
 
 export type FleetOverview = {
@@ -158,6 +198,9 @@ export type FleetOverview = {
   days: string[];
   kpis: FleetKpi[];
   bots: FleetBot[];
+  upcoming: FleetRoutine[];
+  projection_7d_usd: number;
+  projection_unpriced: number;
   waiting: FleetWaiting[];
   finished: FleetFinished[];
   activity: FleetDay[];
@@ -249,6 +292,26 @@ export type MethodParams = {
   "turns.snapshot": { turn_id: string };
   "turns.cancel": { turn_id: string; op_id?: string };
   "fleet.overview": { bot_id?: string };
+  "routines.list": { bot_id?: string; include_cancelled?: boolean };
+  "routines.create": {
+    bot_id: string;
+    name: string;
+    schedule: string;
+    timezone?: string;
+    text: string;
+    op_id?: string;
+  };
+  "routines.update": {
+    routine_id: string;
+    name?: string;
+    schedule?: string;
+    timezone?: string;
+    text?: string;
+    op_id?: string;
+  };
+  "routines.pause": { routine_id: string; op_id?: string };
+  "routines.resume": { routine_id: string; op_id?: string };
+  "routines.cancel": { routine_id: string; op_id?: string };
 };
 
 export type MethodResult = {
@@ -282,6 +345,12 @@ export type MethodResult = {
   "turns.snapshot": { text: string; status: string };
   "turns.cancel": { turn_id: string; status: string };
   "fleet.overview": FleetOverview;
+  "routines.list": { routines: Routine[] };
+  "routines.create": Routine;
+  "routines.update": Routine;
+  "routines.pause": Routine;
+  "routines.resume": Routine;
+  "routines.cancel": Routine;
 };
 
 export type Status =
