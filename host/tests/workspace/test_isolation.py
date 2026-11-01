@@ -185,6 +185,12 @@ async def test_worktree_isolation_ignored_outside_git(
     assert not (Path(str(bot.workspace_path)) / ".sevn" / "worktrees" / agent.id).exists()
 
 
+def _ran_filters(marker: Path) -> list[str]:
+    return [
+        str(path) for path in (marker, Path(f"{marker}-2"), Path(f"{marker}-3")) if path.exists()
+    ]
+
+
 async def test_worktree_checkout_runs_no_bot_filter(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -223,8 +229,7 @@ async def test_worktree_checkout_runs_no_bot_filter(
         connection.commit()
     note = await ensure(agent.id)
     assert note == ""
-    for suffix in ("", "-2", "-3"):
-        assert not Path(f"{marker}{suffix}").exists(), f"filter ran: {marker}{suffix}"
+    assert _ran_filters(marker) == []
     worktree = repo / ".sevn" / "worktrees" / agent.id
     assert (worktree / "README").read_text(encoding="utf-8") == "base\n"
     assert (worktree / "notes.txt").read_text(encoding="utf-8") == "notes\n"
