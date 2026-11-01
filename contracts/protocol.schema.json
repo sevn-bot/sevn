@@ -872,11 +872,15 @@
     },
     "FleetDay": {
       "additionalProperties": false,
-      "description": "Turns one bot finished on one UTC day.",
+      "description": "Turns one bot finished on one UTC day, and what the priced ones cost.",
       "properties": {
         "bot_id": {
           "title": "Bot Id",
           "type": "string"
+        },
+        "cost_usd": {
+          "title": "Cost Usd",
+          "type": "number"
         },
         "day": {
           "title": "Day",
@@ -885,12 +889,18 @@
         "turns": {
           "title": "Turns",
           "type": "integer"
+        },
+        "unpriced": {
+          "title": "Unpriced",
+          "type": "integer"
         }
       },
       "required": [
         "bot_id",
         "day",
-        "turns"
+        "turns",
+        "cost_usd",
+        "unpriced"
       ],
       "title": "FleetDay",
       "type": "object"
@@ -946,6 +956,89 @@
       "title": "FleetFinished",
       "type": "object"
     },
+    "FleetKpi": {
+      "additionalProperties": false,
+      "description": "One tile on the KPI strip. ``value`` is null when it cannot be read.",
+      "properties": {
+        "key": {
+          "title": "Key",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "limit": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Limit"
+        },
+        "note": {
+          "title": "Note",
+          "type": "string"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "subscription": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Subscription"
+        },
+        "unit": {
+          "title": "Unit",
+          "type": "string"
+        },
+        "unpriced": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unpriced"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value"
+        }
+      },
+      "required": [
+        "key",
+        "label",
+        "value",
+        "unit",
+        "source",
+        "note"
+      ],
+      "title": "FleetKpi",
+      "type": "object"
+    },
     "FleetOverview": {
       "additionalProperties": false,
       "description": "Everything the main dashboard shows, read at ``as_of``.",
@@ -983,6 +1076,13 @@
           "title": "Finished",
           "type": "array"
         },
+        "kpis": {
+          "items": {
+            "$ref": "#/$defs/FleetKpi"
+          },
+          "title": "Kpis",
+          "type": "array"
+        },
         "waiting": {
           "items": {
             "$ref": "#/$defs/FleetWaiting"
@@ -994,6 +1094,7 @@
       "required": [
         "as_of",
         "days",
+        "kpis",
         "bots",
         "waiting",
         "finished",
