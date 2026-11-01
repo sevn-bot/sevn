@@ -47,6 +47,12 @@ from sevn.runtime.compaction import Compaction
 from sevn.runtime.errors import TurnError
 from sevn.runtime.events import ApprovalCall, RuntimeEvent
 from sevn.runtime.models import resolve_model
+from sevn.runtime.usage import (
+    begin_side_responses,
+    price_responses,
+    side_responses,
+    usage_record,
+)
 from sevn.sandbox.policy import allow_all_enabled
 from sevn.tools.registry import TurnDeps, register_toolset, toolsets_for
 
@@ -124,6 +130,7 @@ class PydanticAIRuntime:
         task = asyncio.current_task()
         if task is not None:
             self._tasks[turn.agent.id] = task
+        begin_side_responses()
         try:
             if getattr(model, "stream_function", "stream") is None and deferred is None:
                 result = await agent.run(prompt, message_history=history)
@@ -136,7 +143,7 @@ class PydanticAIRuntime:
                 yield RuntimeEvent(
                     kind="turn_finished",
                     text=text,
-                    usage=_usage(result.usage),
+                    usage=_usage(result.usage, result.new_messages()),
                     model_messages=messages,
                     approvals=_approval_calls(output),
                 )
@@ -365,7 +372,7 @@ def _from_result(event: AgentRunResultEvent[object]) -> RuntimeEvent:
     return RuntimeEvent(
         kind="turn_finished",
         text=text,
-        usage=_usage(event.result.usage),
+        usage=_usage(event.result.usage, event.result.new_messages()),
         model_messages=_dump_messages(event.result.all_messages()),
         approvals=_approval_calls(output),
     )
@@ -409,8 +416,14 @@ def _tool_args(raw: object) -> dict[str, object]:
     return body
 
 
-def _usage(usage: RunUsage) -> dict[str, object]:
-    return {
+def _usage(usage: RunUsage, new_messages: list[ModelMessage]) -> dict[str, object]:
+    """Counts for this run, priced per response this run produced.
+
+    Side requests, such as a compaction summary, count too: they are billed to
+    the same turn.
+    """
+    side = [response for response in side_responses() if isinstance(response, ModelResponse)]
+    counts: dict[str, int] = {
         "requests": usage.requests,
         "tool_calls": usage.tool_calls,
         "input_tokens": usage.input_tokens,
@@ -418,6 +431,16 @@ def _usage(usage: RunUsage) -> dict[str, object]:
         "cache_read_tokens": usage.cache_read_tokens,
         "cache_write_tokens": usage.cache_write_tokens,
     }
+    for response in side:
+        counts["requests"] += 1
+        counts["input_tokens"] += response.usage.input_tokens
+        counts["output_tokens"] += response.usage.output_tokens
+        counts["cache_read_tokens"] += response.usage.cache_read_tokens
+        counts["cache_write_tokens"] += response.usage.cache_write_tokens
+    cost, source = price_responses(
+        [*(message for message in new_messages if isinstance(message, ModelResponse)), *side]
+    )
+    return usage_record(counts, cost_usd=cost, cost_source=source)
 
 
 def _dump_messages(messages: list[ModelMessage]) -> list[object]:
@@ -452,6 +475,8 @@ def _register_feature_tools() -> None:
         "sevn.tools.agents",
         "sevn.tools.history",
         "sevn.tools.shell",
+        "sevn.tools.routine",
+        "sevn.tools.metric",
     ):
         importlib.import_module(module)
     from sevn.tools.shell import shell_toolset

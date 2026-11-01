@@ -89,6 +89,245 @@ type PendingItem = {
   status: string;
 };
 
+export type FleetBotStatus = "running" | "waiting" | "idle" | "quiet";
+
+export type FleetBot = {
+  id: string;
+  name: string;
+  title: string;
+  avatar: string;
+  paused: boolean;
+  status: FleetBotStatus;
+  open_agents: number;
+  waiting: number;
+};
+
+export type FleetOption = { id: string; label: string };
+
+export type FleetWaiting = {
+  id: string;
+  kind: string;
+  text: string;
+  name: string;
+  args: Record<string, unknown>;
+  options: FleetOption[];
+  priority: "low" | "normal" | "high";
+  due_by: string | null;
+  blocking: boolean;
+  bot_id: string;
+  bot_name: string;
+  agent_id: string;
+  agent_title: string;
+  turn_id: string;
+  created_at: string;
+};
+
+export type FleetFinished = {
+  turn_id: string;
+  status: string;
+  preview: string;
+  bot_id: string;
+  bot_name: string;
+  agent_id: string;
+  agent_title: string;
+  finished_at: string;
+};
+
+export type FleetDay = {
+  bot_id: string;
+  day: string;
+  turns: number;
+  cost_usd: number;
+  unpriced: number;
+};
+
+export type FleetKpi = {
+  key: string;
+  label: string;
+  value: number | null;
+  unit: string;
+  source: string;
+  note: string;
+  limit?: number | null;
+  unpriced?: number | null;
+  subscription?: number | null;
+  budget_usd?: number | null;
+  level?: "ok" | "warn" | "over" | null;
+};
+
+export type RoutineStatus = "active" | "paused" | "cancelled";
+
+export type Routine = {
+  id: string;
+  bot_id: string;
+  name: string;
+  schedule: string;
+  timezone: string;
+  text: string;
+  status: RoutineStatus;
+  paused_reason: string | null;
+  next_run: string | null;
+  last_run: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FleetRoutine = {
+  id: string;
+  bot_id: string;
+  bot_name: string;
+  name: string;
+  schedule: string;
+  timezone: string;
+  status: RoutineStatus;
+  paused_reason: string | null;
+  next_run: string | null;
+  last_run: string | null;
+  last_outcome: "ok" | "noop" | "failed" | "cancelled" | "running" | null;
+  last_useful_at: string | null;
+  runs_30d: number;
+  cost_30d_usd: number;
+  cost_per_run_usd: number | null;
+  unpriced_runs_30d: number;
+  runs_next_7d: number;
+  candidate_to_cancel: boolean;
+};
+
+export type MetricStatus = "ok" | "stale" | "error" | "conflict";
+
+export type FleetMetric = {
+  key: string;
+  label: string;
+  value: number | null;
+  unit: string;
+  source: string;
+  as_of: string;
+  bot_id: string;
+  bot_name: string;
+  status: MetricStatus;
+  delta_24h: number | null;
+  freshness_minutes: number;
+  shareable: boolean;
+  reports: {
+    bot_id: string;
+    bot_name: string;
+    value: number | null;
+    as_of: string;
+    source: string;
+  }[];
+};
+
+export type OllamaStatus = {
+  configured: boolean;
+  reachable: boolean | null;
+  models: string[];
+  loaded: { name: string; vram_bytes: number | null }[];
+  error: string | null;
+  checked_at: string | null;
+};
+
+export type FleetHost = {
+  as_of: string;
+  version: string;
+  queued_jobs: number;
+  running_turns: number;
+  max_running_turns: number;
+  ollama: OllamaStatus;
+};
+
+export type BriefIssue = { kind: string; text: string };
+
+export type FleetBrief = {
+  built_at: string;
+  since: string;
+  kpis: FleetKpi[];
+  metric_changes: FleetMetric[];
+  decisions: FleetWaiting[];
+  decisions_total: number;
+  finished_done: number;
+  finished_failed: number;
+  finished_top: FleetFinished[];
+  routines_today: {
+    id: string;
+    name: string;
+    bot_name: string;
+    next_run: string | null;
+    runs: number;
+    cost_per_run_usd: number | null;
+  }[];
+  routines_today_usd: number;
+  routines_today_unpriced: number;
+  broken: BriefIssue[];
+};
+
+export type ShareRecord = {
+  id: string;
+  label: string;
+  bot_id: string | null;
+  status: "active" | "expired" | "revoked";
+  created_at: string;
+  expires_at: string;
+  revoked_at: string | null;
+  last_opened_at: string | null;
+  opens: number;
+};
+
+export type SharedFleet = {
+  as_of: string;
+  label: string;
+  scope_bot_name: string | null;
+  expires_at: string;
+  kpis: FleetKpi[];
+  bots: { id: string; name: string; status: string }[];
+  metrics: {
+    key: string;
+    label: string;
+    value: number | null;
+    unit: string;
+    source: string;
+    as_of: string;
+    status: MetricStatus;
+    delta_24h: number | null;
+    reports: {
+      bot_name: string;
+      value: number | null;
+      as_of: string;
+      source: string;
+    }[];
+  }[];
+  days: string[];
+  activity: FleetDay[];
+  upcoming: {
+    name: string;
+    bot_name: string;
+    schedule: string;
+    timezone: string;
+    status: RoutineStatus;
+    paused_reason: string | null;
+    next_run: string | null;
+    cost_per_run_usd: number | null;
+    runs_next_7d: number;
+  }[];
+  projection_7d_usd: number | null;
+  waiting: number;
+  finished_24h: { done: number; failed: number };
+};
+
+export type FleetOverview = {
+  as_of: string;
+  days: string[];
+  kpis: FleetKpi[];
+  bots: FleetBot[];
+  metrics: FleetMetric[];
+  host: FleetHost;
+  upcoming: FleetRoutine[];
+  projection_7d_usd: number;
+  projection_unpriced: number;
+  waiting: FleetWaiting[];
+  finished: FleetFinished[];
+  activity: FleetDay[];
+};
+
 export type MethodParams = {
   "system.info": Record<string, never>;
   "system.ping": { note: string; op_id?: string };
@@ -167,11 +406,43 @@ export type MethodParams = {
   "pending.list": Record<string, never>;
   "pending.answer": {
     pending_id: string;
-    answer: "approve" | "deny";
+    answer?: "approve" | "deny";
+    option_id?: string;
+    text?: string;
     op_id?: string;
   };
   "turns.snapshot": { turn_id: string };
   "turns.cancel": { turn_id: string; op_id?: string };
+  "fleet.overview": { bot_id?: string };
+  "fleet.brief": Record<string, never>;
+  "shares.create": {
+    label: string;
+    bot_id?: string | null;
+    expires_in_hours?: number;
+    op_id?: string;
+  };
+  "shares.list": Record<string, never>;
+  "shares.revoke": { share_id: string; op_id?: string };
+  "routines.list": { bot_id?: string; include_cancelled?: boolean };
+  "routines.create": {
+    bot_id: string;
+    name: string;
+    schedule: string;
+    timezone?: string;
+    text: string;
+    op_id?: string;
+  };
+  "routines.update": {
+    routine_id: string;
+    name?: string;
+    schedule?: string;
+    timezone?: string;
+    text?: string;
+    op_id?: string;
+  };
+  "routines.pause": { routine_id: string; op_id?: string };
+  "routines.resume": { routine_id: string; op_id?: string };
+  "routines.cancel": { routine_id: string; op_id?: string };
 };
 
 export type MethodResult = {
@@ -201,9 +472,20 @@ export type MethodResult = {
   "memories.delete": { id: string };
   "memories.pin": Memory;
   "pending.list": { pending: PendingItem[] };
-  "pending.answer": { id: string; status: string };
+  "pending.answer": { id: string; status: string; job_id?: string | null };
   "turns.snapshot": { text: string; status: string };
   "turns.cancel": { turn_id: string; status: string };
+  "fleet.overview": FleetOverview;
+  "fleet.brief": FleetBrief;
+  "shares.create": { share: ShareRecord; path: string };
+  "shares.list": { shares: ShareRecord[] };
+  "shares.revoke": ShareRecord;
+  "routines.list": { routines: Routine[] };
+  "routines.create": Routine;
+  "routines.update": Routine;
+  "routines.pause": Routine;
+  "routines.resume": Routine;
+  "routines.cancel": Routine;
 };
 
 export type Status =

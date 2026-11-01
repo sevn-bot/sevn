@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sevn.domain.ids import new_id
-from sevn.domain.pending import latest_response_tool_call_ids
+from sevn.domain.pending import blocks_turn, latest_response_tool_call_ids
 from sevn.domain.session import open_session
 from sevn.domain.workspace import drop_locks
 from sevn.log import logger
@@ -26,6 +26,8 @@ from sevn.runtime.turn_store import (
     text_parts,
     turn_event,
 )
+from sevn.runtime.usage import combine as combine_usage
+from sevn.runtime.usage import interrupted_usage
 from sevn.store.db import utcnow
 from sevn.store.models import Agent as AgentRow
 from sevn.store.models import Event, Message
@@ -76,7 +78,9 @@ async def record_turn_failure(
             if job.agent_id is not None:
                 events.append(job_event("job.done", job.id, job.agent_id, "failed"))
         if turn is not None and turn.status in {"running", "waiting"}:
-            events.extend(await _fail_open_turn(session, turn, job, notice, now))
+            events.extend(
+                await _fail_open_turn(session, turn, job, notice, now, usage=_failed_usage(exc))
+            )
         agent_id = turn.agent_id if turn is not None else None
         if agent_id is None and job is not None:
             agent_id = job.agent_id
@@ -132,14 +136,20 @@ async def _open_turn_for_job(session: AsyncSession, agent_id: str, job_id: str) 
     return None
 
 
+def _failed_usage(exc: BaseException) -> dict[str, object]:
+    """What the failed run used, or an unknown marker when nothing reported it."""
+    if isinstance(exc, TurnError) and exc.usage is not None:
+        return exc.usage
+    return interrupted_usage()
+
+
 async def _has_waiting_pending(session: AsyncSession, turn_id: str) -> bool:
-    found = await session.scalar(
-        select(PendingRow.id)
+    rows = await session.execute(
+        select(PendingRow.kind, PendingRow.payload)
         .where(PendingRow.turn_id == turn_id)
         .where(PendingRow.status == "waiting")
-        .limit(1)
     )
-    return found is not None
+    return any(blocks_turn(kind, payload) for kind, payload in rows)
 
 
 async def _fail_open_turn(
@@ -148,9 +158,13 @@ async def _fail_open_turn(
     job: JobRow | None,
     notice: str,
     now: datetime,
+    *,
+    usage: dict[str, object],
 ) -> list[Event]:
     turn.status = "failed"
     turn.finished_at = now
+    # Earlier runs of a resumed turn keep their usage; the failed run adds its own.
+    turn.usage = combine_usage(turn.usage or {}, usage)
     turn.model_messages = None
     events = await resolve_open_pendings(session, turn, now)
     if job is not None and not await has_user_message(session, turn.id):
@@ -200,7 +214,8 @@ async def persist_running_cancel(hub: Hub, turn_id: str) -> bool:
         job = await session.get(JobRow, job_id) if job_id is not None else None
         turn.status = "cancelled"
         turn.finished_at = finished_at
-        turn.usage = {}
+        # The open run never reported its usage; earlier runs keep theirs.
+        turn.usage = combine_usage(turn.usage or {}, interrupted_usage())
         turn.model_messages = None
         events: list[Event] = []
         if job is not None and not await has_user_message(session, turn.id):
@@ -310,7 +325,7 @@ async def cancel_persisted_waiting(hub: Hub, turn_id: str) -> bool:
         await MemoryStore().rollback(turn_id)
         turn.status = "cancelled"
         turn.finished_at = finished_at
-        turn.usage = {}
+        # The run that asked has finished, so its stored usage is complete.
         turn.model_messages = None
         for job_id in turn.job_ids:
             await finish_job(session, job_id, "cancelled", finished_at)

@@ -572,6 +572,68 @@ async def test_runtime_error_keeps_streamed_text_and_hides_provider_text(
         use_client(None)
 
 
+async def test_failed_claude_turn_keeps_its_usage(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An error result reports what the run used; the failed turn stores it."""
+    from sevn.runtime.runtimes.claude import use_client
+    from sevn.runtime.worker import bind
+
+    fake = FakeClaudeClient(
+        script=[
+            {
+                "type": "result",
+                "is_error": True,
+                "subtype": "error_max_turns",
+                "usage": {"input_tokens": 30, "output_tokens": 12},
+                "total_cost_usd": 0.03,
+                "num_turns": 4,
+            },
+        ]
+    )
+    use_client(fake)
+    load_modules("sevn.api.bots", "sevn.api.messages")
+    try:
+        async with connected(tmp_path, monkeypatch) as (_host, client):
+            worker = bind(_host.hub)
+            try:
+                created = ok(
+                    (
+                        await request(
+                            client,
+                            "bots.create",
+                            {
+                                "name": "Claude",
+                                "runtime": "claude",
+                                "access": "full",
+                                "op_id": mint_id("op_"),
+                            },
+                        )
+                    )[0]
+                )
+                await _network_on(client, str(created["id"]))
+                await request(
+                    client,
+                    "messages.send",
+                    {"bot_id": created["id"], "text": "go long", "op_id": mint_id("op_")},
+                )
+                rows = await poll_rows(
+                    tmp_path,
+                    "SELECT status, usage FROM turns",
+                    (),
+                    lambda found: bool(found) and found[0]["status"] == "failed",
+                )
+                usage = json.loads(str(rows[0]["usage"]))
+                assert usage["requests"] == 4
+                assert usage["output_tokens"] == 12
+                assert usage["cost_source"] == "subscription"
+                assert usage["estimated_usd"] == pytest.approx(0.03)
+            finally:
+                await worker.aclose()
+    finally:
+        use_client(None)
+
+
 async def test_cancelled_claude_turn_closes_open_permission(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

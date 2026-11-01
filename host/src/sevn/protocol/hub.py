@@ -120,8 +120,14 @@ class Hub:
         method: str,
         params_hash: str,
         work: OpWork,
+        *,
+        stored: Callable[[dict[str, object]], dict[str, object]] | None = None,
     ) -> dict[str, object]:
-        """Run ``work`` once per ``op_id`` and replay the stored result after that."""
+        """Run ``work`` once per ``op_id`` and replay the stored result after that.
+
+        ``stored`` maps the result to what the op log keeps, so a value shown
+        only once (a share link's secret) never reaches the database.
+        """
         stored_method = f"{method}{_OP_SEP}{params_hash}"
         async with self._lock_for(op_id):
             found = await self.oplog.lookup(op_id)
@@ -140,11 +146,12 @@ class Hub:
                 raise
             finally:
                 _active_op.reset(token)
+            kept = stored(result) if stored is not None else result
             saved = await self.oplog.lookup(op_id)
             if saved is None:
-                await self.oplog.record(op_id, stored_method, result)
+                await self.oplog.record(op_id, stored_method, kept)
             else:
-                await self.oplog.replace_result(op_id, result)
+                await self.oplog.replace_result(op_id, kept)
             return result
 
     def _lock_for(self, op_id: str) -> asyncio.Lock:

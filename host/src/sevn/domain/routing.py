@@ -9,9 +9,9 @@ import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import cast
+from typing import Any, cast
 
-from sqlalchemy import select
+from sqlalchemy import CursorResult, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sevn.config import Settings
@@ -341,11 +341,198 @@ async def _cancel_agent(agent_id: str) -> None:
         await AgentService().set_status(agent_id, "done")
 
 
-async def _resolve_answer(agent_id: str, text: str) -> None:
-    from sevn.domain.pending import PendingService
-    from sevn.runtime.base import ToolDecision
+async def answer_question(
+    pending_id: str,
+    *,
+    option_id: str | None,
+    text: str | None,
+    hub: Hub,
+) -> tuple[str, str, str]:
+    """Answer a ``user.ask`` question from a card, without routing.
+
+    The question closes like a chat answer does, and the answer is queued on
+    the same lane as the user's next message. Returns ``(job_id, agent_id,
+    turn_id)``.
+    """
+    async with open_session() as session:
+        row = await session.get(PendingRow, pending_id)
+        if row is None:
+            raise DomainError("not_found", "pending request not found")
+        if row.kind != "question":
+            raise DomainError("invalid_params", "not a question")
+        if row.status != "waiting":
+            raise DomainError("pending_resolved", "pending request is resolved")
+        agent_id = row.agent_id
+        turn_id = row.turn_id
+        answer_text, answer = _question_answer(row.payload, option_id=option_id, text=text)
+    agent = await AgentService().get(agent_id)
+    bot = await BotService().get(agent.bot_id)
+    # Only one answer wins a card; a second client gets ``pending_resolved``
+    # and queues nothing.
+    if not await _claim_question(pending_id, agent_id, answer):
+        raise DomainError("pending_resolved", "pending request is resolved")
+    await _resume_answered(agent_id, {turn_id})
+    job_id = await queue_on_lane(
+        bot, agent, answer_text, origin="user", intent="answer", path="card", hub=hub
+    )
+    return job_id, agent_id, turn_id
+
+
+async def queue_on_lane(
+    bot: BotRecord,
+    agent: AgentRecord,
+    text: str,
+    *,
+    origin: str,
+    intent: str,
+    path: str,
+    hub: Hub,
+    routine_id: str | None = None,
+    job_id: str | None = None,
+) -> str:
+    """Queue ``text`` as the user's next message on ``agent``, without routing.
+
+    The message gets the same chip a routed one would. The job starts now
+    unless a new lane would go past the bot's parallel cap; then it waits
+    like any held job. Returns the job id.
+    """
+    job_id = job_id if job_id is not None else new_id("job_")
+    decision = RouteDecision(
+        intent=intent,
+        target_agent_id=agent.id,
+        confidence=1.0,
+        path=path,
+    )
+    await JobService().enqueue(
+        job_id,
+        bot.id,
+        agent.id,
+        text,
+        origin=origin,
+        route_decision_id=None,
+        status="queued",
+        routine_id=routine_id,
+    )
+    message_id, created = await _attach_user_message(job_id, agent, bot, text, decision)
+    held = await _over_cap(bot.id, intent, agent)
+    payload: dict[str, object] = {
+        "job_id": job_id,
+        "agent_id": agent.id,
+        "bot_id": bot.id,
+        "status": "queued",
+    }
+    if held:
+        ahead = await _ahead(bot.id, job_id)
+        payload["ahead"] = ahead
+        payload["notice"] = f"queued: {ahead} ahead"
+    await hub.emit("message.created", message_id, created)
+    await hub.emit(
+        "route.decided",
+        message_id,
+        {
+            "message_id": message_id,
+            "job_id": job_id,
+            "agent_id": agent.id,
+            "bot_id": bot.id,
+            "intent": intent,
+            "path": path,
+        },
+    )
+    await hub.emit("job.queued", job_id, payload)
+    if not held:
+        await _start(agent.id)
+    return job_id
+
+
+def _question_answer(
+    payload: dict[str, object],
+    *,
+    option_id: str | None,
+    text: str | None,
+) -> tuple[str, dict[str, object]]:
+    """The answer text and the stored answer. Exactly one of the two is given."""
+    if (option_id is None) == (text is None):
+        raise DomainError("invalid_params", "give option_id or text")
+    if text is not None:
+        cleaned = text.strip()
+        if cleaned == "":
+            raise DomainError("invalid_params", "the answer is empty")
+        return cleaned, {"text": cleaned}
+    for option in _question_options(payload):
+        if option.get("id") == option_id:
+            label = option.get("label", "")
+            return label, {"option_id": option_id, "text": label}
+    raise DomainError("invalid_params", "unknown option")
+
+
+def _question_options(payload: dict[str, object]) -> list[dict[str, str]]:
+    raw = payload.get("options")
+    if not isinstance(raw, list):
+        return []
+    found: list[dict[str, str]] = []
+    for item in cast("list[object]", raw):
+        if not isinstance(item, dict):
+            continue
+        body = cast("dict[object, object]", item)
+        option_id = body.get("id")
+        label = body.get("label")
+        if isinstance(option_id, str) and isinstance(label, str):
+            found.append({"id": option_id, "label": label})
+    return found
+
+
+async def _claim_question(pending_id: str, agent_id: str, answer: dict[str, object]) -> bool:
+    """Resolve one question while it is still waiting. False when another answer won.
+
+    The paused turn closes only once nothing that holds it is left, so the
+    lane's other questions stay on their cards. The answer job is queued
+    either way; the worker runs it once the turn is no longer waiting.
+    """
     from sevn.runtime.turn_end import close_question_turns
-    from sevn.runtime.worker import current
+
+    now = utcnow()
+    async with open_session() as session:
+        claimed = cast(
+            "CursorResult[Any]",
+            await session.execute(
+                update(PendingRow)
+                .where(PendingRow.id == pending_id)
+                .where(PendingRow.status == "waiting")
+                .values(status="resolved", answer=answer, resolved_at=now)
+            ),
+        )
+        if claimed.rowcount != 1:
+            await session.rollback()
+            return False
+        # close_question_turns leaves a turn alone while it still has a
+        # blocking question or an approval to resume.
+        await close_question_turns(session, agent_id, now)
+        await session.flush()
+        await _release_agent(session, agent_id, now)
+        await session.commit()
+    return True
+
+
+async def _release_agent(session: AsyncSession, agent_id: str, now: datetime) -> None:
+    """Set a waiting agent idle once none of its turns is still waiting."""
+    agent = await session.get(AgentRow, agent_id)
+    if agent is None or agent.status != "waiting":
+        return
+    still = await session.scalar(
+        select(TurnRow.id)
+        .where(TurnRow.agent_id == agent_id)
+        .where(TurnRow.status == "waiting")
+        .limit(1)
+    )
+    if still is not None:
+        return
+    agent.status = "idle"
+    agent.last_activity_at = now
+    apply_lifecycle(agent, "idle", now)
+
+
+async def _resolve_answer(agent_id: str, text: str) -> None:
+    from sevn.runtime.turn_end import close_question_turns
 
     now = utcnow()
     answer: dict[str, object] = {"text": text}
@@ -368,33 +555,30 @@ async def _resolve_answer(agent_id: str, text: str) -> None:
         # the agent because ``Worker._pump`` returns while a turn is waiting.
         await close_question_turns(session, agent_id, now)
         await session.flush()
-        agent = await session.get(AgentRow, agent_id)
-        if agent is not None and agent.status == "waiting":
-            still = await session.scalar(
-                select(TurnRow.id)
-                .where(TurnRow.agent_id == agent_id)
-                .where(TurnRow.status == "waiting")
-                .limit(1)
-            )
-            if still is None:
-                agent.status = "idle"
-                agent.last_activity_at = now
-                apply_lifecycle(agent, "idle", now)
+        await _release_agent(session, agent_id, now)
         await session.commit()
+    await _resume_answered(agent_id, turn_ids)
+
+
+async def _resume_answered(agent_id: str, turn_ids: set[str]) -> None:
+    """Resume a turn that paused on questions and approvals once nothing holds it."""
+    from sevn.domain.pending import PendingService
+    from sevn.runtime.base import ToolDecision
+    from sevn.runtime.worker import current
+
     worker = current()
-    if worker is not None:
-        pending = PendingService()
-        for turn_id in turn_ids:
-            if not await pending.has_waiting(turn_id):
-                pairs = await pending.decisions(turn_id)
-                if pairs:
-                    worker.start_resume(
-                        agent_id,
-                        turn_id,
-                        tuple(
-                            ToolDecision(tool_call_id=call_id, approved=ok) for call_id, ok in pairs
-                        ),
-                    )
+    if worker is None:
+        return
+    pending = PendingService()
+    for turn_id in turn_ids:
+        if not await pending.has_waiting(turn_id):
+            pairs = await pending.decisions(turn_id)
+            if pairs:
+                worker.start_resume(
+                    agent_id,
+                    turn_id,
+                    tuple(ToolDecision(tool_call_id=call_id, approved=ok) for call_id, ok in pairs),
+                )
 
 
 async def _agent_on_bot(bot_id: str, agent_id: str) -> AgentRecord:

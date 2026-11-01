@@ -170,3 +170,21 @@ def test_json_file_lines(captured_log: tuple[list[Message], Path]) -> None:
     for line in lines:
         payload = json.loads(line)
         assert {"time", "level", "message", "extra"} <= set(payload)
+
+
+def test_share_link_secrets_are_redacted_from_access_lines(
+    captured_log: tuple[list[Message], Path],
+) -> None:
+    """uvicorn's access log carries the request path, and a share path holds its secret."""
+    from sevn.log import logger
+
+    found, log_path = captured_log
+    value = secrets.token_urlsafe(32)
+    access = logging.getLogger("uvicorn.access")
+    for path in (f"/share/shr_abc/{value}/data", f"/share/shr_abc/{value}"):
+        access.info('%s - "%s %s HTTP/1.1" %d', "127.0.0.1", "GET", path, 200)
+    logger.complete()
+    messages = [str(item.record["message"]) for item in found]
+    blob = "\n".join([*messages, log_path.read_text(encoding="utf-8")])
+    assert value not in blob
+    assert sum("/share/shr_abc/«redacted»" in message for message in messages) == 2

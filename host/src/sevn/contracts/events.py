@@ -22,6 +22,7 @@ _DURABLE = (
     "pending.resolved",
     "memory.changed",
     "routine.run",
+    "routine.updated",
     "ui.surface",
     "system.ping",
 )

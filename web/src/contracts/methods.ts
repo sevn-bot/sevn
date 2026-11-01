@@ -36,6 +36,16 @@ export const methods = {
     params: "BotsUpdateParams",
     result: "BotRecord",
   },
+  "fleet.brief": {
+    mutating: false,
+    params: "FleetBriefParams",
+    result: "FleetBrief",
+  },
+  "fleet.overview": {
+    mutating: false,
+    params: "FleetOverviewParams",
+    result: "FleetOverview",
+  },
   "host.set_sandbox_mode": {
     mutating: true,
     params: "SandboxModeParams",
@@ -90,6 +100,51 @@ export const methods = {
     mutating: false,
     params: "PendingListParams",
     result: "PendingListResult",
+  },
+  "routines.cancel": {
+    mutating: true,
+    params: "RoutineIdParams",
+    result: "RoutineRecord",
+  },
+  "routines.create": {
+    mutating: true,
+    params: "RoutinesCreateParams",
+    result: "RoutineRecord",
+  },
+  "routines.list": {
+    mutating: false,
+    params: "RoutinesListParams",
+    result: "RoutinesListResult",
+  },
+  "routines.pause": {
+    mutating: true,
+    params: "RoutineIdParams",
+    result: "RoutineRecord",
+  },
+  "routines.resume": {
+    mutating: true,
+    params: "RoutineIdParams",
+    result: "RoutineRecord",
+  },
+  "routines.update": {
+    mutating: true,
+    params: "RoutinesUpdateParams",
+    result: "RoutineRecord",
+  },
+  "shares.create": {
+    mutating: true,
+    params: "SharesCreateParams",
+    result: "SharesCreateResult",
+  },
+  "shares.list": {
+    mutating: false,
+    params: "SharesListParams",
+    result: "SharesListResult",
+  },
+  "shares.revoke": {
+    mutating: true,
+    params: "SharesRevokeParams",
+    result: "ShareRecord",
   },
   "sync.since": {
     mutating: false,

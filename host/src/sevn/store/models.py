@@ -9,7 +9,9 @@ from sqlalchemy import (
     JSON,
     Boolean,
     DateTime,
+    Float,
     ForeignKey,
+    Index,
     Integer,
     LargeBinary,
     String,
@@ -228,6 +230,80 @@ class Job(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     started_at: Mapped[datetime | None] = mapped_column(_IsoDateTime, nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(_IsoDateTime, nullable=True)
+    # Set on a run of a routine. ``silent`` is set when the run said it had
+    # nothing to report (``routine.silent``).
+    routine_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    silent: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+
+
+class Routine(Base):
+    """A prompt a bot runs on a cron schedule (plan fleet-dashboards, phase 4)."""
+
+    __tablename__ = "routines"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    bot_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("bots.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    schedule: Mapped[str] = mapped_column(String, nullable=False)
+    timezone: Mapped[str] = mapped_column(String, nullable=False)
+    text: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    paused_reason: Mapped[str | None] = mapped_column(String, nullable=True)
+    next_run: Mapped[datetime | None] = mapped_column(_IsoDateTime, nullable=True)
+    last_run: Mapped[datetime | None] = mapped_column(_IsoDateTime, nullable=True)
+    # When the owner resumed a routine the budget had paused. The budget sweep
+    # leaves it running for the rest of that day.
+    budget_resumed_at: Mapped[datetime | None] = mapped_column(_IsoDateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(_IsoDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(_IsoDateTime, nullable=False)
+
+
+class MetricPoint(Base):
+    """One value a bot reported for a metric (plan fleet-dashboards, phase 6)."""
+
+    __tablename__ = "metric_points"
+    __table_args__ = (Index("ix_metric_points_key_bot_as_of", "key", "bot_id", "as_of"),)
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    bot_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("bots.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    key: Mapped[str] = mapped_column(String, nullable=False)
+    label: Mapped[str] = mapped_column(String, nullable=False)
+    value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    unit: Mapped[str] = mapped_column(String, nullable=False)
+    source: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    as_of: Mapped[datetime] = mapped_column(_IsoDateTime, nullable=False)
+    freshness_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
+    shareable: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(_IsoDateTime, nullable=False)
+
+
+class ShareLink(Base):
+    """A read-only dashboard link. Only a hash of its secret is stored."""
+
+    __tablename__ = "share_links"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    secret_hash: Mapped[str] = mapped_column(String, nullable=False)
+    label: Mapped[str] = mapped_column(String, nullable=False)
+    bot_id: Mapped[str | None] = mapped_column(
+        String,
+        ForeignKey("bots.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(_IsoDateTime, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(_IsoDateTime, nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(_IsoDateTime, nullable=True)
+    last_opened_at: Mapped[datetime | None] = mapped_column(_IsoDateTime, nullable=True)
+    opens: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
 
 class PendingRequest(Base):

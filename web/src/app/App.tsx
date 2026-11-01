@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { type Connection, cancelConnect, connect } from "../client/index.ts";
 import { BotList } from "./bots/BotList.tsx";
 import { Chat } from "./chat/Chat.tsx";
-import { botIdFromPath } from "./routes.ts";
+import { BriefPage } from "./fleet/BriefPage.tsx";
+import { Dashboard } from "./fleet/Dashboard.tsx";
+import { SharePage } from "./fleet/SharePage.tsx";
+import { isBriefPath, routeFromPath, shareFromPath } from "./routes.ts";
 
 type Status =
   | "connecting"
@@ -33,12 +36,21 @@ function remember(
 }
 
 export default function App() {
+  // A share link is for someone who is not the owner: no login and no socket.
+  const share = shareFromPath(window.location.pathname);
+  if (share !== null) {
+    return <SharePage shareId={share.shareId} secret={share.secret} />;
+  }
+  return <OwnerApp />;
+}
+
+function OwnerApp() {
   const [status, setStatus] = useState<Status>("connecting");
   const [hostId, setHostId] = useState("");
   const [events, setEvents] = useState<ShownEvent[]>([]);
   const [path, setPath] = useState(() => window.location.pathname);
   const connectionRef = useRef<Connection | null>(null);
-  const botId = botIdFromPath(path);
+  const route = routeFromPath(path);
 
   useEffect(() => {
     const sync = () => {
@@ -125,7 +137,16 @@ export default function App() {
         >
           Ping
         </button>
-        {botId === null ? <BotList /> : <Chat botId={botId} />}
+        {isBriefPath(path) ? (
+          <BriefPage />
+        ) : route.botId === null ? (
+          <>
+            <Dashboard />
+            <BotList />
+          </>
+        ) : (
+          <Chat key={route.botId} botId={route.botId} agentId={route.agentId} />
+        )}
         <ul className="space-y-1 font-mono text-sm">
           {events.map((event) => (
             <li key={event.seq}>{`event #${event.seq} — ${event.kind}`}</li>

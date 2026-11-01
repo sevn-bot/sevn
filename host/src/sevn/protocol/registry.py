@@ -32,15 +32,26 @@ class Ctx(Protocol):
     def release_live(self, high_water: int) -> None: ...
 
 
+type StoredResult = Callable[[dict[str, object]], dict[str, object]]
+
+
 class BoundMethod:
     spec: MethodSpec
     handler: Handler
     scope: Scope | None
+    stored: StoredResult | None
 
-    def __init__(self, spec: MethodSpec, handler: Handler, scope: Scope | None) -> None:
+    def __init__(
+        self,
+        spec: MethodSpec,
+        handler: Handler,
+        scope: Scope | None,
+        stored: StoredResult | None = None,
+    ) -> None:
         self.spec = spec
         self.handler = handler
         self.scope = scope
+        self.stored = stored
 
 
 _registry: dict[str, BoundMethod] = {}
@@ -53,14 +64,20 @@ def method[P: BaseModel, R: BaseModel](
     result: type[R],
     mutating: bool,
     scope: Scope | None = None,
+    stored: StoredResult | None = None,
 ) -> Callable[[Callable[[Ctx, P], Awaitable[R]]], Callable[[Ctx, P], Awaitable[R]]]:
-    """Register ``fn`` as the handler for ``name``."""
+    """Register ``fn`` as the handler for ``name``.
+
+    ``stored`` maps a mutating method's result to what the op log keeps for
+    a replay. Use it for a value that must be shown once and never stored.
+    """
 
     def decorate(fn: Callable[[Ctx, P], Awaitable[R]]) -> Callable[[Ctx, P], Awaitable[R]]:
         _registry[name] = BoundMethod(
             MethodSpec(name=name, params=params, result=result, mutating=mutating),
             cast(Handler, fn),
             scope,
+            stored,
         )
         return fn
 
@@ -90,6 +107,7 @@ async def dispatch(ctx: Ctx, req: Req) -> Res:
                 bound.spec.name,
                 _params_hash(params),
                 lambda: _invoke(bound, ctx, params),
+                stored=bound.stored,
             )
             return Res(t="res", id=req.id, r=_object(body))
         return Res(t="res", id=req.id, r=await _invoke(bound, ctx, params))

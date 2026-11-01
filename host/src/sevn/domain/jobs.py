@@ -79,6 +79,7 @@ class JobService:
         origin: str = "user",
         route_decision_id: str | None = None,
         status: str = "queued",
+        routine_id: str | None = None,
     ) -> JobRecord:
         now = utcnow()
         async with open_session() as session:
@@ -98,6 +99,8 @@ class JobService:
                     created_at=now,
                     started_at=None,
                     finished_at=None,
+                    routine_id=routine_id,
+                    silent=False,
                 )
             )
             await session.commit()

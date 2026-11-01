@@ -10,8 +10,12 @@ from pydantic import BaseModel, ConfigDict, Field
 from sevn.contracts.kinds import AccessName, ApprovalPolicy, NetworkFlag, RuntimeName
 from sevn.domain.agents import AgentRecord
 from sevn.domain.bots import BotRecord
+from sevn.domain.brief import FleetBrief
+from sevn.domain.fleet import FleetOverview
 from sevn.domain.jobs import MessageRecord
 from sevn.domain.pending import PendingRecord
+from sevn.domain.routines import RoutineRecord
+from sevn.domain.shares import ShareRecord
 from sevn.memory.store import MemoryRecord
 
 
@@ -252,10 +256,14 @@ class PendingListResult(BaseModel):
 
 
 class PendingAnswerParams(BaseModel):
+    """An approval takes ``answer``. A question takes ``option_id`` or ``text``."""
+
     model_config = ConfigDict(extra="forbid")
 
     pending_id: str
-    answer: Literal["approve", "deny"]
+    answer: Literal["approve", "deny"] | None = None
+    option_id: str | None = None
+    text: str | None = None
     op_id: str | None = None
 
 
@@ -264,6 +272,7 @@ class PendingAnswerResult(BaseModel):
 
     id: str
     status: str
+    job_id: str | None = None
 
 
 class TurnsSnapshotParams(BaseModel):
@@ -291,6 +300,97 @@ class TurnsCancelResult(BaseModel):
 
     turn_id: str
     status: str
+
+
+class SharesCreateParams(BaseModel):
+    """A read-only link. The returned ``path`` holds the only copy of its secret."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    label: str
+    bot_id: str | None = None
+    expires_in_hours: int = 168
+    op_id: str | None = None
+
+
+class SharesCreateResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    share: ShareRecord
+    path: str
+
+
+class SharesListParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class SharesListResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    shares: list[ShareRecord]
+
+
+class SharesRevokeParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    share_id: str
+    op_id: str | None = None
+
+
+class FleetBriefParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class RoutinesListParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    bot_id: str | None = None
+    include_cancelled: bool = False
+
+
+class RoutinesListResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    routines: list[RoutineRecord]
+
+
+class RoutinesCreateParams(BaseModel):
+    """``schedule`` is five-field cron, read in ``timezone`` (an IANA name)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    bot_id: str
+    name: str
+    schedule: str
+    timezone: str = "UTC"
+    text: str
+    op_id: str | None = None
+
+
+class RoutinesUpdateParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    routine_id: str
+    name: str | None = None
+    schedule: str | None = None
+    timezone: str | None = None
+    text: str | None = None
+    op_id: str | None = None
+
+
+class RoutineIdParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    routine_id: str
+    op_id: str | None = None
+
+
+class FleetOverviewParams(BaseModel):
+    """``bot_id`` narrows only the finished list."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    bot_id: str | None = None
 
 
 class MemoriesListParams(BaseModel):
@@ -380,5 +480,16 @@ METHODS: dict[str, MethodSpec] = {
         _spec("memories.update", MemoriesUpdateParams, MemoryRecord, mutating=True),
         _spec("memories.delete", MemoriesDeleteParams, MemoriesDeleteResult, mutating=True),
         _spec("memories.pin", MemoriesPinParams, MemoryRecord, mutating=True),
+        _spec("fleet.overview", FleetOverviewParams, FleetOverview, mutating=False),
+        _spec("fleet.brief", FleetBriefParams, FleetBrief, mutating=False),
+        _spec("shares.create", SharesCreateParams, SharesCreateResult, mutating=True),
+        _spec("shares.list", SharesListParams, SharesListResult, mutating=False),
+        _spec("shares.revoke", SharesRevokeParams, ShareRecord, mutating=True),
+        _spec("routines.list", RoutinesListParams, RoutinesListResult, mutating=False),
+        _spec("routines.create", RoutinesCreateParams, RoutineRecord, mutating=True),
+        _spec("routines.update", RoutinesUpdateParams, RoutineRecord, mutating=True),
+        _spec("routines.pause", RoutineIdParams, RoutineRecord, mutating=True),
+        _spec("routines.resume", RoutineIdParams, RoutineRecord, mutating=True),
+        _spec("routines.cancel", RoutineIdParams, RoutineRecord, mutating=True),
     )
 }
