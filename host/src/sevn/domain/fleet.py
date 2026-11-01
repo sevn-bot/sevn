@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sevn.config import Settings
 from sevn.domain.fleet_routines import FleetRoutine, upcoming
-from sevn.domain.host_status import FleetHost, host_status
+from sevn.domain.host_status import FleetHost, host_status, ollama_status
 from sevn.domain.metrics import FleetMetric
 from sevn.domain.metrics import tiles as metric_tiles
 from sevn.domain.session import open_session
@@ -156,6 +156,8 @@ async def overview(*, bot_id: str | None = None) -> FleetOverview:
     """Read the dashboard. ``bot_id`` narrows only the finished list."""
     now = utcnow()
     days = _days(now.date())
+    # Checked before the session opens, so a slow Ollama holds no connection.
+    ollama = await ollama_status()
     async with open_session() as session:
         bots = list(await session.scalars(select(BotRow).order_by(BotRow.created_at, BotRow.id)))
         names = {bot.id: bot.name for bot in bots}
@@ -167,7 +169,7 @@ async def overview(*, bot_id: str | None = None) -> FleetOverview:
         running = await _running_turns(session)
         routines, projection, unpriced = await upcoming(session, names, now)
         metrics = await metric_tiles(session, names, now)
-        host = await host_status(session)
+        host = await host_status(session, ollama)
     counts = Counter(item.bot_id for item in waiting)
     return FleetOverview(
         as_of=now,
