@@ -82,6 +82,22 @@ def test_risk_overrides_are_destructive() -> None:
         ("ls\nrm -rf build", "medium"),
         ("echo $HOME", "medium"),
         ("sort -o out.txt notes.txt", "medium"),
+        # Writing forms the exact-token check missed: an attached or clustered
+        # short option, and a positional output operand.
+        ("sort -oout.txt notes.txt", "medium"),
+        ("sort -ro out.txt notes.txt", "medium"),
+        ("sort --compress-program=sh notes.txt", "medium"),
+        ("uniq notes.txt out.txt", "medium"),
+        ("uniq -c notes.txt", "low"),
+        ("sort notes.txt | uniq -c", "low"),
+        ("file -C -m magic", "medium"),
+        ("date -s 2020-01-01", "medium"),
+        # A system-bin prefix is trusted only as a canonical, direct path.
+        ("/usr/bin/../../tmp/ls", "medium"),
+        ("/usr/bin/./ls", "medium"),
+        ("/usr/bin/sub/ls", "medium"),
+        ("//usr/bin/ls", "medium"),
+        ("/usr/bin/ls -la", "low"),
         ("echo 'unbalanced", "medium"),
         # sh treats each newline as a command break, and ``#`` only comments
         # out the rest of its own line, so the hidden line still runs.

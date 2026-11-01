@@ -12,6 +12,7 @@ and ``core.fsmonitor`` or a pager there runs a command on ``git status``.
 
 from __future__ import annotations
 
+import posixpath
 import re
 import shlex
 from dataclasses import dataclass, field
@@ -78,11 +79,23 @@ _WRITING_ARGS: dict[str, frozenset[str]] = {
     "find": frozenset(
         {"-delete", "-exec", "-execdir", "-ok", "-okdir", "-fprint", "-fprint0", "-fprintf", "-fls"}
     ),
-    "sort": frozenset({"-o", "--output"}),
+    "sort": frozenset({"-o", "--output", "--compress-program", "-T", "--temporary-directory"}),
     "tree": frozenset({"-o"}),
     "rg": frozenset({"--pre"}),
     "diff": frozenset({"--to-file"}),
+    "file": frozenset({"-C", "--compile"}),
+    "date": frozenset({"-s", "--set"}),
 }
+# Short options that write, matched anywhere in a cluster: ``-ooutput`` and
+# ``-ro out`` write as surely as ``-o out``.
+_WRITING_SHORT: dict[str, frozenset[str]] = {
+    "sort": frozenset("oT"),
+    "tree": frozenset("o"),
+    "file": frozenset("C"),
+    "date": frozenset("s"),
+}
+# Programs whose second operand is an output file (``uniq in out``).
+_OUTPUT_OPERAND = frozenset({"uniq"})
 _NETWORK = frozenset(
     {"curl", "wget", "ssh", "scp", "sftp", "rsync", "nc", "ncat", "socat", "telnet", "ftp"}
 )
@@ -223,12 +236,33 @@ def _score(item: _Command) -> Risk:
         return "medium"
     if program not in _READ_ONLY:
         return "medium"
+    if _writes_by_argument(program, args):
+        return "high" if program == "find" else "medium"
+    return "low"
+
+
+def _writes_by_argument(program: str, args: list[str]) -> bool:
+    """True when an argument makes a read-only program write or run something."""
     blocked = _WRITING_ARGS.get(program, frozenset())
+    short = _WRITING_SHORT.get(program, frozenset())
     for arg in args:
         flag = arg.split("=", 1)[0]
         if flag in blocked or flag.startswith("--output"):
-            return "high" if program == "find" else "medium"
-    return "low"
+            return True
+        if arg.startswith("-") and not arg.startswith("--") and short & set(arg[1:]):
+            return True
+    # Every non-option word counts as an operand, option values included. That
+    # can only over-count, which scores ``medium``, never ``low``.
+    return program in _OUTPUT_OPERAND and len(_operands(args)) > 1
+
+
+def _operands(args: list[str]) -> list[str]:
+    if "--" in args:
+        cut = args.index("--")
+        return [arg for arg in args[:cut] if not arg.startswith("-") or arg == "-"] + args[
+            cut + 1 :
+        ]
+    return [arg for arg in args if not arg.startswith("-") or arg == "-"]
 
 
 def _special(program: str, args: list[str], *, piped_in: bool) -> Risk | None:
@@ -262,11 +296,17 @@ def _special(program: str, args: list[str], *, piped_in: bool) -> Risk | None:
 
 
 def _program(word: str) -> str:
-    """The program name. A path outside the system bins is not a known program."""
+    """The program name. A path outside the system bins is not a known program.
+
+    Only a canonical path directly inside a system bin counts: ``..`` or ``.``
+    parts, doubled slashes and subdirectories are left as unknown programs, so
+    ``/usr/bin/../../tmp/ls`` is not ``ls``.
+    """
     if "/" not in word:
         return word
-    if word.startswith(_SYSTEM_BINS):
-        return word.rsplit("/", 1)[-1]
+    folder, _, name = word.rpartition("/")
+    if posixpath.normpath(word) == word and f"{folder}/" in _SYSTEM_BINS:
+        return name
     return word
 
 

@@ -381,6 +381,109 @@ async def test_user_ask_answer_reaches_the_next_turn(
         _clear()
 
 
+async def test_memory_saved_before_a_question_survives_the_answer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The answer runs as a new turn, so the question turn's staged save must commit."""
+    from fakes.fake_jev import FakeJev
+    from sevn.decisions.jev import use_client
+    from sevn.runtime.models import use_model
+    from sevn.runtime.worker import bind
+
+    load_modules("sevn.api.bots", "sevn.api.messages")
+    use_client(FakeJev(answers={}))
+    use_model(
+        function_model(
+            [
+                [
+                    {
+                        "kind": "tool",
+                        "name": "memory.save",
+                        "args": {"text": "meetings are on Tuesdays"},
+                    },
+                    {
+                        "kind": "tool",
+                        "name": "user.ask",
+                        "args": {"question": "Which room?"},
+                    },
+                ],
+                [{"kind": "text", "text": "ok"}],
+            ]
+        )
+    )
+    try:
+        async with connected(tmp_path, monkeypatch) as (host, client):
+            bind(host.hub)
+            bot = await _create_bot(client)
+            first = await _send(client, bot["id"], "book it")
+            await poll_rows(
+                tmp_path,
+                "SELECT id FROM pending_requests WHERE agent_id = ? AND status = 'waiting'",
+                (first["agent_id"],),
+                lambda rows: bool(rows),
+            )
+            answer = await _send(client, bot["id"], "Room 4")
+            await poll_rows(
+                tmp_path,
+                "SELECT status FROM jobs WHERE id = ?",
+                (answer["job_id"],),
+                lambda rows: bool(rows) and rows[0]["status"] == "done",
+            )
+            saved = fetch_all(tmp_path, "SELECT text FROM memories WHERE bot_id = ?", (bot["id"],))
+            assert [row["text"] for row in saved] == ["meetings are on Tuesdays"]
+    finally:
+        _clear()
+
+
+async def test_reroute_waits_for_a_slot_under_the_parallel_cap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Start new on a queued message must not take a lane past max_parallel_agents."""
+    from sevn.runtime.worker import bind
+
+    monkeypatch.setenv("SEVN_BOTS__MAX_PARALLEL_AGENTS", "1")
+    gate = TurnGate()
+    load_modules("sevn.api.bots", "sevn.api.messages")
+    _install(
+        [{"message.intent": ("new_request", 0.95), "message.target_agent": ("none", 0.9)}],
+        gate=gate,
+    )
+    try:
+        async with connected(tmp_path, monkeypatch) as (host, client):
+            bind(host.hub)
+            bot = await _create_bot(client)
+            first = await _send(client, bot["id"], "keep writing")
+            await gate.until(lambda: gate.active == 1)
+            second = await _send(client, bot["id"], "/new another task")
+            assert second["agent_id"] != first["agent_id"]
+            message = fetch_all(
+                tmp_path,
+                "SELECT id FROM messages WHERE role = 'user' AND agent_id = ?",
+                (second["agent_id"],),
+            )
+            frame, _earlier = await request(
+                client,
+                "messages.reroute",
+                {"message_id": message[0]["id"], "new": True, "op_id": mint_id("op_")},
+            )
+            moved = ok(frame)
+            held = fetch_all(tmp_path, "SELECT status FROM jobs WHERE id = ?", (second["job_id"],))
+            assert held[0]["status"] == "queued"
+            assert gate.max_active == 1
+            gate.release_all.set()
+            await poll_rows(
+                tmp_path,
+                "SELECT status FROM jobs WHERE id = ?",
+                (second["job_id"],),
+                lambda rows: bool(rows) and rows[0]["status"] == "done",
+            )
+            assert moved["agent_id"] not in (first["agent_id"], second["agent_id"])
+            assert gate.max_active == 1
+    finally:
+        gate.release_all.set()
+        _clear()
+
+
 async def test_cancel_stops_agent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from sevn.domain.agents import AgentService
     from sevn.runtime.worker import bind
@@ -584,12 +687,12 @@ async def test_idle_ttl_to_done_then_archived(
                 bot = await _create_bot(client)
                 sent = await _send(client, bot["id"], "one note")
                 await poll_agent(tmp_path, str(sent["agent_id"]), "idle")
-                frozen.move_to(start + timedelta(hours=24, seconds=1))
+                # idle_since is stamped after the turn ends, on a ticking clock, so
+                # leave a wide margin past each deadline instead of one second.
+                frozen.move_to(start + timedelta(hours=48))
                 await expire_agents()
                 assert await poll_agent(tmp_path, str(sent["agent_id"]), "done") == "done"
-                frozen.move_to(
-                    start + timedelta(hours=24, seconds=1) + timedelta(days=7, seconds=1)
-                )
+                frozen.move_to(start + timedelta(hours=48) + timedelta(days=8))
                 await expire_agents()
                 assert await poll_agent(tmp_path, str(sent["agent_id"]), "archived") == "archived"
     finally:

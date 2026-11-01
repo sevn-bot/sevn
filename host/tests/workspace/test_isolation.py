@@ -38,8 +38,8 @@ def _git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
         "GIT_COMMITTER_NAME": "Sevn Test",
         "GIT_COMMITTER_EMAIL": "sevn-test@example.com",
     }
-    return subprocess.run(  # noqa: S603
-        ["git", *args],  # noqa: S607
+    return subprocess.run(  # noqa: S603 — fixed git argv, test repo only
+        ["git", *args],  # noqa: S607 — git from PATH, like a developer shell
         cwd=repo,
         check=False,
         env=env,

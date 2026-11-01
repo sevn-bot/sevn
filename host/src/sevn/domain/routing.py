@@ -162,7 +162,7 @@ async def deliver(
         route_decision_id=decision_id,
         status=job_status,
     )
-    message_id = await _attach_user_message(job_id, agent, bot, message.text, decision)
+    message_id, created = await _attach_user_message(job_id, agent, bot, message.text, decision)
     payload: dict[str, object] = {
         "job_id": job_id,
         "agent_id": agent.id,
@@ -173,6 +173,10 @@ async def deliver(
         ahead = await _ahead(bot.id, job_id)
         payload["ahead"] = ahead
         payload["notice"] = f"queued: {ahead} ahead"
+    # The open chat refreshes on message.created. A message that waits for the
+    # user's choice, or behind the bot's cap, starts no turn, so nothing else
+    # would show it (or its choice buttons) until a reload.
+    await hub.emit("message.created", message_id, created)
     await hub.emit(
         "route.decided",
         message_id,
@@ -211,13 +215,33 @@ async def reroute(
             raise DomainError("invalid_params", "agent_id or new is required")
         target = await _agent_on_bot(bot_id, agent_id)
     await _requeue(job_id, target.id)
-    await _start(target.id)
+    # Requeueing cancelled any turn the job had, so its slot is free again. The
+    # moved job then takes a slot like a new lane or a follow-up would in deliver.
+    target = await AgentService().get(target.id)
+    held = await _over_cap(bot_id, "new_request" if start_new else "follow_up", target)
+    if not held:
+        await _start(target.id)
     await mark_corrected(decision_id, target.id)
     await hub.emit(
         "route.corrected",
         message_id,
         {"message_id": message_id, "job_id": job_id, "agent_id": target.id},
     )
+    if held:
+        # Left queued: the worker starts it when a slot frees (Worker._open_slots).
+        ahead = await _ahead(bot_id, job_id)
+        await hub.emit(
+            "job.queued",
+            job_id,
+            {
+                "job_id": job_id,
+                "agent_id": target.id,
+                "bot_id": bot_id,
+                "status": "queued",
+                "ahead": ahead,
+                "notice": f"queued: {ahead} ahead",
+            },
+        )
     return job_id, target.id
 
 
@@ -307,6 +331,8 @@ async def _cancel_agent(agent_id: str) -> None:
 
 
 async def _resolve_answer(agent_id: str, text: str) -> None:
+    from sevn.runtime.turn_end import close_question_turns
+
     now = utcnow()
     answer: dict[str, object] = {"text": text}
     async with open_session() as session:
@@ -325,21 +351,7 @@ async def _resolve_answer(agent_id: str, text: str) -> None:
         # Close the paused turn and its job. The answer is delivered as the
         # next user message by ``deliver``; leaving the turn waiting wedges
         # the agent because ``Worker._pump`` returns while a turn is waiting.
-        waiting_turns = list(
-            await session.scalars(
-                select(TurnRow)
-                .where(TurnRow.agent_id == agent_id)
-                .where(TurnRow.status == "waiting")
-            )
-        )
-        for turn in waiting_turns:
-            turn.status = "done"
-            turn.finished_at = now
-            for job_id in turn.job_ids or ():
-                job = await session.get(JobRow, job_id)
-                if job is not None and job.status in ("queued", "started"):
-                    job.status = "done"
-                    job.finished_at = now
+        await close_question_turns(session, agent_id, now)
         await session.flush()
         agent = await session.get(AgentRow, agent_id)
         if agent is not None and agent.status == "waiting":
@@ -450,10 +462,12 @@ async def _attach_user_message(
     bot: BotRecord,
     text: str,
     decision: RouteDecision,
-) -> str:
+) -> tuple[str, dict[str, object]]:
+    """Store the user message and its queued turn. Returns the id and its event payload."""
     now = utcnow()
     turn_id = new_id("turn_")
     message_id = new_id("msg_")
+    parts = _message_parts(text, decision, agent.title)
     async with open_session() as session:
         session.add(
             TurnRow(
@@ -478,13 +492,20 @@ async def _attach_user_message(
                 agent_id=agent.id,
                 role="user",
                 author="user",
-                parts=_message_parts(text, decision, agent.title),
+                parts=parts,
                 created_at=now,
             )
         )
         session.add(RouteDecisionRow(id=new_id("rd_"), message_id=message_id, created_at=now))
         await session.commit()
-    return message_id
+    return message_id, {
+        "message_id": message_id,
+        "thread_id": agent.thread_id,
+        "turn_id": turn_id,
+        "agent_id": agent.id,
+        "role": "user",
+        "parts": parts,
+    }
 
 
 async def _job_for_message(message_id: str) -> tuple[str, str, str | None, str]:
