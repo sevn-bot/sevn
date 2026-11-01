@@ -46,6 +46,7 @@ from sevn.runtime.turn_store import (
     turn_event,
 )
 from sevn.runtime.usage import combine as combine_usage
+from sevn.runtime.usage import interrupted_usage
 from sevn.store.db import utcnow
 from sevn.store.models import Event, Message
 from sevn.store.models import Job as JobRow
@@ -180,6 +181,8 @@ class TurnRunner:
         try:
             await self._runtime.open(agent)
             try:
+                # Usage of the drives that finished, kept if a later one stops.
+                spent: dict[str, object] = {}
                 try:
                     outcome = await self._drive(turn_id, agent, bot, job, history, decisions)
                     # Under ``auto`` a low-risk shell command does not need the user.
@@ -194,24 +197,38 @@ class TurnRunner:
                         )
                         # The approvals answer the calls on the latest response,
                         # so the next drive needs the history that ends with it.
-                        earlier = outcome.usage
-                        outcome = await self._drive(
-                            turn_id, agent, bot, job, outcome.model_messages, auto
-                        )
+                        spent = outcome.usage
+                        try:
+                            outcome = await self._drive(
+                                turn_id, agent, bot, job, outcome.model_messages, auto
+                            )
+                        except TurnError as exc:
+                            exc.usage = combine_usage(
+                                spent, exc.usage if exc.usage is not None else interrupted_usage()
+                            )
+                            raise
                         # Each auto-approved drive is another model run of
                         # this turn; keep what the earlier runs used.
-                        outcome = replace(outcome, usage=combine_usage(earlier, outcome.usage))
+                        outcome = replace(outcome, usage=combine_usage(spent, outcome.usage))
                 except asyncio.CancelledError:
                     if self._watch is not None and self._watch.cancelled(turn_id):
                         await MemoryStore().rollback(turn_id)
                         await self._persist_cancelled(
-                            turn_id, started, job, agent, bot, stored=stored
+                            turn_id,
+                            started,
+                            job,
+                            agent,
+                            bot,
+                            stored=stored,
+                            usage=combine_usage(spent, interrupted_usage()),
                         )
                     raise
                 noted = inbound_hits()
                 if self._watch is not None and self._watch.cancelled(turn_id):
                     await MemoryStore().rollback(turn_id)
-                    await self._persist_cancelled(turn_id, started, job, agent, bot, stored=stored)
+                    await self._persist_cancelled(
+                        turn_id, started, job, agent, bot, stored=stored, usage=outcome.usage
+                    )
                 elif outcome.approvals or await PendingService().has_waiting(turn_id):
                     await self._persist_waiting(
                         turn_id, started, job, agent, bot, outcome, stored=stored
@@ -259,6 +276,7 @@ class TurnRunner:
         parts: list[str] = []
         finished: RuntimeEvent | None = None
         error_code: str | None = None
+        error_usage: dict[str, object] | None = None
         async for event in self._runtime.run_turn(context):
             if event.kind == "text_delta" and event.text:
                 parts.append(event.text)
@@ -273,13 +291,15 @@ class TurnRunner:
                 finished = event
             elif event.kind == "error" and error_code is None:
                 error_code = event.code if event.code else "error"
+                error_usage = event.usage
         if finished is None or finished.model_messages is None:
             if self._watch is not None and self._watch.cancelled(turn_id):
-                return _Outcome(text="", usage={}, model_messages=[], approvals=())
+                stopped = error_usage if error_usage is not None else interrupted_usage()
+                return _Outcome(text="", usage=stopped, model_messages=[], approvals=())
             if error_code is not None:
                 # ``message`` can echo the prompt. Keep the code, store fixed text.
                 logger.warning("runtime error {code}", code=error_code)
-                raise TurnError(failure_text("".join(parts)))
+                raise TurnError(failure_text("".join(parts)), usage=error_usage)
             raise TurnError("turn produced no result")
         text = "".join(parts)
         if text == "" and finished.text:
@@ -412,6 +432,7 @@ class TurnRunner:
         bot: BotRecord,
         *,
         stored: bool,
+        usage: dict[str, object],
     ) -> None:
         finished_at = utcnow()
         async with open_session() as session:
@@ -426,7 +447,7 @@ class TurnRunner:
                 bot=bot,
                 started=started,
                 status="cancelled",
-                usage={},
+                usage=usage,
                 model_messages=None,
                 finished_at=finished_at,
             )

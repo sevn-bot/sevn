@@ -23,6 +23,7 @@ from sevn.log import logger
 from sevn.memory.context import carries_memories
 from sevn.runtime.errors import ModelError
 from sevn.runtime.models import cheapest_configured_model, model_override_active, resolve_model
+from sevn.runtime.usage import record_side_response
 
 if TYPE_CHECKING:
     from pydantic_ai.models import ModelRequestContext
@@ -175,6 +176,8 @@ async def _summarize(messages: Sequence[ModelMessage]) -> str:
         None,
         ModelRequestParameters(),
     )
+    # The summary is a paid request of the turn that triggered it.
+    record_side_response(response)
     chunks: list[str] = []
     for part in response.parts:
         if isinstance(part, TextPart) and part.content != "":

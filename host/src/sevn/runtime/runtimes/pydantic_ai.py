@@ -46,7 +46,12 @@ from sevn.runtime.compaction import Compaction
 from sevn.runtime.errors import TurnError
 from sevn.runtime.events import ApprovalCall, RuntimeEvent
 from sevn.runtime.models import resolve_model
-from sevn.runtime.usage import price_responses, usage_record
+from sevn.runtime.usage import (
+    begin_side_responses,
+    price_responses,
+    side_responses,
+    usage_record,
+)
 from sevn.sandbox.policy import allow_all_enabled
 from sevn.tools.registry import TurnDeps, register_toolset, toolsets_for
 
@@ -117,6 +122,7 @@ class PydanticAIRuntime:
         task = asyncio.current_task()
         if task is not None:
             self._tasks[turn.agent.id] = task
+        begin_side_responses()
         try:
             if getattr(model, "stream_function", "stream") is None and deferred is None:
                 result = await agent.run(prompt, message_history=history)
@@ -399,22 +405,30 @@ def _tool_args(raw: object) -> dict[str, object]:
 
 
 def _usage(usage: RunUsage, new_messages: list[ModelMessage]) -> dict[str, object]:
-    """Counts for this run, priced per response this run produced."""
+    """Counts for this run, priced per response this run produced.
+
+    Side requests, such as a compaction summary, count too: they are billed to
+    the same turn.
+    """
+    side = [response for response in side_responses() if isinstance(response, ModelResponse)]
+    counts: dict[str, int] = {
+        "requests": usage.requests,
+        "tool_calls": usage.tool_calls,
+        "input_tokens": usage.input_tokens,
+        "output_tokens": usage.output_tokens,
+        "cache_read_tokens": usage.cache_read_tokens,
+        "cache_write_tokens": usage.cache_write_tokens,
+    }
+    for response in side:
+        counts["requests"] += 1
+        counts["input_tokens"] += response.usage.input_tokens
+        counts["output_tokens"] += response.usage.output_tokens
+        counts["cache_read_tokens"] += response.usage.cache_read_tokens
+        counts["cache_write_tokens"] += response.usage.cache_write_tokens
     cost, source = price_responses(
-        message for message in new_messages if isinstance(message, ModelResponse)
+        [*(message for message in new_messages if isinstance(message, ModelResponse)), *side]
     )
-    return usage_record(
-        {
-            "requests": usage.requests,
-            "tool_calls": usage.tool_calls,
-            "input_tokens": usage.input_tokens,
-            "output_tokens": usage.output_tokens,
-            "cache_read_tokens": usage.cache_read_tokens,
-            "cache_write_tokens": usage.cache_write_tokens,
-        },
-        cost_usd=cost,
-        cost_source=source,
-    )
+    return usage_record(counts, cost_usd=cost, cost_source=source)
 
 
 def _dump_messages(messages: list[ModelMessage]) -> list[object]:
