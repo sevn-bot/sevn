@@ -347,7 +347,7 @@ test("question metadata does not duplicate the displayed question", async () => 
   }
 });
 
-test.each(["job.started", "job.done", "turn.finished"])(
+test.each(["job.started", "job.done"])(
   "%s clears the queued notice",
   async (kind) => {
     const harness = await startHarness({
@@ -360,9 +360,13 @@ test.each(["job.started", "job.done", "turn.finished"])(
       const Chat = await loadChat();
       testing.render(createElement(Chat, { botId }));
       await testing.screen.findByText("Lisbon");
-      harness.event("job.queued", { agent_id: "agent_trip", ahead: 2 });
+      harness.event("job.queued", {
+        job_id: "job_trip",
+        agent_id: "agent_trip",
+        ahead: 2,
+      });
       await testing.screen.findByText("queued: 2 ahead");
-      harness.event(kind, { agent_id: "agent_trip" });
+      harness.event(kind, { job_id: "job_trip", agent_id: "agent_trip" });
       await testing.waitFor(() => {
         expect(testing.screen.queryByText("queued: 2 ahead")).toBeNull();
       });
@@ -372,3 +376,44 @@ test.each(["job.started", "job.done", "turn.finished"])(
     }
   },
 );
+
+test("rerouting clears only the moved job's queue notice", async () => {
+  const harness = await startHarness({
+    "messages.list": { messages: [], next_cursor: null },
+    "agents.list": agents,
+    "pending.list": { pending: [] },
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Chat = await loadChat();
+    testing.render(createElement(Chat, { botId }));
+    await testing.screen.findByText("Lisbon");
+    harness.event("job.queued", {
+      job_id: "job_kept",
+      agent_id: "agent_trip",
+      ahead: 1,
+    });
+    harness.event("job.queued", {
+      job_id: "job_moved",
+      agent_id: "agent_trip",
+      ahead: 2,
+    });
+    await testing.screen.findByText("queued: 2 ahead");
+    harness.event("route.corrected", {
+      job_id: "job_moved",
+      agent_id: "agent_invoice",
+    });
+    await testing.screen.findByText("queued: 1 ahead");
+    expect(testing.screen.queryByText("queued: 2 ahead")).toBeNull();
+    harness.event("job.started", {
+      job_id: "job_kept",
+      agent_id: "agent_trip",
+    });
+    await testing.waitFor(() =>
+      expect(testing.screen.queryByText("queued: 1 ahead")).toBeNull(),
+    );
+  } finally {
+    testing.cleanup();
+    harness.stop();
+  }
+});

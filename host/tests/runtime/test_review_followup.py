@@ -308,3 +308,74 @@ async def test_uncorrelated_correction_does_not_change_another_decision(
     await record_attempt("fixture", attempt_for(RouteDecision("new_request", None, 1.0, "rule")))
     await mark_corrected(None, "agent_other")
     assert fetch_all(tmp_path, "SELECT corrected_to FROM decision_log")[0]["corrected_to"] is None
+
+
+async def test_capacity_rejection_retries_a_kick_received_during_check(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fakes.models import function_model
+
+    arm_configured(monkeypatch, tmp_path)
+    await upgrade_home(tmp_path)
+    bot = await BotService().create("Proof")
+    use_model(function_model([{"kind": "text", "text": "completed"}]))
+    load_modules("sevn.api.bots", "sevn.api.messages")
+    try:
+        async with connected(tmp_path, monkeypatch) as (host, client):
+            worker = bind(host.hub)
+            reserve = worker._reserve
+            rejected = False
+
+            async def slot_freed_before_return(agent_id: str) -> bool:
+                nonlocal rejected
+                if not rejected:
+                    rejected = True
+                    # Another lane finishes after this pump observes the cap,
+                    # but before its pending session teardown completes.
+                    worker.kick(agent_id)
+                    await asyncio.sleep(0)
+                    return False
+                return await reserve(agent_id)
+
+            monkeypatch.setattr(worker, "_reserve", slot_freed_before_return)
+            sent = ok(
+                (
+                    await request(
+                        client,
+                        "messages.send",
+                        {
+                            "bot_id": bot.id,
+                            "text": "one job",
+                            "op_id": mint_id("op_"),
+                        },
+                    )
+                )[0]
+            )
+            await poll_rows(
+                tmp_path,
+                "SELECT status FROM jobs WHERE id=?",
+                (sent["job_id"],),
+                lambda rows: bool(rows) and rows[0]["status"] == "done",
+            )
+            assert rejected
+    finally:
+        use_model(None)
+
+
+async def test_user_pin_credits_an_existing_staged_promotion(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    arm_configured(monkeypatch, tmp_path)
+    await upgrade_home(tmp_path)
+    bot = await BotService().create("Proof")
+    store = MemoryStore()
+    row = await store.save(bot.id, "x" * 3000, tier="recall", origin="bot", turn_id="turn_seed")
+    await store.commit("turn_seed")
+    await store.stage_tier(row.id, "pinned", actor="bot", revision=row.revision, turn_id="turn_pin")
+    pinned = await store.pin(row.id, tier="pinned", revision=row.revision)
+    assert pinned.tier == "pinned"
+    # The concurrent user mutation still invalidates the stale turn revision.
+    with pytest.raises(DomainError, match="revision conflict") as caught:
+        await store.commit("turn_pin")
+    assert caught.value.code == "revision_conflict"
+    assert (await store.list_for(bot.id))[0].tier == "pinned"

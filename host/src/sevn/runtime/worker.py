@@ -223,6 +223,8 @@ class Worker:
                         continue
                     return
                 if not await self._reserve(agent_id):
+                    if agent_id in self._again:
+                        continue
                     return
                 try:
                     async with self._slots:

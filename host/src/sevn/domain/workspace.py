@@ -201,6 +201,26 @@ def _worktree_path(agent_id: str) -> Path:
     return Paths.from_env().home.expanduser().resolve() / "worktrees" / agent_id
 
 
+def purge_worktrees(agent_ids: list[str]) -> None:
+    """Remove owned checkouts; the bot purge also removes their repository metadata.
+
+    The parent is pinned and rmtree refuses symlink traversal. A symlink entry
+    is unlinked rather than following it into a directory outside host storage.
+    """
+    for agent_id in agent_ids:
+        path = _worktree_path(agent_id)
+        if not path.parent.exists():
+            continue
+        with directory(path.parent) as parent:
+            try:
+                if path.is_symlink():
+                    path.unlink()
+                else:
+                    shutil.rmtree(path.name, dir_fd=parent)
+            except FileNotFoundError:
+                pass
+
+
 def _is_git(workspace: Path) -> bool:
     return (workspace / ".git").exists()
 

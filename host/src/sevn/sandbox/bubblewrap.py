@@ -10,6 +10,8 @@ from sevn.domain.errors import DomainError
 from sevn.paths import Paths
 
 _SHELL = "/bin/sh"
+_RUNTIME_DIRS = (Path("/run"), Path("/var/run"))
+_RESOLV_CONF = Path("/etc/resolv.conf")
 # Home paths a command may read: git's config and the usual toolchain installs.
 # The rest of the home, including .ssh, .aws and the CLI credential folders,
 # is replaced by an empty tmpfs.
@@ -56,9 +58,9 @@ def argv(command: str, *, workspace: Path, shared: Path, network: bool) -> list[
     )
     # A read-only bind still permits connecting to filesystem UNIX sockets.
     # Hide host service sockets even when IP networking is explicitly allowed.
-    for runtime_dir in (Path("/run"), Path("/var/run")):
-        if runtime_dir.is_dir():
-            args.extend(["--tmpfs", str(runtime_dir.resolve())])
+    runtime_roots = {path.resolve() for path in _RUNTIME_DIRS if path.is_dir()}
+    for runtime_dir in sorted(runtime_roots):
+        args.extend(["--tmpfs", str(runtime_dir)])
     paths = Paths.from_env()
     home = Path(os.environ.get("HOME", str(Path.home()))).expanduser().resolve()
     masked_home = home != Path("/") and home.is_dir()
@@ -102,6 +104,15 @@ def argv(command: str, *, workspace: Path, shared: Path, network: bool) -> list[
     for secret_dir in (paths.keys, paths.run, paths.logs):
         if secret_dir.is_dir() and not _inside_any(secret_dir, hidden):
             args.extend(["--tmpfs", str(secret_dir)])
+    # /etc/resolv.conf commonly points into /run. Restore just that regular
+    # file, read-only, while leaving service sockets hidden.
+    resolver = _RESOLV_CONF.resolve()
+    if (
+        network
+        and resolver.is_file()
+        and any(resolver.is_relative_to(root) for root in runtime_roots)
+    ):
+        args.extend(["--ro-bind", str(resolver), str(resolver)])
     args.extend(["--chdir", str(workspace)])
     args.extend([_SHELL, "-c", command])
     return args

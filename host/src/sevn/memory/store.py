@@ -154,7 +154,9 @@ class MemoryStore:
             fresh = await self._require(memory_id)
             _guard_tier(fresh.origin, fresh.revision, actor=actor, revision=revision)
             if wanted == "pinned" and fresh.tier != "pinned":
-                await _reject_over_budget(fresh.bot_id, len(fresh.text.encode("utf-8")))
+                await _reject_over_budget(
+                    fresh.bot_id, len(fresh.text.encode("utf-8")), replacing=memory_id
+                )
             async with open_session() as session:
                 row = await session.get(MemoryRow, memory_id)
                 if row is None:
@@ -273,7 +275,9 @@ class MemoryStore:
                 if staged is not None:
                     _guard_tier(staged.origin, staged.revision, actor=actor, revision=revision)
                     if wanted == "pinned" and staged.tier != "pinned":
-                        await _reject_over_budget(staged.bot_id, len(staged.text.encode("utf-8")))
+                        await _reject_over_budget(
+                            staged.bot_id, len(staged.text.encode("utf-8")), replacing=memory_id
+                        )
                     updated = staged.model_copy(update={"tier": wanted, "revision": revision + 1})
                     index = batch.inserts.index(staged)
                     batch.inserts[index] = updated
@@ -281,7 +285,9 @@ class MemoryStore:
             current = await self._require(memory_id)
             _guard_tier(current.origin, current.revision, actor=actor, revision=revision)
             if wanted == "pinned" and current.tier != "pinned":
-                await _reject_over_budget(current.bot_id, len(current.text.encode("utf-8")))
+                await _reject_over_budget(
+                    current.bot_id, len(current.text.encode("utf-8")), replacing=memory_id
+                )
             _batch(turn_id, current.bot_id).tiers.append((memory_id, wanted, revision))
             return current.model_copy(update={"tier": wanted, "revision": revision + 1})
 
@@ -360,12 +366,12 @@ async def _replace_fts(session: AsyncSession, memory_id: str, body: str) -> None
     )
 
 
-async def _reject_over_budget(bot_id: str, extra: int) -> None:
-    if await _pinned_bytes(bot_id) + extra > _budget():
+async def _reject_over_budget(bot_id: str, extra: int, *, replacing: str | None = None) -> None:
+    if await _pinned_bytes(bot_id, excluding=replacing) + extra > _budget():
         raise DomainError("pinned_budget", "pinned memory budget exceeded")
 
 
-async def _pinned_bytes(bot_id: str) -> int:
+async def _pinned_bytes(bot_id: str, *, excluding: str | None = None) -> int:
     async with open_session() as session:
         rows = list(await session.scalars(select(MemoryRow).where(MemoryRow.bot_id == bot_id)))
     pinned = {row.id: row.text for row in rows if row.tier == "pinned"}
@@ -381,7 +387,9 @@ async def _pinned_bytes(bot_id: str) -> int:
         for memory_id, tier, _revision in batch.tiers:
             if tier == "pinned" and memory_id in texts:
                 pinned[memory_id] = texts[memory_id]
-    return sum(len(body.encode("utf-8")) for body in pinned.values())
+    return sum(
+        len(body.encode("utf-8")) for memory_id, body in pinned.items() if memory_id != excluding
+    )
 
 
 def _budget() -> int:

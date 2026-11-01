@@ -15,10 +15,12 @@ from sevn.contracts.kinds import AccessName, ApprovalPolicy, NetworkFlag, Runtim
 from sevn.domain.errors import DomainError
 from sevn.domain.ids import new_id
 from sevn.domain.session import open_session
+from sevn.domain.workspace import purge_worktrees
 from sevn.paths import Paths
 from sevn.secrets.backends import open_backend
 from sevn.secrets.errors import SecretNotFound
 from sevn.store.db import utcnow
+from sevn.store.models import Agent as AgentRow
 from sevn.store.models import Bot as BotRow
 
 _PROVIDERS = ("anthropic", "openai", "google", "openrouter")
@@ -171,10 +173,14 @@ class BotService:
             if row is None:
                 raise DomainError("not_found", "bot not found")
             workspace = Path(row.workspace_path)
+            if purge:
+                agent_ids = list(
+                    await session.scalars(select(AgentRow.id).where(AgentRow.bot_id == bot_id))
+                )
+                await asyncio.to_thread(purge_worktrees, agent_ids)
+                await asyncio.to_thread(_remove_workspace, workspace)
             await session.execute(delete(BotRow).where(BotRow.id == bot_id))
             await session.commit()
-        if purge:
-            await asyncio.to_thread(_remove_workspace, workspace)
         return bot_id
 
 

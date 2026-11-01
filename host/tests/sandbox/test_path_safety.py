@@ -165,3 +165,71 @@ async def test_scratch_creation_refuses_replaced_tasks_directory(
         await make_scratch(workspace, "agent_fixture")
     assert caught.value.code == "path_outside_workspace"
     assert list(outside.iterdir()) == []
+
+
+@pytest.mark.parametrize("network", [False, True])
+def test_bubblewrap_restores_only_resolver_file_after_runtime_mask(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, network: bool
+) -> None:
+    import shutil
+
+    from sevn.sandbox import bubblewrap
+
+    runtime = tmp_path / "run"
+    resolver = runtime / "systemd" / "resolve" / "stub-resolv.conf"
+    resolver.parent.mkdir(parents=True)
+    resolver.write_text("nameserver 127.0.0.53\n", encoding="utf-8")
+    config = tmp_path / "resolv.conf"
+    config.symlink_to(resolver)
+    monkeypatch.setattr(bubblewrap, "_RUNTIME_DIRS", (runtime,))
+    monkeypatch.setattr(bubblewrap, "_RESOLV_CONF", config)
+    monkeypatch.setattr(shutil, "which", lambda _name: "/usr/bin/bwrap")
+    monkeypatch.setenv("SEVN_HOME", str(tmp_path / "host"))
+    args = bubblewrap.argv(
+        "true", workspace=tmp_path / "ws", shared=tmp_path / "shared", network=network
+    )
+    rebind = ["--ro-bind", str(resolver), str(resolver)]
+    indexes = [i for i in range(len(args)) if args[i : i + 3] == rebind]
+    assert bool(indexes) is network
+    if network:
+        masks = [i for i in range(len(args)) if args[i : i + 2] == ["--tmpfs", str(runtime)]]
+        assert masks and masks[0] < indexes[0]
+        assert ["--bind", str(runtime), str(runtime)] not in [
+            args[i : i + 3] for i in range(len(args))
+        ]
+
+
+async def test_linux_network_shell_reads_resolver_without_runtime_neighbors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import shlex
+    import shutil
+    import sys
+
+    from sevn.sandbox import bubblewrap
+    from sevn.tools.shell import execute
+
+    if sys.platform != "linux" or shutil.which("bwrap") is None:
+        pytest.skip("requires Linux bubblewrap")
+    arm_configured(monkeypatch, tmp_path)
+    await upgrade_home(tmp_path)
+    bot = await BotService().create("Proof")
+    await BotService().update(bot.id, network="on", fields={"network"})
+    agent = await AgentService().spawn(bot.id)
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+    resolver = runtime / "resolv.conf"
+    resolver.write_text("nameserver 127.0.0.53\n", encoding="utf-8")
+    neighbor = runtime / "host-service"
+    neighbor.write_text("must stay hidden", encoding="utf-8")
+    config = tmp_path / "resolver-link"
+    config.symlink_to(resolver)
+    monkeypatch.setattr(bubblewrap, "_RUNTIME_DIRS", (runtime,))
+    monkeypatch.setattr(bubblewrap, "_RESOLV_CONF", config)
+    result = await execute(
+        bot.id,
+        agent.id,
+        f"cat {shlex.quote(str(resolver))} && test ! -e {shlex.quote(str(neighbor))}",
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == "nameserver 127.0.0.53\n"

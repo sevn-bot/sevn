@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 import sqlite3
 import subprocess
@@ -233,3 +234,35 @@ async def test_worktree_checkout_runs_no_bot_filter(
     worktree = tmp_path / "worktrees" / agent.id
     assert (worktree / "README").read_text(encoding="utf-8") == "base\n"
     assert (worktree / "notes.txt").read_text(encoding="utf-8") == "notes\n"
+
+
+@pytest.mark.parametrize("purge", [False, True])
+async def test_bot_delete_cleans_only_its_worktrees_when_purged(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, purge: bool
+) -> None:
+    from sevn.domain.agents import AgentService
+    from sevn.domain.bots import BotService
+    from sevn.domain.workspace import ensure
+
+    bot, agent = await _pair(tmp_path, monkeypatch)
+    repo = Path(str(bot.workspace_path))
+    assert _git(repo, "init", "-b", "main").returncode == 0
+    (repo / "README").write_text("base", encoding="utf-8")
+    assert _git(repo, "add", "README").returncode == 0
+    assert _git(repo, "commit", "-m", "init").returncode == 0
+    with sqlite3.connect(tmp_path / "sevn.db") as connection:
+        connection.execute("UPDATE agents SET isolation='worktree' WHERE id=?", (agent.id,))
+    assert await ensure(agent.id) == ""
+    checkout = tmp_path / "worktrees" / agent.id
+    (checkout / "uncommitted.txt").write_text("bot data", encoding="utf-8")
+    other_bot = await BotService().create("Other")
+    other_agent = await AgentService().spawn(other_bot.id)
+    other_checkout = tmp_path / "worktrees" / other_agent.id
+    other_checkout.mkdir()
+    (other_checkout / "keep.txt").write_text("other bot data", encoding="utf-8")
+    await BotService().delete(bot.id, purge=purge)
+    assert await asyncio.to_thread(checkout.exists) is not purge
+    assert await asyncio.to_thread(repo.exists) is not purge
+    assert (other_checkout / "keep.txt").read_text(encoding="utf-8") == "other bot data"
+    if not purge:
+        assert (checkout / "uncommitted.txt").read_text(encoding="utf-8") == "bot data"

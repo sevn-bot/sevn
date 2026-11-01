@@ -344,27 +344,26 @@ function lanesFor(
 }
 
 function aheadByAgent(events: ProtocolEvent[]): ReadonlyMap<string, number> {
-  const found = new Map<string, number>();
+  const jobs = new Map<string, { agentId: string; ahead: number }>();
   for (const event of events) {
     const agentId = event.d.agent_id;
+    const jobId = event.d.job_id;
+    if (typeof jobId !== "string") continue;
     if (
-      typeof agentId === "string" &&
-      (event.k === "job.started" ||
-        event.k === "job.done" ||
-        event.k === "turn.finished")
+      event.k === "route.corrected" ||
+      event.k === "job.started" ||
+      event.k === "job.done"
     ) {
-      found.delete(agentId);
+      jobs.delete(jobId);
     }
-    if (event.k !== "job.queued") {
-      continue;
-    }
+    if (event.k !== "job.queued") continue;
     const ahead = event.d.ahead;
-    if (typeof agentId !== "string" || typeof ahead !== "number") {
-      continue;
-    }
-    found.set(agentId, ahead);
+    if (typeof agentId !== "string" || typeof ahead !== "number") continue;
+    jobs.set(jobId, { agentId, ahead });
   }
-  return found;
+  return new Map(
+    [...jobs.values()].map(({ agentId, ahead }) => [agentId, ahead]),
+  );
 }
 
 function allowAllOn(
