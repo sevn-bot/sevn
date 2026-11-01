@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Protocol, cast
 
@@ -24,6 +24,7 @@ from sevn.protocol.hub import Hub
 from sevn.runtime.base import Runtime, ToolDecision, TurnContext
 from sevn.runtime.errors import ModelError, TurnError
 from sevn.runtime.events import ApprovalCall, RuntimeEvent
+from sevn.runtime.usage import combine as combine_usage
 from sevn.sandbox.policy import allow_all_enabled
 from sevn.sandbox.risk import risk_of
 from sevn.store.db import utcnow
@@ -176,9 +177,13 @@ class TurnRunner:
                         )
                         # The approvals answer the calls on the latest response,
                         # so the next drive needs the history that ends with it.
+                        earlier = outcome.usage
                         outcome = await self._drive(
                             turn_id, agent, bot, job, outcome.model_messages, auto
                         )
+                        # Each auto-approved drive is another model run of
+                        # this turn; keep what the earlier runs used.
+                        outcome = replace(outcome, usage=combine_usage(earlier, outcome.usage))
                 except asyncio.CancelledError:
                     if self._watch is not None and self._watch.cancelled(turn_id):
                         await MemoryStore().rollback(turn_id)
@@ -718,7 +723,8 @@ async def _bind_turn(
             raise TurnError("turn not found")
         row.status = status
         row.model = bot.model
-        row.usage = usage
+        # A resumed turn already stored the usage of its runs before the pause.
+        row.usage = combine_usage(row.usage or {}, usage)
         row.model_messages = model_messages
         row.finished_at = finished_at
         return row

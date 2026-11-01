@@ -46,6 +46,7 @@ from sevn.runtime.base import PendingAnswer, SessionRef, TurnContext
 from sevn.runtime.errors import TurnError
 from sevn.runtime.events import RuntimeEvent
 from sevn.runtime.runtimes.pydantic_ai import build_instructions
+from sevn.runtime.usage import usage_record
 from sevn.store.db import utcnow
 from sevn.store.models import Agent as AgentRow
 from sevn.store.models import PendingRequest as PendingRow
@@ -522,6 +523,8 @@ def _result_native(message: ResultMessage) -> dict[str, object]:
         "is_error": message.is_error,
         "terminal_reason": message.terminal_reason,
         "usage": usage,
+        "total_cost_usd": message.total_cost_usd,
+        "num_turns": message.num_turns,
         "result": message.result,
         "errors": None if message.errors is None else list(message.errors),
     }
@@ -618,8 +621,27 @@ def _map_result(native: dict[str, object]) -> RuntimeEvent:
     return RuntimeEvent(
         kind="turn_finished",
         text=result if isinstance(result, str) and result != "" else None,
-        usage=_json_object(native.get("usage")),
+        usage=_claude_usage(native),
         model_messages=[],
+    )
+
+
+def _claude_usage(native: dict[str, object]) -> dict[str, object]:
+    """The shared usage shape. A Claude turn runs on the user's own login."""
+    raw = _json_object(native.get("usage")) or {}
+    estimate = native.get("total_cost_usd")
+    turns = native.get("num_turns")
+    return usage_record(
+        {
+            "requests": turns if isinstance(turns, int) else 0,
+            "input_tokens": raw.get("input_tokens"),
+            "output_tokens": raw.get("output_tokens"),
+            "cache_read_tokens": raw.get("cache_read_input_tokens"),
+            "cache_write_tokens": raw.get("cache_creation_input_tokens"),
+        },
+        cost_usd=None,
+        cost_source="subscription",
+        estimated_usd=float(estimate) if isinstance(estimate, int | float) else None,
     )
 
 

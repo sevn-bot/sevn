@@ -46,6 +46,7 @@ from sevn.runtime.compaction import Compaction
 from sevn.runtime.errors import TurnError
 from sevn.runtime.events import ApprovalCall, RuntimeEvent
 from sevn.runtime.models import resolve_model
+from sevn.runtime.usage import price_responses, usage_record
 from sevn.sandbox.policy import allow_all_enabled
 from sevn.tools.registry import TurnDeps, register_toolset, toolsets_for
 
@@ -125,7 +126,7 @@ class PydanticAIRuntime:
                 yield RuntimeEvent(
                     kind="turn_finished",
                     text=text,
-                    usage=_usage(result.usage),
+                    usage=_usage(result.usage, result.new_messages()),
                     model_messages=_dump_messages(result.all_messages()),
                     approvals=_approval_calls(output),
                 )
@@ -352,7 +353,7 @@ def _from_result(event: AgentRunResultEvent[object]) -> RuntimeEvent:
     return RuntimeEvent(
         kind="turn_finished",
         text=text,
-        usage=_usage(event.result.usage),
+        usage=_usage(event.result.usage, event.result.new_messages()),
         model_messages=_dump_messages(event.result.all_messages()),
         approvals=_approval_calls(output),
     )
@@ -396,15 +397,23 @@ def _tool_args(raw: object) -> dict[str, object]:
     return body
 
 
-def _usage(usage: RunUsage) -> dict[str, object]:
-    return {
-        "requests": usage.requests,
-        "tool_calls": usage.tool_calls,
-        "input_tokens": usage.input_tokens,
-        "output_tokens": usage.output_tokens,
-        "cache_read_tokens": usage.cache_read_tokens,
-        "cache_write_tokens": usage.cache_write_tokens,
-    }
+def _usage(usage: RunUsage, new_messages: list[ModelMessage]) -> dict[str, object]:
+    """Counts for this run, priced per response this run produced."""
+    cost, source = price_responses(
+        message for message in new_messages if isinstance(message, ModelResponse)
+    )
+    return usage_record(
+        {
+            "requests": usage.requests,
+            "tool_calls": usage.tool_calls,
+            "input_tokens": usage.input_tokens,
+            "output_tokens": usage.output_tokens,
+            "cache_read_tokens": usage.cache_read_tokens,
+            "cache_write_tokens": usage.cache_write_tokens,
+        },
+        cost_usd=cost,
+        cost_source=source,
+    )
 
 
 def _dump_messages(messages: list[ModelMessage]) -> list[object]:
