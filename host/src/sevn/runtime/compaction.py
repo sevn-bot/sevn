@@ -20,8 +20,10 @@ from pydantic_ai.messages import (
 from pydantic_ai.models import Model, ModelRequestParameters
 
 from sevn.log import logger
+from sevn.memory.context import carries_memories
 from sevn.runtime.errors import ModelError
 from sevn.runtime.models import cheapest_configured_model, model_override_active, resolve_model
+from sevn.runtime.usage import record_side_response
 
 if TYPE_CHECKING:
     from pydantic_ai.models import ModelRequestContext
@@ -141,7 +143,15 @@ def _over_threshold(estimated_tokens: int, model_window: int) -> bool:
 
 
 def _keeps_capability(message: ModelMessage) -> bool:
+    """Kept verbatim: capability pairs, and the user prompt carrying memories.
+
+    Later turns send only a memory diff, so the full block must stay in the
+    window or the model loses the memories the diff builds on.
+    """
     for part in message.parts:
+        if isinstance(part, UserPromptPart) and isinstance(part.content, str):
+            if carries_memories(part.content):
+                return True
         if isinstance(part, LoadCapabilityCallPart | LoadCapabilityReturnPart):
             return True
         tool_name = getattr(part, "tool_name", None)
@@ -166,6 +176,8 @@ async def _summarize(messages: Sequence[ModelMessage]) -> str:
         None,
         ModelRequestParameters(),
     )
+    # The summary is a paid request of the turn that triggered it.
+    record_side_response(response)
     chunks: list[str] = []
     for part in response.parts:
         if isinstance(part, TextPart) and part.content != "":

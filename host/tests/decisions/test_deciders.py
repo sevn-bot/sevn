@@ -877,7 +877,7 @@ def test_core_modules_import_no_feature_modules() -> None:
 
 def test_migrations_single_head() -> None:
     completed = subprocess.run(
-        ["make", "db-heads"],  # noqa: S607
+        ["make", "db-heads"],  # noqa: S607 — the repo Makefile target CI runs
         cwd=repo_root(),
         check=False,
         capture_output=True,

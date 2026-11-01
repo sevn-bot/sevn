@@ -213,10 +213,18 @@ def _bot_status(statuses: list[str], waiting: int) -> FleetBotStatus:
 
 
 async def _agent_statuses(session: AsyncSession) -> dict[str, list[str]]:
-    rows = await session.execute(select(AgentRow.bot_id, AgentRow.status))
+    """Each agent's status per bot, with a running turn counting as running.
+
+    An approval resume flips the turn to running but leaves the agent row
+    ``waiting`` until the turn ends; the turn is the truer signal.
+    """
+    running = set(
+        await session.scalars(select(TurnRow.agent_id).where(TurnRow.status == "running"))
+    )
+    rows = await session.execute(select(AgentRow.id, AgentRow.bot_id, AgentRow.status))
     found: dict[str, list[str]] = {}
-    for bot_id, status in rows:
-        found.setdefault(bot_id, []).append(status)
+    for agent_id, bot_id, status in rows:
+        found.setdefault(bot_id, []).append("running" if agent_id in running else status)
     return found
 
 
@@ -377,8 +385,9 @@ async def _activity(session: AsyncSession, first: date) -> list[FleetDay]:
         if stamp < start:
             continue
         key = (bot_id, stamp.date().isoformat())
-        if status == "done":
-            counts[key] += 1
+        # Every finished turn is activity, failed or cancelled too (as on #11).
+        _ = status
+        counts[key] += 1
         spent = _spend(usage)
         if spent is _UNPRICED:
             unpriced[key] += 1

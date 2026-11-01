@@ -276,3 +276,82 @@ async def test_auto_approved_runs_add_up(tmp_path: Path, monkeypatch: pytest.Mon
         _clear()
     usage = json.loads(rows[0]["usage"])
     assert usage["requests"] == 2
+
+
+async def test_compaction_summary_is_billed_to_the_turn(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The cheap-model summary is a paid request of the turn that triggered it."""
+    from pydantic_ai.messages import ModelRequest, UserPromptPart
+    from pydantic_ai.usage import RunUsage
+    from sevn.runtime import compaction
+    from sevn.runtime.runtimes.pydantic_ai import _usage
+    from sevn.runtime.usage import begin_side_responses, price_responses
+
+    summary = _response("claude-haiku-4-5", "anthropic", 2000, 100)
+
+    class _Cheap:
+        async def request(self, *_args: object) -> object:
+            return summary
+
+    async def cheap() -> object:
+        return _Cheap()
+
+    monkeypatch.setattr(compaction, "_cheap_model", cheap)
+    begin_side_responses()
+    messages = [
+        ModelRequest(parts=[UserPromptPart(content=f"message {index} " * 40)])
+        for index in range(10)
+    ]
+    compacted = await compaction.compact_messages(messages, model_window=100, estimated_tokens=90)
+    assert len(compacted) < len(messages)
+    usage = _usage(RunUsage(requests=1, input_tokens=10, output_tokens=5), [])
+    expected, _ = price_responses([summary])
+    assert usage["requests"] == 2
+    assert usage["input_tokens"] == 2010
+    assert usage["output_tokens"] == 105
+    assert usage["cost_source"] == "price_table"
+    assert usage["cost_usd"] == pytest.approx(expected)
+
+
+def test_side_responses_start_empty_for_each_run() -> None:
+    from sevn.runtime.usage import begin_side_responses, record_side_response, side_responses
+
+    begin_side_responses()
+    record_side_response(_response("claude-haiku-4-5", "anthropic", 1, 1))
+    assert len(side_responses()) == 1
+    begin_side_responses()
+    assert side_responses() == []
+
+
+def test_claude_error_results_keep_their_usage() -> None:
+    from sevn.runtime.runtimes.claude import _map_result
+
+    for native in (
+        {"type": "result", "is_error": True, "subtype": "rate_limit"},
+        {"type": "result", "terminal_reason": "aborted_streaming"},
+    ):
+        event = _map_result(
+            {
+                **native,
+                "usage": {"input_tokens": 40, "output_tokens": 9},
+                "total_cost_usd": 0.02,
+                "num_turns": 2,
+            }
+        )
+        assert event.kind == "error"
+        assert event.usage is not None
+        assert event.usage["requests"] == 2
+        assert event.usage["output_tokens"] == 9
+        assert event.usage["cost_source"] == "subscription"
+        assert event.usage["estimated_usd"] == pytest.approx(0.02)
+
+
+def test_a_failure_with_no_reported_usage_is_unknown() -> None:
+    from sevn.runtime.errors import TurnError
+    from sevn.runtime.turn_end import _failed_usage
+
+    reported = {"requests": 1, "cost_usd": None, "cost_source": "subscription"}
+    assert _failed_usage(TurnError("x", usage=reported)) is reported
+    for exc in (TurnError("x"), RuntimeError("boom")):
+        usage = _failed_usage(exc)
+        assert usage["cost_source"] == "unknown"
+        assert usage["cost_usd"] is None

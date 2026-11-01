@@ -1,6 +1,11 @@
 import { createElement } from "react";
 import { afterEach, expect, test } from "vitest";
-import { loadDashboard, requestParams, startHarness } from "../chat/host.ts";
+import {
+  loadDashboard,
+  requestParams,
+  rpcError,
+  startHarness,
+} from "../chat/host.ts";
 
 const now = new Date();
 const today = now.toISOString().slice(0, 10);
@@ -751,6 +756,157 @@ test("a routine event refreshes the overview", async () => {
         requestParams(harness.requests, "fleet.overview").length,
       ).toBeGreaterThan(before);
     });
+  } finally {
+    harness.stop();
+  }
+});
+
+test("an answered card locks so a second click cannot report a failure", async () => {
+  const harness = await startHarness({
+    "fleet.overview": overview({
+      waiting: [
+        question({
+          options: [
+            { id: "opt_1", label: "Monday" },
+            { id: "opt_2", label: "Tuesday" },
+          ],
+        }),
+      ],
+    }),
+    "pending.answer": { id: "pend_q", status: "resolved", job_id: "job_1" },
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Dashboard = await loadDashboard();
+    testing.render(createElement(Dashboard));
+    (await testing.screen.findByRole("button", { name: "Monday" })).click();
+    await testing.screen.findByRole("status");
+    expect(testing.screen.getByRole("status").textContent).toBe("Answered");
+    expect(
+      testing.screen.queryByRole("button", { name: "Tuesday" }),
+    ).toBeNull();
+    expect(testing.screen.queryByText("Could not send the answer")).toBeNull();
+    expect(requestParams(harness.requests, "pending.answer").length).toBe(1);
+  } finally {
+    harness.stop();
+  }
+});
+
+test("a failed refresh keeps the data and says so", async () => {
+  const harness = await startHarness({
+    "fleet.overview": (_params, nth) =>
+      nth === 1 ? full : rpcError("internal", "host busy"),
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Dashboard = await loadDashboard();
+    testing.render(createElement(Dashboard));
+    await testing.screen.findByText("Which subject line?");
+    expect(testing.screen.queryByText("refresh failed")).toBeNull();
+    harness.event("turn.finished", { turn_id: "turn_x" });
+    await testing.screen.findByText("refresh failed");
+    expect(testing.screen.getByText("Which subject line?")).not.toBeNull();
+  } finally {
+    harness.stop();
+  }
+});
+
+test("the bot filter clears when that bot is gone", async () => {
+  const withoutAtlas = {
+    ...full,
+    bots: full.bots.filter((item) => item.id !== "bot_atlas"),
+  };
+  const harness = await startHarness({
+    "fleet.overview": (params) =>
+      params.bot_id === "bot_atlas" ? withoutAtlas : full,
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Dashboard = await loadDashboard();
+    testing.render(createElement(Dashboard));
+    (await testing.screen.findByRole("button", { name: "Only Atlas" })).click();
+    await testing.waitFor(() => {
+      const calls = requestParams(harness.requests, "fleet.overview");
+      expect(calls.at(-1)?.bot_id).toBeUndefined();
+      expect(calls.some((call) => call.bot_id === "bot_atlas")).toBe(true);
+    });
+    const all = await testing.screen.findByRole("button", { name: "All bots" });
+    await testing.waitFor(() => {
+      expect(all.getAttribute("aria-pressed")).toBe("true");
+    });
+  } finally {
+    harness.stop();
+  }
+});
+
+test("an overdue routine says so", async () => {
+  const harness = await startHarness({
+    "fleet.overview": overview({
+      bots: [bot("bot_atlas", "Atlas", "idle")],
+      upcoming: [
+        routine({
+          next_run: new Date(now.getTime() - 10 * 60_000).toISOString(),
+        }),
+      ],
+    }),
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Dashboard = await loadDashboard();
+    testing.render(createElement(Dashboard));
+    const scan = (await testing.screen.findByText("Mentions scan")).closest(
+      "li",
+    );
+    expect(scan?.textContent).toContain("overdue 10m");
+    expect(scan?.textContent).not.toContain("next in");
+    expect(scan?.getAttribute("data-overdue")).toBe("true");
+  } finally {
+    harness.stop();
+  }
+});
+
+test("a resumed routine stays in the list after the refresh", async () => {
+  const paused = routine({
+    id: "rtn_weekly",
+    name: "Weekly report",
+    status: "paused",
+    paused_reason: "user",
+    next_run: null,
+  });
+  const resumed = routine({
+    id: "rtn_weekly",
+    name: "Weekly report",
+    next_run: new Date(now.getTime() + 3 * 24 * hour).toISOString(),
+  });
+  const harness = await startHarness({
+    "fleet.overview": (_params, nth) =>
+      overview({
+        bots: [bot("bot_atlas", "Atlas", "idle")],
+        upcoming: [nth === 1 ? paused : resumed],
+      }),
+    "routines.resume": resumed,
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Dashboard = await loadDashboard();
+    testing.render(createElement(Dashboard));
+    (await testing.screen.findByRole("button", { name: "Resume" })).click();
+    await testing.waitFor(() => {
+      expect(requestParams(harness.requests, "routines.resume").length).toBe(1);
+    });
+    harness.event("routine.updated", { routine_id: "rtn_weekly" });
+    await testing.waitFor(() => {
+      expect(
+        requestParams(harness.requests, "fleet.overview").length,
+      ).toBeGreaterThan(1);
+    });
+    const row = (await testing.screen.findByText("Weekly report")).closest(
+      "li",
+    );
+    await testing.waitFor(() => {
+      expect(row?.getAttribute("data-status")).toBe("active");
+    });
+    expect(row?.textContent).toContain("next in 3d");
   } finally {
     harness.stop();
   }

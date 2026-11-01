@@ -7,12 +7,13 @@ budgets pause routines with ``paused_reason="budget"``.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import select
+from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sevn.config import Settings
@@ -20,14 +21,16 @@ from sevn.domain.agents import AgentService
 from sevn.domain.bots import BotService
 from sevn.domain.cron import CronSpec, next_after, parse
 from sevn.domain.errors import DomainError
-from sevn.domain.ids import new_id
+from sevn.domain.ids import new_id, stable_id
 from sevn.domain.session import open_session
 from sevn.domain.spend import day_start, spend_by_bot
 from sevn.log import logger
 from sevn.protocol.hub import Hub
 from sevn.store.db import utcnow
 from sevn.store.models import Bot as BotRow
+from sevn.store.models import Job as JobRow
 from sevn.store.models import Routine
+from sevn.tools.routine import SILENT_MARKER
 
 type RoutineStatus = Literal["active", "paused", "cancelled"]
 
@@ -37,6 +40,17 @@ _SILENT_HINT = (
     "\n\n(Scheduled run of the routine “{name}”. If nothing here needs the "
     "owner, call routine.silent.)"
 )
+# Claude bots get no sevn tools, so they say it in the reply instead.
+_SILENT_REPLY_HINT = (
+    "\n\n(Scheduled run of the routine “{name}”. If nothing here needs the "
+    "owner, start your reply with {marker}.)"
+)
+
+
+def _silent_hint(runtime: str, name: str) -> str:
+    if runtime == "claude":
+        return _SILENT_REPLY_HINT.format(name=name, marker=SILENT_MARKER)
+    return _SILENT_HINT.format(name=name)
 
 
 class RoutineRecord(BaseModel):
@@ -200,46 +214,84 @@ async def run_due(hub: Hub, *, now: datetime | None = None) -> list[str]:
 
 
 async def _run(hub: Hub, routine: Routine, now: datetime) -> str | None:
+    """Run one due occurrence at most once.
+
+    The job id comes from the routine and its slot, so a sweep that stopped
+    after queueing the job but before moving the cursor finds that job on
+    the next try and only moves the cursor. ``routine.run`` is announced
+    after the cursor moves; losing it loses a live event, never a run.
+    """
     from sevn.domain.routing import queue_on_lane
 
+    slot = routine.next_run
+    if slot is None:
+        return None
     following = next_after(_spec(routine.schedule), now, _zone(routine.timezone))
+    job_id = occurrence_job_id(routine.id, slot)
     bot = await BotService().get(routine.bot_id)
-    job_id: str | None = None
-    if not bot.paused:
+    queued: str | None = None
+    agent_id: str | None = None
+    if not bot.paused and not await _job_exists(job_id):
         agent = await AgentService().spawn(
             bot.id,
             title=routine.name,
             summary=routine.text[:_SUMMARY_LIMIT],
         )
-        job_id = await queue_on_lane(
-            bot,
-            agent,
-            routine.text + _SILENT_HINT.format(name=routine.name),
-            origin="routine",
-            intent="new_request",
-            path="routine",
-            hub=hub,
-            routine_id=routine.id,
+        try:
+            queued = await queue_on_lane(
+                bot,
+                agent,
+                routine.text + _silent_hint(bot.runtime, routine.name),
+                origin="routine",
+                intent="new_request",
+                path="routine",
+                hub=hub,
+                routine_id=routine.id,
+                job_id=job_id,
+            )
+        except IntegrityError:
+            # Another sweep queued this occurrence first.
+            queued = None
+        agent_id = agent.id
+    async with open_session() as session:
+        values: dict[str, object] = {"next_run": following, "updated_at": utcnow()}
+        if queued is not None:
+            values["last_run"] = now
+        await session.execute(
+            update(Routine)
+            .where(Routine.id == routine.id)
+            .where(Routine.next_run == slot)
+            .values(**values)
         )
+        await session.commit()
+    if queued is not None:
         await hub.emit(
             "routine.run",
             routine.id,
             {
                 "routine_id": routine.id,
-                "job_id": job_id,
-                "agent_id": agent.id,
+                "job_id": queued,
+                "agent_id": agent_id,
                 "bot_id": bot.id,
             },
         )
+    return queued
+
+
+def occurrence_job_id(routine_id: str, slot: datetime) -> str:
+    """The one job id for a routine's run at ``slot``."""
+    return stable_id("job_", routine_id, _utc(slot).isoformat())
+
+
+async def _job_exists(job_id: str) -> bool:
     async with open_session() as session:
-        row = await session.get(Routine, routine.id)
-        if row is not None:
-            if job_id is not None:
-                row.last_run = now
-            row.next_run = following
-            row.updated_at = utcnow()
-            await session.commit()
-    return job_id
+        return await session.get(JobRow, job_id) is not None
+
+
+def _utc(moment: datetime) -> datetime:
+    if moment.tzinfo is None:
+        return moment.replace(tzinfo=UTC)
+    return moment.astimezone(UTC)
 
 
 async def _apply_budgets(hub: Hub, now: datetime) -> None:

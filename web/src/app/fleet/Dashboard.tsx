@@ -80,6 +80,17 @@ function DashboardView() {
   }, [events, refetch]);
 
   const data = query.data;
+  const filterGone =
+    botFilter !== null &&
+    data !== undefined &&
+    !data.bots.some((bot) => bot.id === botFilter);
+
+  useEffect(() => {
+    // A deleted bot leaves no chip to click; fall back to all bots.
+    if (filterGone) {
+      setBotFilter(null);
+    }
+  }, [filterGone]);
   if (data === undefined) {
     return (
       <section className="space-y-2">
@@ -175,7 +186,7 @@ function FleetHeader({ bots }: { bots: FleetBot[] }) {
   return (
     <div className="flex items-start gap-3">
       {hidden ? null : (
-        <ul className="flex max-h-24 flex-1 flex-wrap gap-2 overflow-hidden">
+        <ul className="flex max-h-24 flex-1 flex-wrap gap-2 overflow-y-auto">
           {bots.map((bot) => (
             <li key={bot.id}>
               <button

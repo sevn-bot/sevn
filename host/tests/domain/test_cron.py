@@ -32,6 +32,13 @@ def _next(expr: str, after: str, tz: str = "UTC") -> str:
         ("@daily", "2026-11-01T10:00:00+00:00", "2026-11-02T00:00:00+00:00"),
         ("@hourly", "2026-11-01T10:59:00+00:00", "2026-11-01T11:00:00+00:00"),
         ("0 10-12/2 * * *", "2026-11-01T10:30:00+00:00", "2026-11-01T12:00:00+00:00"),
+        # A stepped wildcard still restricts its day field.
+        ("0 0 */2 * *", "2026-11-01T00:00:00+00:00", "2026-11-03T00:00:00+00:00"),
+        ("0 0 * * */2", "2026-11-01T00:00:00+00:00", "2026-11-03T00:00:00+00:00"),
+        # With one day field starting with "*", both must match.
+        ("0 0 */2 * mon", "2026-11-01T00:00:00+00:00", "2026-11-09T00:00:00+00:00"),
+        # With both day fields restricted, either may match.
+        ("0 0 15 * mon", "2026-11-01T00:00:00+00:00", "2026-11-02T00:00:00+00:00"),
     ],
 )
 def test_next_after_in_utc(expr: str, after: str, expected: str) -> None:

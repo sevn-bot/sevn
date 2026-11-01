@@ -609,13 +609,20 @@ def _map_permission(native: dict[str, object]) -> RuntimeEvent:
 def _map_result(native: dict[str, object]) -> RuntimeEvent:
     terminal = native.get("terminal_reason")
     if terminal in _INTERRUPTED:
-        return RuntimeEvent(kind="error", code="interrupted", message=_message_text(native))
+        return RuntimeEvent(
+            kind="error",
+            code="interrupted",
+            message=_message_text(native),
+            usage=_claude_usage(native),
+        )
     if native.get("is_error") is True:
         code = native.get("subtype")
         return RuntimeEvent(
             kind="error",
             code=code if isinstance(code, str) and code != "" else "error",
             message=_message_text(native),
+            # An error result still reports what the run used.
+            usage=_claude_usage(native),
         )
     result = native.get("result")
     return RuntimeEvent(
