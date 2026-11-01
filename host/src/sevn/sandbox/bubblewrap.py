@@ -54,8 +54,16 @@ def argv(command: str, *, workspace: Path, shared: Path, network: bool) -> list[
             "/tmp",  # noqa: S108  # writable tmp inside the container, not a host file
         ]
     )
+    paths = Paths.from_env()
     home = Path(os.environ.get("HOME", str(Path.home()))).expanduser().resolve()
     masked_home = home != Path("/") and home.is_dir()
+    # The sevn home and the workspaces folder hold every bot's files. Hide both
+    # before the user's home is masked (one may contain the other) and before
+    # this bot's workspace and Shared are bound back in.
+    masked: list[Path] = []
+    for root in _sevn_roots(paths, home):
+        args.extend(["--tmpfs", str(root)])
+        masked.append(root)
     if masked_home:
         args.extend(["--tmpfs", str(home)])
         for name in _HOME_READABLE:
@@ -79,19 +87,42 @@ def argv(command: str, *, workspace: Path, shared: Path, network: bool) -> list[
     # The host home holds the database, the secret store, the age key and the
     # run token. Under the user's home the tmpfs already hides them; SEVN_HOME
     # can move them anywhere, so mask them again.
-    paths = Paths.from_env()
+    hidden = [*masked, home] if masked_home else masked
     sidecars = tuple(
         paths.db.with_name(paths.db.name + suffix) for suffix in ("-wal", "-shm", "-journal")
     )
     for secret_file in (paths.db, *sidecars, paths.secrets_file):
-        if secret_file.is_file() and not (masked_home and _inside(secret_file, home)):
+        if secret_file.is_file() and not _inside_any(secret_file, hidden):
             args.extend(["--ro-bind", "/dev/null", str(secret_file)])
     for secret_dir in (paths.keys, paths.run, paths.logs):
-        if secret_dir.is_dir() and not (masked_home and _inside(secret_dir, home)):
+        if secret_dir.is_dir() and not _inside_any(secret_dir, hidden):
             args.extend(["--tmpfs", str(secret_dir)])
     args.extend(["--chdir", str(workspace)])
     args.extend([_SHELL, "-c", command])
     return args
+
+
+def _sevn_roots(paths: Paths, home: Path) -> list[Path]:
+    """Existing sevn home and workspaces folder, outermost only.
+
+    ``/``, the user's home and any ancestor of the user's home are skipped:
+    masking them would hide the system or the readable toolchain paths. The
+    user's home is masked separately.
+    """
+    chosen: list[Path] = []
+    for raw in (paths.home, paths.workspaces):
+        root = raw.expanduser().resolve()
+        if not root.is_dir() or root == Path("/") or _inside(home, root):
+            continue
+        if any(_inside(root, kept) for kept in chosen):
+            continue
+        chosen = [kept for kept in chosen if not _inside(kept, root)]
+        chosen.append(root)
+    return chosen
+
+
+def _inside_any(path: Path, roots: list[Path]) -> bool:
+    return any(_inside(path, root) for root in roots)
 
 
 def _inside(path: Path, root: Path) -> bool:
