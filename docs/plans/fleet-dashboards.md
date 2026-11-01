@@ -1,6 +1,6 @@
 # Plan: fleet dashboards
 
-Status: phase 1 in review (PR #11), phase 2 in review (PR #12), phase 3 in review. Integration branch: `wave/fleet-dashboards`, cut from `wave/0020-bot-core` (PR #9). Every PR for this plan targets `wave/fleet-dashboards`, not `test` or `main`.
+Status: phase 1 in review (PR #11), phase 2 in review (PR #12), phase 3 in review (PR #14), phase 4 on hold until plan 0050 merges (PR #15). Integration branch: `wave/fleet-dashboards`, cut from `wave/0020-bot-core` (PR #9). Every PR for this plan targets `wave/fleet-dashboards`, not `test` or `main`.
 
 Source: the "Agent Fleet Dashboards" playbook, which restates ideas from Alex Finn's video on running a fleet of about 20 agents. This plan maps those ideas onto sevn.
 
@@ -124,6 +124,21 @@ Done when:
 - A routine with 14 days of silent runs is flagged as a candidate to cancel.
 - Crossing 100 percent of a bot budget pauses that bot's routines with `paused_reason = "budget"`, and user messages to the bot still run.
 - Host tests cover the cost-per-run median, the null rules for unknown cost, the 14-day flag and the budget pause. They run against fixture rows in 0050's tables.
+
+### What PR #15 built ahead of plan 0050
+
+PR #15 was written before this section named plan 0050 as the owner of the routine tables. It ships a smaller routine model of its own. **Decision: PR #15 waits for plan 0050.** It does not merge with its own `0004_routines` migration; once 0050 lands, it is rebased onto 0050's tables and methods, and the parts below that 0050 already provides are dropped. What PR #15 holds today:
+
+- Migration `0004_routines`: `routines` (bot, name, five-field cron `schedule`, IANA `timezone`, prompt `text`, `status`, `paused_reason`, `next_run`, `last_run`) and `jobs.routine_id` and `jobs.silent`. Last outcome, last useful run and costs are read from jobs and turns, not stored.
+- `domain/cron.py` evaluates the schedule on the routine's wall clock: a time daylight saving skips does not run, a repeated time runs once.
+- `routines.list`, `create`, `update`, `pause`, `resume`, `cancel`. Writes are owner only, with `op_id`, and emit `routine.updated`.
+- `sevn serve` checks every 30 seconds. A due routine runs on a new lane named after it, with `origin="routine"`, and emits `routine.run`. After downtime it runs once. A paused bot skips the slot. Resume starts from the next slot.
+- `domain/cron.py` follows cron's day rule: when either day field starts with `*` (including a step such as `*/2`) both must match; only two restricted day fields match on either.
+- Each occurrence has one job id, derived from the routine and its slot. A sweep that stopped after queueing the job finds it on the retry and only moves the cursor, so an occurrence never runs twice. `routine.run` is sent after the cursor moves.
+- A run is useful unless it says it was silent: a pydantic-ai bot calls the `routine.silent` tool; a Claude bot, which gets no sevn tools, starts its reply with `[silent]`. The prompt tells each runtime its own way.
+- Budgets: `budgets.daily_usd_per_bot` and `budgets.daily_usd_host` (USD, priced turns since 00:00 UTC). At the cap, routines pause with `paused_reason="budget"`. The spend tile shows the host budget and turns amber at 80 percent, red at 100.
+- Dashboard column "Upcoming": next run (or "overdue" when the slot has passed), cost per run and over 30 days, last useful run, "candidate to cancel" after 14 days with nothing useful, the next 7 days' projected cost (routines with no known cost are counted apart), Pause, Resume, Cancel with a confirm, and a New routine form. A routine the owner just paused or resumed stays in the list.
+- Not done: notifications (`notify.priority`); sevn has no notification channel yet. Bots cannot create routines themselves yet. A per-bot budget warning at 80 percent is not shown yet; only the host budget level is.
 
 ## Phase 5: coordinator
 

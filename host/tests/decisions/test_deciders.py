@@ -884,7 +884,7 @@ def test_migrations_single_head() -> None:
         text=True,
     )
     assert completed.returncode == 0, completed.stderr
-    assert "0003_router_memory" in completed.stdout
+    assert "0004_routines" in completed.stdout
 
 
 def test_upgrade_from_previous_head(tmp_path: Path) -> None:

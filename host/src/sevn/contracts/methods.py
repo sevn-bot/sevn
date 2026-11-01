@@ -13,6 +13,7 @@ from sevn.domain.bots import BotRecord
 from sevn.domain.fleet import FleetOverview
 from sevn.domain.jobs import MessageRecord
 from sevn.domain.pending import PendingRecord
+from sevn.domain.routines import RoutineRecord
 from sevn.memory.store import MemoryRecord
 
 
@@ -299,6 +300,50 @@ class TurnsCancelResult(BaseModel):
     status: str
 
 
+class RoutinesListParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    bot_id: str | None = None
+    include_cancelled: bool = False
+
+
+class RoutinesListResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    routines: list[RoutineRecord]
+
+
+class RoutinesCreateParams(BaseModel):
+    """``schedule`` is five-field cron, read in ``timezone`` (an IANA name)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    bot_id: str
+    name: str
+    schedule: str
+    timezone: str = "UTC"
+    text: str
+    op_id: str | None = None
+
+
+class RoutinesUpdateParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    routine_id: str
+    name: str | None = None
+    schedule: str | None = None
+    timezone: str | None = None
+    text: str | None = None
+    op_id: str | None = None
+
+
+class RoutineIdParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    routine_id: str
+    op_id: str | None = None
+
+
 class FleetOverviewParams(BaseModel):
     """``bot_id`` narrows only the finished list."""
 
@@ -395,5 +440,11 @@ METHODS: dict[str, MethodSpec] = {
         _spec("memories.delete", MemoriesDeleteParams, MemoriesDeleteResult, mutating=True),
         _spec("memories.pin", MemoriesPinParams, MemoryRecord, mutating=True),
         _spec("fleet.overview", FleetOverviewParams, FleetOverview, mutating=False),
+        _spec("routines.list", RoutinesListParams, RoutinesListResult, mutating=False),
+        _spec("routines.create", RoutinesCreateParams, RoutineRecord, mutating=True),
+        _spec("routines.update", RoutinesUpdateParams, RoutineRecord, mutating=True),
+        _spec("routines.pause", RoutineIdParams, RoutineRecord, mutating=True),
+        _spec("routines.resume", RoutineIdParams, RoutineRecord, mutating=True),
+        _spec("routines.cancel", RoutineIdParams, RoutineRecord, mutating=True),
     )
 }

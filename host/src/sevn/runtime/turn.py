@@ -52,6 +52,7 @@ from sevn.store.db import utcnow
 from sevn.store.models import Event, Message
 from sevn.store.models import Job as JobRow
 from sevn.store.models import Turn as TurnRow
+from sevn.tools.routine import is_silent_reply, mark_jobs_silent
 
 
 class TurnWatch(Protocol):
@@ -365,6 +366,9 @@ class TurnRunner:
             session.add(assistant)
             events.append(message_event(assistant))
             await finish_job(session, job.id, "done", finished_at)
+            if is_silent_reply(outcome.text):
+                # A Claude routine run has no routine.silent tool; its reply says it.
+                await mark_jobs_silent(session, [job.id])
             agent_status = "done" if job.origin == "chit_chat" else "idle"
             await set_agent(session, agent.id, agent_status, finished_at)
             events.append(turn_event("turn.finished", turn_id, agent.id, "done"))

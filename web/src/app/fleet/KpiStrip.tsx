@@ -47,6 +47,16 @@ function extras(kpi: FleetKpi): string[] {
   return lines;
 }
 
+function levelBorder(level: FleetKpi["level"]): string {
+  if (level === "over") {
+    return "border-red-700";
+  }
+  if (level === "warn") {
+    return "border-amber-600";
+  }
+  return "border-zinc-800";
+}
+
 export function KpiStrip({ kpis }: { kpis: FleetKpi[] }) {
   if (kpis.length === 0) {
     return null;
@@ -60,8 +70,9 @@ export function KpiStrip({ kpis }: { kpis: FleetKpi[] }) {
           <li
             key={kpi.key}
             data-testid={`kpi-${kpi.key}`}
+            data-level={kpi.level ?? undefined}
             title={title.join(" · ")}
-            className="rounded border border-zinc-800 px-3 py-2"
+            className={`rounded border px-3 py-2 ${levelBorder(kpi.level)}`}
           >
             <p className="text-xs text-zinc-400">{kpi.label}</p>
             <p
@@ -74,6 +85,11 @@ export function KpiStrip({ kpis }: { kpis: FleetKpi[] }) {
                 </span>
               ) : null}
             </p>
+            {typeof kpi.budget_usd === "number" ? (
+              <p className="text-xs text-zinc-400">
+                {`of ${formatUsd(kpi.budget_usd)} a day`}
+              </p>
+            ) : null}
             {notes.length > 0 ? (
               <p className="text-xs text-amber-400">{notes.join(" · ")}</p>
             ) : null}

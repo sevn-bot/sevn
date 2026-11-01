@@ -29,11 +29,13 @@ import sevn.api.memories as memory_api
 import sevn.api.messages as message_api
 import sevn.api.models as model_api
 import sevn.api.pending as pending_api
+import sevn.api.routines as routine_api
 import sevn.sandbox.policy as sandbox_policy
 import sevn.system as system
 from sevn import __version__
 from sevn.config import Settings
 from sevn.domain.agents import expire_agents
+from sevn.domain.routines import run_due
 from sevn.log import logger
 from sevn.paths import Paths
 from sevn.protocol.hub import Hub
@@ -72,7 +74,15 @@ _REGISTERED = (
     memory_api.memories_delete,
     memory_api.memories_pin,
     fleet_api.fleet_overview,
+    routine_api.routines_list,
+    routine_api.routines_create,
+    routine_api.routines_update,
+    routine_api.routines_pause,
+    routine_api.routines_resume,
+    routine_api.routines_cancel,
 )
+
+_ROUTINE_TICK_S = 30
 
 CSP = (
     "default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'"
@@ -178,6 +188,16 @@ async def _expire_loop() -> None:
         await asyncio.sleep(600)
 
 
+async def _routine_loop(hub: Hub) -> None:
+    """Run due routines while the host runs."""
+    while True:
+        try:
+            await run_due(hub)
+        except Exception:  # noqa: BLE001 — one failed sweep must not stop the loop
+            logger.exception("routine sweep failed")
+        await asyncio.sleep(_ROUTINE_TICK_S)
+
+
 @asynccontextmanager
 async def _lifespan(app: ASGIApp) -> AsyncGenerator[None]:
     state = _state(app)
@@ -192,6 +212,7 @@ async def _lifespan(app: ASGIApp) -> AsyncGenerator[None]:
     await _retain(outbox, oplog)
     browser: asyncio.Task[None] | None = None
     expiry: asyncio.Task[None] | None = None
+    routines: asyncio.Task[None] | None = None
     worker: Worker | None = None
     resumes: list[asyncio.Task[None]] = []
     retention = asyncio.create_task(_retain_loop(outbox, oplog))
@@ -200,6 +221,7 @@ async def _lifespan(app: ASGIApp) -> AsyncGenerator[None]:
         recovered = await recover()
         worker = bind(state.hub)
         expiry = asyncio.create_task(_expire_loop())
+        routines = asyncio.create_task(_routine_loop(state.hub))
         for item in recovered.resume:
             logger.info("resuming answered turn {turn_id}", turn_id=item.turn_id)
             resumes.append(
@@ -236,6 +258,10 @@ async def _lifespan(app: ASGIApp) -> AsyncGenerator[None]:
             expiry.cancel()
             with suppress(asyncio.CancelledError):
                 await expiry
+        if routines is not None:
+            routines.cancel()
+            with suppress(asyncio.CancelledError):
+                await routines
         if worker is not None:
             await worker.aclose()
         await outbox.aclose()

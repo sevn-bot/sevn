@@ -25,6 +25,7 @@ import {
   staleAfterMs,
   stamp,
 } from "./time.ts";
+import { UpcomingPanel } from "./UpcomingPanel.tsx";
 
 const refreshKinds = new Set([
   "pending.created",
@@ -35,6 +36,8 @@ const refreshKinds = new Set([
   "agent.updated",
   "bot.updated",
   "bot.deleted",
+  "routine.updated",
+  "routine.run",
 ]);
 
 const pollMs = 60_000;
@@ -108,13 +111,14 @@ function DashboardView() {
       </div>
       <FleetHeader bots={data.bots} />
       <KpiStrip kpis={data.kpis} />
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <WaitingPanel overview={data} />
         <FinishedPanel
           overview={data}
           filter={botFilter}
           onFilter={setBotFilter}
         />
+        <UpcomingPanel overview={data} />
       </div>
       <ActivityGrid
         bots={data.bots}
