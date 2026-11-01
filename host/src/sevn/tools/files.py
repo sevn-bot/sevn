@@ -10,11 +10,14 @@ from pathlib import Path
 from sevn.decisions.registry import screen_inbound
 from sevn.domain.errors import DomainError
 from sevn.domain.workspace import WorkspacePlace, acquire_write, open_place, scratch_dir
+from sevn.log import redact_string
 from sevn.paths import Paths
+from sevn.sandbox.paths import directory, regular_file
+from sevn.sandbox.paths import write_text as safe_write_text
 from sevn.tools.registry import TurnDeps, register_toolset
 
 _OUTSIDE = "path is outside the workspace"
-_SKIP = frozenset({".git", ".sevn"})
+_SKIP = frozenset({".git", ".sevn", ".sevn-git-backup"})
 _MATCH_LIMIT = 50
 _FILE_LIMIT = 200
 
@@ -33,7 +36,7 @@ async def write_file(bot_id: str, agent_id: str, path: str, content: str) -> str
     if locked:
         await acquire_write(agent_id, str(resolved))
     await asyncio.to_thread(_write_text, resolved, content)
-    return path
+    return redact_string(path)
 
 
 async def edit_file(bot_id: str, agent_id: str, path: str, old: str, new: str) -> str:
@@ -49,14 +52,14 @@ async def edit_file(bot_id: str, agent_id: str, path: str, old: str, new: str) -
     if old not in current:
         raise DomainError("invalid_params", "edit text was not found")
     await write_file(bot_id, agent_id, path, current.replace(old, new, 1))
-    return path
+    return redact_string(path)
 
 
 async def list_dir(bot_id: str, agent_id: str, path: str = ".") -> str:
     """List one directory inside the workspace or Shared."""
     located = await _owned(bot_id, agent_id)
     names = await asyncio.to_thread(_list_names, located.root, path)
-    return "\n".join(names)
+    return redact_string("\n".join(names))
 
 
 async def grep(bot_id: str, agent_id: str, pattern: str, path: str = ".") -> str:
@@ -67,7 +70,7 @@ async def grep(bot_id: str, agent_id: str, pattern: str, path: str = ".") -> str
         raise DomainError("invalid_params", "invalid pattern") from exc
     located = await _owned(bot_id, agent_id)
     hits = await asyncio.to_thread(_search, located.root, path, compiled)
-    return "\n".join(hits)
+    return await screen_inbound("\n".join(hits))
 
 
 async def attach(bot_id: str, agent_id: str, path: str) -> str:
@@ -77,7 +80,7 @@ async def attach(bot_id: str, agent_id: str, path: str) -> str:
     is_file = await asyncio.to_thread(resolved.is_file)
     if not is_file:
         raise DomainError("not_found", "file not found")
-    return str(resolved)
+    return redact_string(str(resolved))
 
 
 def files_toolset(deps: TurnDeps) -> dict[str, object]:
@@ -139,10 +142,10 @@ def _target(root: Path, agent_id: str, raw: str) -> tuple[Path, bool]:
 
 def _read_text(root: Path, raw: str) -> str:
     resolved = _resolve(root, raw)
-    if not resolved.is_file():
-        raise DomainError("not_found", "file not found")
     try:
-        return resolved.read_text(encoding="utf-8")
+        with regular_file(resolved) as descriptor:
+            with os.fdopen(os.dup(descriptor), encoding="utf-8") as stream:
+                return stream.read()
     except UnicodeError as exc:
         raise DomainError("invalid_params", "file is not text") from exc
 
@@ -150,15 +153,15 @@ def _read_text(root: Path, raw: str) -> str:
 def _write_text(path: Path, content: str) -> None:
     if path.exists() and path.is_dir():
         raise DomainError("invalid_params", "path is a directory")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
+    safe_write_text(path, content)
 
 
 def _list_names(root: Path, raw: str) -> list[str]:
     resolved = _resolve(root, raw)
     if not resolved.is_dir():
         raise DomainError("invalid_params", "path is not a directory")
-    return sorted(item.name for item in resolved.iterdir())
+    with directory(resolved) as descriptor:
+        return sorted(os.listdir(descriptor))
 
 
 def _search(root: Path, raw: str, pattern: re.Pattern[str]) -> list[str]:
@@ -171,8 +174,8 @@ def _search(root: Path, raw: str, pattern: re.Pattern[str]) -> list[str]:
         if not _allowed(checked, root):
             continue
         try:
-            text = checked.read_text(encoding="utf-8")
-        except (OSError, UnicodeError):
+            text = _read_text(root, str(checked))
+        except (OSError, UnicodeError, DomainError):
             continue
         label = _label(checked, root)
         for number, line in enumerate(text.splitlines(), start=1):
@@ -202,7 +205,7 @@ def _files(start: Path) -> list[Path]:
 def _resolve(root: Path, raw: str) -> Path:
     if raw == "" or "\x00" in raw:
         raise DomainError("path_outside_workspace", _OUTSIDE)
-    base = root.resolve()
+    base = root.absolute()
     candidate = Path(raw)
     target = candidate if candidate.is_absolute() else base / candidate
     resolved = target.resolve(strict=False)
@@ -212,7 +215,7 @@ def _resolve(root: Path, raw: str) -> Path:
 
 
 def _allowed(path: Path, root: Path) -> bool:
-    if _inside(path, root.resolve()):
+    if _inside(path, root.absolute()):
         return True
     shared = (Paths.from_env().workspaces.parent / "Shared").resolve()
     return _inside(path, shared)

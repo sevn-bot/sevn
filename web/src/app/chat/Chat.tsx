@@ -24,6 +24,7 @@ type LaneRef = { id: string; title: string };
 
 const refreshKinds = new Set([
   "message.created",
+  "route.corrected",
   "agent.updated",
   "pending.created",
   "pending.resolved",
@@ -111,13 +112,20 @@ function ChatView({
     }
     const fresh = events.slice(seenEvents.current);
     seenEvents.current = events.length;
+    if (
+      fresh.some(
+        (event) => event.k === "audit" && event.d.setting === "sandbox.mode",
+      )
+    ) {
+      void infoQuery.refetch();
+    }
     if (!fresh.some((event) => refreshKinds.has(event.k))) {
       return;
     }
     void messagesQuery.refetch();
     void agentsQuery.refetch();
     void pendingQuery.refetch();
-  }, [agentsQuery, events, messagesQuery, pendingQuery]);
+  }, [agentsQuery, events, infoQuery, messagesQuery, pendingQuery]);
 
   async function loadOlder(): Promise<void> {
     const cursor = olderCursor.current;
@@ -378,19 +386,26 @@ function lanesFor(
 }
 
 function aheadByAgent(events: ProtocolEvent[]): ReadonlyMap<string, number> {
-  const found = new Map<string, number>();
+  const jobs = new Map<string, { agentId: string; ahead: number }>();
   for (const event of events) {
-    if (event.k !== "job.queued") {
-      continue;
-    }
     const agentId = event.d.agent_id;
-    const ahead = event.d.ahead;
-    if (typeof agentId !== "string" || typeof ahead !== "number") {
-      continue;
+    const jobId = event.d.job_id;
+    if (typeof jobId !== "string") continue;
+    if (
+      event.k === "route.corrected" ||
+      event.k === "job.started" ||
+      event.k === "job.done"
+    ) {
+      jobs.delete(jobId);
     }
-    found.set(agentId, ahead);
+    if (event.k !== "job.queued") continue;
+    const ahead = event.d.ahead;
+    if (typeof agentId !== "string" || typeof ahead !== "number") continue;
+    jobs.set(jobId, { agentId, ahead });
   }
-  return found;
+  return new Map(
+    [...jobs.values()].map(({ agentId, ahead }) => [agentId, ahead]),
+  );
 }
 
 function allowAllOn(
@@ -404,7 +419,10 @@ function chronological(rows: ListedMessage[]): ListedMessage[] {
 }
 
 function messageText(parts: Record<string, string>[]): string {
-  return parts.map((part) => part.text ?? "").join("");
+  return parts
+    .filter((part) => part.type !== "question")
+    .map((part) => part.text ?? "")
+    .join("");
 }
 
 function botTicks(
