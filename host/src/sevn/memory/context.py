@@ -20,7 +20,9 @@ _DIFF = "<sevn_memories_diff>"
 _HINT = "consider memory.save if the user stated a durable preference or fact"
 _CAPTURE = 0.8
 _hints: dict[str, str] = {}
-_shown: dict[str, dict[str, tuple[str, str, int]]] = {}
+# Keyed by (bot, agent): sibling lanes run in parallel, and each one needs
+# its own baseline so a memory saved by one lane still reaches the other.
+_shown: dict[tuple[str, str], dict[str, tuple[str, str, int]]] = {}
 
 
 class _Block(str):
@@ -71,12 +73,13 @@ class MemoryContext(AbstractCapability[Any]):
         return request_context
 
 
-async def render_user_block(bot_id: str, *, prior: bool) -> str:
-    """Full block on the first view, then a diff of memories that changed."""
+async def render_user_block(bot_id: str, *, prior: bool, agent_id: str = "") -> str:
+    """Full block on the first view, then a diff of what changed for this lane."""
     rows = await MemoryStore().list_for(bot_id)
     current = {row.id: (row.text, row.tier, row.revision) for row in rows}
-    previous = _shown.get(bot_id, {})
-    _shown[bot_id] = current
+    key = (bot_id, agent_id)
+    previous = _shown.get(key, {})
+    _shown[key] = current
     if not prior:
         if len(rows) == 0:
             return ""
@@ -106,7 +109,7 @@ async def capture_after_turn(agent_id: str, text: str) -> None:
 
 async def _prefix(bot_id: str, agent_id: str, *, prior: bool) -> str:
     parts: list[str] = []
-    block = await render_user_block(bot_id, prior=prior)
+    block = await render_user_block(bot_id, prior=prior, agent_id=agent_id)
     if block != "":
         parts.append(str(block))
     if prior:
