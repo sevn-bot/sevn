@@ -412,3 +412,39 @@ test("slow-consumer reconnect replays from the delivered cursor", async () => {
     vi.unstubAllGlobals();
   }
 });
+
+test("welcome timeouts retry until the host becomes available", async () => {
+  const { connect } = await loadClient();
+  const { Server, WebSocket } = await loadMock();
+  vi.stubGlobal("WebSocket", WebSocket);
+  vi.useFakeTimers();
+  const server = new Server(url);
+  let attempts = 0;
+  server.on("connection", (socket) => {
+    const attempt = ++attempts;
+    socket.on("message", (data) => {
+      const frame = frameOf(data);
+      if (frame.t === "hello" && attempt >= 3) socket.send(welcome());
+      if (frame.t === "req")
+        socket.send(
+          JSON.stringify({ t: "res", id: frame.id, r: { events: [] } }),
+        );
+    });
+  });
+  try {
+    const ready = connect({ url });
+    await vi.advanceTimersByTimeAsync(33_000);
+    const connection = await ready;
+    expect(attempts).toBe(3);
+    const reply = connection.call("sync.since", { seq: 0 });
+    await vi.advanceTimersByTimeAsync(20);
+    await expect(reply).resolves.toEqual({ events: [] });
+    connection.close();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(attempts).toBe(3);
+  } finally {
+    server.stop();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  }
+});

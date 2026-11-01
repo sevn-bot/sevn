@@ -266,3 +266,30 @@ async def test_bot_delete_cleans_only_its_worktrees_when_purged(
     assert (other_checkout / "keep.txt").read_text(encoding="utf-8") == "other bot data"
     if not purge:
         assert (checkout / "uncommitted.txt").read_text(encoding="utf-8") == "bot data"
+
+
+async def test_new_filter_after_config_read_is_confined(tmp_path: Path, monkeypatch) -> None:
+    from sevn.domain import workspace
+
+    bot, agent = await _pair(tmp_path, monkeypatch)
+    repo = Path(bot.workspace_path)
+    assert _git(repo, "init", "-b", "main").returncode == 0
+    (repo / "notes.txt").write_text("notes\n")
+    (repo / ".gitattributes").write_text("notes.txt filter=late\n")
+    assert _git(repo, "add", ".").returncode == 0
+    assert _git(repo, "commit", "-m", "init").returncode == 0
+    marker = tmp_path / "outside-checkout"
+    original = workspace._filter_drivers
+
+    async def change_config(git, cwd, env):
+        names = await original(git, cwd, env)
+        with (repo / ".git" / "config").open("a") as config:
+            config.write(f'[filter "late"]\n\tsmudge = touch {marker}; cat\n')
+        return names
+
+    monkeypatch.setattr(workspace, "_filter_drivers", change_config)
+    with sqlite3.connect(tmp_path / "sevn.db") as connection:
+        connection.execute("UPDATE agents SET isolation='worktree' WHERE id=?", (agent.id,))
+    assert await workspace.ensure(agent.id) == ""
+    assert not marker.exists()
+    assert (tmp_path / "worktrees" / agent.id / "notes.txt").read_text() == "notes\n"

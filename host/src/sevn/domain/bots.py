@@ -173,14 +173,16 @@ class BotService:
             if row is None:
                 raise DomainError("not_found", "bot not found")
             workspace = Path(row.workspace_path)
+            agent_ids: list[str] = []
             if purge:
                 agent_ids = list(
                     await session.scalars(select(AgentRow.id).where(AgentRow.bot_id == bot_id))
                 )
-                await asyncio.to_thread(purge_worktrees, agent_ids)
-                await asyncio.to_thread(_remove_workspace, workspace)
             await session.execute(delete(BotRow).where(BotRow.id == bot_id))
             await session.commit()
+        if purge:
+            await asyncio.to_thread(purge_worktrees, agent_ids)
+            await asyncio.to_thread(_remove_workspace, workspace)
         return bot_id
 
 

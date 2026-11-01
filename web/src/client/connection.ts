@@ -446,20 +446,18 @@ export function connect(options: ConnectOptions): Promise<Connection> {
     }
     const next = new WebSocket(url);
     socket = next;
-    if (!settled) {
-      if (connectTimer !== undefined) {
-        clearTimeout(connectTimer);
-      }
-      connectTimer = setTimeout(() => {
-        connectTimer = undefined;
-        if (settled || stopped) {
-          return;
-        }
-        fail(new Error("connect timeout"));
-        stopped = true;
-        next.close();
-      }, CONNECT_TIMEOUT_MS);
+    if (connectTimer !== undefined) {
+      clearTimeout(connectTimer);
     }
+    connectTimer = setTimeout(() => {
+      connectTimer = undefined;
+      if (stopped || socket !== next) {
+        return;
+      }
+      socket = null;
+      next.close();
+      onClose(1006);
+    }, CONNECT_TIMEOUT_MS);
     next.addEventListener("open", () => {
       if (socket !== next) {
         return;
@@ -485,7 +483,7 @@ export function connect(options: ConnectOptions): Promise<Connection> {
       onMessage(messageText(event));
     });
     next.addEventListener("close", (event) => {
-      if (socket !== next && socket !== null) {
+      if (socket !== next) {
         return;
       }
       if (socket === next) {
@@ -507,6 +505,10 @@ export function connect(options: ConnectOptions): Promise<Connection> {
       return;
     }
     if (frame.t === "welcome") {
+      if (connectTimer !== undefined) {
+        clearTimeout(connectTimer);
+        connectTimer = undefined;
+      }
       backoff = INITIAL_BACKOFF_MS;
       emitStatus("connected");
       succeed();
@@ -538,6 +540,10 @@ export function connect(options: ConnectOptions): Promise<Connection> {
   }
 
   function onClose(code: number): void {
+    if (connectTimer !== undefined) {
+      clearTimeout(connectTimer);
+      connectTimer = undefined;
+    }
     rejectPending(new Error("closed"));
     if (stopped) {
       return;

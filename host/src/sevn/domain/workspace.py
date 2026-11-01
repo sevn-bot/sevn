@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import shlex
 import shutil
+import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -16,8 +18,10 @@ from sevn.domain.ids import new_id
 from sevn.domain.session import open_session
 from sevn.log import logger
 from sevn.paths import Paths
+from sevn.sandbox.bubblewrap import argv as bwrap_argv
 from sevn.sandbox.env import child_env
 from sevn.sandbox.paths import directory
+from sevn.sandbox.seatbelt import argv as seatbelt_argv
 from sevn.store.db import utcnow
 from sevn.store.models import Agent as AgentRow
 from sevn.store.models import AgentLock, Message
@@ -230,7 +234,7 @@ def _is_worktree(path: Path) -> bool:
 
 
 async def _add_worktree(workspace: Path, worktree: Path, agent_id: str) -> None:
-    await asyncio.to_thread(_make_directory, worktree.parent)
+    await asyncio.to_thread(_make_directory, worktree)
     code = await _git(
         workspace,
         "worktree",
@@ -238,13 +242,14 @@ async def _add_worktree(workspace: Path, worktree: Path, agent_id: str) -> None:
         "-b",
         f"sevn/{agent_id}",
         str(worktree),
+        target=worktree,
     )
     if code != 0:
         logger.warning("git worktree add failed")
         raise DomainError("invalid_params", "git worktree add failed")
 
 
-async def _git(cwd: Path, *args: str) -> int:
+async def _git(cwd: Path, *args: str, target: Path) -> int:
     git = await asyncio.to_thread(shutil.which, "git")
     if git is None or not Path(git).is_absolute():
         raise DomainError("invalid_params", "git is not available")
@@ -267,9 +272,17 @@ async def _git(cwd: Path, *args: str) -> int:
     for index, (key, value) in enumerate(overrides):
         env[f"GIT_CONFIG_KEY_{index}"] = key
         env[f"GIT_CONFIG_VALUE_{index}"] = value
+    # Config can change after enumeration. Confinement is the security boundary
+    # for any newly introduced driver, hook, include or worktree config.
+    command = shlex.join([git, *args])
+    if sys.platform == "darwin":
+        argv = seatbelt_argv(command, workspace=cwd, shared=target, network=False)
+    elif sys.platform == "linux":
+        argv = bwrap_argv(command, workspace=cwd, shared=target, network=False)
+    else:
+        raise DomainError("invalid_params", "sandbox is unavailable")
     process = await asyncio.create_subprocess_exec(
-        git,
-        *args,
+        *argv,
         cwd=cwd,
         env=env,
         stdout=asyncio.subprocess.PIPE,

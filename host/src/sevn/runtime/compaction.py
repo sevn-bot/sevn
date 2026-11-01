@@ -7,7 +7,9 @@ from collections.abc import Sequence
 from dataclasses import KW_ONLY, dataclass
 from typing import TYPE_CHECKING, Any
 
+from httpx import HTTPError
 from pydantic_ai.capabilities.abstract import AbstractCapability
+from pydantic_ai.exceptions import ModelAPIError
 from pydantic_ai.messages import (
     LoadCapabilityCallPart,
     LoadCapabilityReturnPart,
@@ -59,8 +61,8 @@ class Compaction(AbstractCapability[Any]):
                 model_window=window,
                 estimated_tokens=_estimate_tokens(messages),
             )
-        except ModelError:
-            logger.warning("compaction skipped: no cheap model")
+        except (ModelError, ModelAPIError, HTTPError, OSError):
+            logger.warning("compaction skipped: summary model unavailable")
             return request_context
         request_context.messages = compacted
         return request_context

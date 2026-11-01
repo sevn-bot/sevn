@@ -448,6 +448,11 @@ async def test_reroute_waits_for_a_slot_under_the_parallel_cap(
                 lambda rows: bool(rows) and rows[0]["status"] == "done",
             )
             assert moved["agent_id"] not in (first["agent_id"], second["agent_id"])
+            from sevn.domain.agents import AgentService
+
+            target = await AgentService().get(str(moved["agent_id"]))
+            assert target.title
+            assert target.summary
             assert gate.max_active == 1
     finally:
         gate.release_all.set()

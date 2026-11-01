@@ -142,11 +142,13 @@ class TurnRunner:
 
     async def resume(self, turn_id: str, decisions: tuple[ToolDecision, ...]) -> None:
         loaded = await _load_resume(turn_id)
-        if loaded.status not in {"waiting", "running"}:
-            return
-        await _mark_running(turn_id)
-        if self._watch is not None:
-            self._watch.open_turn(turn_id, loaded.agent.id)
+        async with job_lock(loaded.job.id):
+            loaded = await _load_resume(turn_id)
+            if loaded.status not in {"waiting", "running"}:
+                return
+            await _mark_running(turn_id)
+            if self._watch is not None:
+                self._watch.open_turn(turn_id, loaded.agent.id)
         with logger.contextualize(
             bot_id=loaded.bot.id,
             agent_id=loaded.agent.id,

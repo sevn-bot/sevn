@@ -212,7 +212,14 @@ async def reroute(
         # Moving an ended job would run the message (and its side effects) again.
         raise DomainError("invalid_params", "message already finished")
     if start_new:
-        target = await AgentService().spawn(bot_id, origin_job_id=job_id)
+        async with open_session() as session:
+            job = await session.get(JobRow, job_id)
+            if job is None:
+                raise DomainError("not_found", "job not found")
+            title, summary = lane_text(job.text)
+        target = await AgentService().spawn(
+            bot_id, origin_job_id=job_id, title=title, summary=summary
+        )
     else:
         if agent_id is None:
             raise DomainError("invalid_params", "agent_id or new is required")
@@ -326,11 +333,11 @@ async def _requeue(job_id: str, agent_id: str) -> None:
 async def _cancel_agent(agent_id: str) -> None:
     from sevn.runtime.worker import current
 
-    turn_id = await _running_turn(agent_id)
     worker = current()
-    if worker is not None and turn_id is not None:
-        await worker.cancel(turn_id)
-    await AgentService().set_status(agent_id, "done")
+    if worker is not None:
+        await worker.cancel_agent(agent_id)
+    else:
+        await AgentService().set_status(agent_id, "done")
 
 
 async def _resolve_answer(agent_id: str, text: str) -> None:
@@ -543,16 +550,6 @@ async def _job_for_message(message_id: str) -> tuple[str, str, str | None, str]:
         if job is None:
             raise DomainError("not_found", "job not found")
         return job.id, job.to_bot_id, job.route_decision_id, job.status
-
-
-async def _running_turn(agent_id: str) -> str | None:
-    async with open_session() as session:
-        return await session.scalar(
-            select(TurnRow.id)
-            .where(TurnRow.agent_id == agent_id)
-            .where(TurnRow.status.in_(("running", "waiting")))
-            .limit(1)
-        )
 
 
 async def _ahead(bot_id: str, job_id: str) -> int:
