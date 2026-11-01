@@ -15,12 +15,22 @@ from sevn.domain.shares import ShareRecord, ShareService
 from sevn.protocol.registry import Ctx, method
 
 
+def _without_secret(result: dict[str, object]) -> dict[str, object]:
+    """The op log's copy of a create: the link path holds the secret, so it is blank.
+
+    A replay of the same ``op_id`` returns the share without its link; the
+    secret was shown once, to the first response.
+    """
+    return {**result, "path": ""}
+
+
 @method(
     "shares.create",
     params=SharesCreateParams,
     result=SharesCreateResult,
     mutating=True,
     scope="owner",
+    stored=_without_secret,
 )
 async def shares_create(_ctx: Ctx, params: SharesCreateParams) -> SharesCreateResult:
     try:
