@@ -354,3 +354,20 @@ async def test_overview_is_read_only(tmp_path: Path, monkeypatch: pytest.MonkeyP
         await _overview(client)
         after = await host.outbox.since(0)
     assert len(after) == len(before)
+
+
+async def test_a_resumed_turn_shows_its_bot_running(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An approval resume flips the turn to running but leaves the agent row
+    ``waiting`` until the turn ends; the bot is running, not waiting on anyone."""
+    _load()
+    async with connected(tmp_path, monkeypatch) as (_host, client):
+        bot = await _bot(client, "Atlas")
+        agent = await _agent(bot, "waiting", "Deploy")
+        await _turn(agent, "running", None)
+        body = await _overview(client)
+    row = next(item for item in body["bots"] if item["id"] == bot)
+    assert body["waiting"] == []
+    assert row["status"] == "running"
+    assert row["waiting"] == 0

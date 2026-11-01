@@ -285,3 +285,31 @@ test("a failed refresh keeps the data and says so", async () => {
     harness.stop();
   }
 });
+
+test("the bot filter clears when that bot is gone", async () => {
+  const withoutAtlas = {
+    ...full,
+    bots: full.bots.filter((item) => item.id !== "bot_atlas"),
+  };
+  const harness = await startHarness({
+    "fleet.overview": (params) =>
+      params.bot_id === "bot_atlas" ? withoutAtlas : full,
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Dashboard = await loadDashboard();
+    testing.render(createElement(Dashboard));
+    (await testing.screen.findByRole("button", { name: "Only Atlas" })).click();
+    await testing.waitFor(() => {
+      const calls = requestParams(harness.requests, "fleet.overview");
+      expect(calls.at(-1)?.bot_id).toBeUndefined();
+      expect(calls.some((call) => call.bot_id === "bot_atlas")).toBe(true);
+    });
+    const all = await testing.screen.findByRole("button", { name: "All bots" });
+    await testing.waitFor(() => {
+      expect(all.getAttribute("aria-pressed")).toBe("true");
+    });
+  } finally {
+    harness.stop();
+  }
+});
