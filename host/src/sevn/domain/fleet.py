@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sevn.config import Settings
 from sevn.domain.fleet_routines import FleetRoutine, upcoming
+from sevn.domain.host_status import FleetHost, host_status
 from sevn.domain.metrics import FleetMetric
 from sevn.domain.metrics import tiles as metric_tiles
 from sevn.domain.session import open_session
@@ -142,6 +143,7 @@ class FleetOverview(BaseModel):
     kpis: list[FleetKpi]
     bots: list[FleetBot]
     metrics: list[FleetMetric]
+    host: FleetHost
     upcoming: list[FleetRoutine]
     projection_7d_usd: float
     projection_unpriced: int
@@ -165,6 +167,7 @@ async def overview(*, bot_id: str | None = None) -> FleetOverview:
         running = await _running_turns(session)
         routines, projection, unpriced = await upcoming(session, names, now)
         metrics = await metric_tiles(session, names, now)
+        host = await host_status(session)
     counts = Counter(item.bot_id for item in waiting)
     return FleetOverview(
         as_of=now,
@@ -175,6 +178,7 @@ async def overview(*, bot_id: str | None = None) -> FleetOverview:
         finished=finished,
         activity=activity,
         metrics=metrics,
+        host=host,
         upcoming=routines,
         projection_7d_usd=projection,
         projection_unpriced=unpriced,

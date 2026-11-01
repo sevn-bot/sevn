@@ -956,6 +956,45 @@
       "title": "FleetFinished",
       "type": "object"
     },
+    "FleetHost": {
+      "additionalProperties": false,
+      "properties": {
+        "as_of": {
+          "format": "date-time",
+          "title": "As Of",
+          "type": "string"
+        },
+        "max_running_turns": {
+          "title": "Max Running Turns",
+          "type": "integer"
+        },
+        "ollama": {
+          "$ref": "#/$defs/OllamaStatus"
+        },
+        "queued_jobs": {
+          "title": "Queued Jobs",
+          "type": "integer"
+        },
+        "running_turns": {
+          "title": "Running Turns",
+          "type": "integer"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "as_of",
+        "version",
+        "queued_jobs",
+        "running_turns",
+        "max_running_turns",
+        "ollama"
+      ],
+      "title": "FleetHost",
+      "type": "object"
+    },
     "FleetKpi": {
       "additionalProperties": false,
       "description": "One tile on the KPI strip. ``value`` is null when it cannot be read.",
@@ -1217,6 +1256,9 @@
           "title": "Finished",
           "type": "array"
         },
+        "host": {
+          "$ref": "#/$defs/FleetHost"
+        },
         "kpis": {
           "items": {
             "$ref": "#/$defs/FleetKpi"
@@ -1260,6 +1302,7 @@
         "kpis",
         "bots",
         "metrics",
+        "host",
         "upcoming",
         "projection_7d_usd",
         "projection_unpriced",
@@ -1614,6 +1657,32 @@
           "type": "null"
         }
       ]
+    },
+    "LoadedModel": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "vram_bytes": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Vram Bytes"
+        }
+      },
+      "required": [
+        "name",
+        "vram_bytes"
+      ],
+      "title": "LoadedModel",
+      "type": "object"
     },
     "MemoriesDeleteParams": {
       "additionalProperties": false,
@@ -2167,6 +2236,74 @@
         "off"
       ],
       "type": "string"
+    },
+    "OllamaStatus": {
+      "additionalProperties": false,
+      "description": "``reachable`` is null when no Ollama URL is set.",
+      "properties": {
+        "checked_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Checked At"
+        },
+        "configured": {
+          "title": "Configured",
+          "type": "boolean"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Error"
+        },
+        "loaded": {
+          "items": {
+            "$ref": "#/$defs/LoadedModel"
+          },
+          "title": "Loaded",
+          "type": "array"
+        },
+        "models": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Models",
+          "type": "array"
+        },
+        "reachable": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reachable"
+        }
+      },
+      "required": [
+        "configured",
+        "reachable",
+        "models",
+        "loaded",
+        "error",
+        "checked_at"
+      ],
+      "title": "OllamaStatus",
+      "type": "object"
     },
     "Origin": {
       "enum": [
