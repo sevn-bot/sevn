@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from sevn.domain.agents import AgentRecord, AgentService
+from sevn.domain.errors import DomainError
 from sevn.tools.registry import TurnDeps, register_toolset
 
 
@@ -30,8 +31,14 @@ def agents_toolset(deps: TurnDeps) -> dict[str, object]:
         return "\n".join(_line(item) for item in rows)
 
     async def read_one(agent_id: str) -> str:
-        """Read one agent's title, status, and summary."""
-        return _line(await read_agent(agent_id))
+        """Read one of this bot's agents: title, status, and summary."""
+        try:
+            agent = await read_agent(agent_id)
+        except DomainError as exc:
+            return exc.code
+        if agent.bot_id != deps.bot_id:
+            return "not_found"
+        return _line(agent)
 
     async def close_self() -> str:
         """Mark this agent done."""
