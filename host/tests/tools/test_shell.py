@@ -274,6 +274,63 @@ async def test_cancelled_shell_kills_the_command(
         os.kill(pid, 0)
 
 
+def _gone(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return True
+    return False
+
+
+async def _wait_gone(pid: int) -> bool:
+    for _ in range(100):
+        if _gone(pid):
+            return True
+        await asyncio.sleep(0.05)
+    return False
+
+
+async def test_timeout_stops_children_after_the_shell_exits(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The leader exits 0 at once; its background child must not survive the timeout."""
+    import sevn.tools.shell as shell
+
+    monkeypatch.setattr(shell, "TIMEOUT_SECONDS", 0.5)
+    ran = await shell._run(  # pyright: ignore[reportPrivateUsage]
+        ["/bin/sh", "-c", "sleep 30 & echo $! > child.pid; exit 0"], tmp_path, dict(os.environ)
+    )
+    assert ran.timed_out is True
+    pid = int((tmp_path / "child.pid").read_text(encoding="utf-8").strip())
+    assert await _wait_gone(pid)
+
+
+async def test_timeout_kills_children_that_ignore_sigterm(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """SIGTERM ends the leader; a child that ignores it still gets SIGKILL.
+
+    The child does not hold the shell's pipes, so waiting on the leader returns as
+    soon as it dies, before any SIGKILL would be sent.
+    """
+    import sevn.tools.shell as shell
+
+    monkeypatch.setattr(shell, "TIMEOUT_SECONDS", 0.5)
+    monkeypatch.setattr(shell, "_TERM_GRACE", 0.3)
+    ran = await shell._run(  # pyright: ignore[reportPrivateUsage]
+        [
+            "/bin/sh",
+            "-c",
+            "(trap '' TERM; exec sleep 30 </dev/null >/dev/null 2>&1) & echo $! > child.pid; wait",
+        ],
+        tmp_path,
+        dict(os.environ),
+    )
+    assert ran.timed_out is True
+    pid = int((tmp_path / "child.pid").read_text(encoding="utf-8").strip())
+    assert await _wait_gone(pid)
+
+
 async def test_shell_caps_output_and_reports_stderr(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -36,6 +36,7 @@ TIMEOUT_SECONDS = 300.0
 OUTPUT_LIMIT = 64_000
 _CHUNK = 65_536
 _TERM_GRACE = 2.0
+_POLL = 0.05
 
 
 @dataclass(frozen=True, slots=True)
@@ -287,20 +288,37 @@ async def _read_capped(stream: asyncio.StreamReader | None) -> tuple[bytes, bool
 
 
 async def _stop(process: asyncio.subprocess.Process) -> None:
-    """SIGTERM the process group, then SIGKILL what is left after a short grace."""
-    if process.returncode is not None:
-        return
-    _signal_group(process.pid, signal.SIGTERM)
-    try:
-        await asyncio.wait_for(process.wait(), timeout=_TERM_GRACE)
-    except TimeoutError:
-        _signal_group(process.pid, signal.SIGKILL)
+    """SIGTERM the process group, then SIGKILL what is left after a short grace.
+
+    The group is the unit, not the leader: a background child keeps working
+    after its shell exits, and a child that ignores SIGTERM outlives a leader
+    that does not. ``start_new_session`` makes the leader's pid the group id.
+    """
+    group = process.pid
+    _signal_group(group, signal.SIGTERM)
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + _TERM_GRACE
+    # No event exists for "the group is empty": poll it.
+    while _group_alive(group) and loop.time() < deadline:  # noqa: ASYNC110
+        await asyncio.sleep(_POLL)
+    if _group_alive(group):
+        _signal_group(group, signal.SIGKILL)
+    if process.returncode is None:
         await process.wait()
 
 
 def _signal_group(pid: int, sig: signal.Signals) -> None:
     with suppress(ProcessLookupError, PermissionError):
         os.killpg(pid, sig)
+
+
+def _group_alive(pid: int) -> bool:
+    """True while any member of the group exists. A group we may not signal is gone to us."""
+    try:
+        os.killpg(pid, 0)
+    except (ProcessLookupError, PermissionError):
+        return False
+    return True
 
 
 def _text(raw: bytes | None) -> str:
