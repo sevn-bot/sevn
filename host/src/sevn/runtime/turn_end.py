@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sevn.domain.ids import new_id
+from sevn.domain.pending import latest_response_tool_call_ids
 from sevn.domain.session import open_session
 from sevn.domain.workspace import drop_locks
 from sevn.log import logger
@@ -270,9 +271,21 @@ async def close_question_turns(session: AsyncSession, agent_id: str, now: dateti
         )
     )
     for turn in turns:
+        # A mixed question/approval run must resume its deferred calls instead
+        # of publishing an unfinished checkpoint as a completed conversation.
+        calls = latest_response_tool_call_ids(turn.model_messages)
+        approvals = select(PendingRow.id).where(
+            PendingRow.turn_id == turn.id, PendingRow.kind == "approval"
+        )
+        if calls is not None:
+            approvals = approvals.where(PendingRow.tool_call_id.in_(calls))
+        approval = await session.scalar(approvals.limit(1))
+        if approval is not None or await _has_waiting_pending(session, turn.id):
+            continue
         turn.status = "done"
         turn.finished_at = now
         await MemoryStore().write(session, turn.id)
+        await drop_locks(session, agent_id)
         for job_id in turn.job_ids or ():
             job = await session.get(JobRow, job_id)
             if job is not None and job.status in ("queued", "started"):

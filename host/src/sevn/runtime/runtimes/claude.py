@@ -216,6 +216,11 @@ class ClaudeRuntime:
 
     async def open(self, agent: AgentRecord) -> SessionRef:
         bot = await BotService().get(agent.bot_id)
+        if bot.access != "full" or bot.network != "on":
+            raise TurnError(
+                "Claude requires full access and network on; "
+                "use Pydantic AI for workspace, isolated, or network-off execution"
+            )
         client = self._client_for(agent.id)
 
         async def _can_use_tool(tool: str, args: object, request_id: object) -> str:
@@ -338,11 +343,6 @@ _KEEP_ENV = frozenset(
         "TMP",
         "TEMP",
         "TERM",
-        "SSH_AUTH_SOCK",
-        "XDG_CONFIG_HOME",
-        "XDG_CACHE_HOME",
-        "XDG_DATA_HOME",
-        "XDG_STATE_HOME",
         "CLAUDE_CONFIG_DIR",
     }
 )
