@@ -330,6 +330,59 @@ async def test_host_budget_pauses_every_routine(
         assert [row["paused_reason"] for row in rows] == ["budget", "budget"]
 
 
+async def test_a_budget_pause_ends_with_the_period(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Paused by today's spend, the routine runs again tomorrow without the owner."""
+    from sevn.domain.routines import run_due
+
+    load_modules(*_MODULES)
+    monkeypatch.setenv("SEVN_BUDGETS__DAILY_USD_PER_BOT", "1.0")
+    async with connected(tmp_path, monkeypatch) as (host, client):
+        spender = await _bot(client, "Spender")
+        routine = await _create(client, spender, name="Over")
+        await _spent_today(tmp_path, spender, 1.25)
+        now = datetime.now(UTC)
+        await _make_due(tmp_path, routine["id"], now - timedelta(minutes=1))
+        assert await run_due(host.hub, now=now) == []
+        tomorrow = now + timedelta(days=1)
+        await run_due(host.hub, now=tomorrow)
+        rows = fetch_all(
+            tmp_path,
+            "SELECT status, paused_reason, next_run FROM routines WHERE id = ?",
+            (routine["id"],),
+        )
+    assert rows[0]["status"] == "active"
+    assert rows[0]["paused_reason"] is None
+    assert datetime.fromisoformat(rows[0]["next_run"]) > tomorrow
+
+
+async def test_an_owner_resume_holds_for_the_rest_of_the_day(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Resuming over budget is the owner's call; the next sweep does not undo it."""
+    from sevn.domain.routines import run_due
+
+    load_modules(*_MODULES)
+    monkeypatch.setenv("SEVN_BUDGETS__DAILY_USD_PER_BOT", "1.0")
+    async with connected(tmp_path, monkeypatch) as (host, client):
+        spender = await _bot(client, "Spender")
+        routine = await _create(client, spender, name="Over")
+        await _spent_today(tmp_path, spender, 1.25)
+        now = datetime.now(UTC)
+        await _make_due(tmp_path, routine["id"], now - timedelta(minutes=1))
+        assert await run_due(host.hub, now=now) == []
+        ok(await _call(client, "routines.resume", routine_id=routine["id"]))
+        await _make_due(tmp_path, routine["id"], now)
+        jobs = await run_due(host.hub, now=now + timedelta(seconds=30))
+        rows = fetch_all(
+            tmp_path, "SELECT status, paused_reason FROM routines WHERE id = ?", (routine["id"],)
+        )
+    assert len(jobs) == 1
+    assert rows[0]["status"] == "active"
+    assert rows[0]["paused_reason"] is None
+
+
 def _clear() -> None:
     from sevn.decisions.jev import use_client
     from sevn.runtime.models import use_model
