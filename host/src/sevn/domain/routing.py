@@ -33,6 +33,8 @@ from sevn.store.models import Turn as TurnRow
 
 _OPEN = ("running", "waiting", "idle")
 _ENDED_JOBS = frozenset({"done", "failed", "cancelled"})
+_QUEUED_ON_TARGET = frozenset({"follow_up", "steer"})
+_SLOT_HOLDERS = frozenset({"running", "waiting"})
 _FRESH = frozenset({"new_request", "chit_chat"})
 
 
@@ -149,7 +151,7 @@ async def deliver(
     decision_id = after if after != before else None
     bot = await BotService().get(message.bot_id)
     agent, origin, consumed = await _act(message, decision, job_id)
-    held = await _over_cap(bot.id, decision.intent)
+    held = await _over_cap(bot.id, decision.intent, agent)
     job_status = "waiting" if decision.ask_user else ("done" if consumed else "queued")
     await JobService().enqueue(
         job_id,
@@ -249,8 +251,18 @@ async def _act(
     return agent, "user", False
 
 
-async def _over_cap(bot_id: str, intent: str) -> bool:
-    if intent not in _FRESH:
+async def _over_cap(bot_id: str, intent: str, agent: AgentRecord) -> bool:
+    """True when running this job would take a parallel slot the bot does not have.
+
+    A new lane always needs a slot. A follow-up or a queued steer needs one
+    only when its target is not already running or waiting.
+    """
+    if intent in _FRESH:
+        pass
+    elif intent in _QUEUED_ON_TARGET:
+        if agent.status in _SLOT_HOLDERS:
+            return False
+    else:
         return False
     return await occupying(bot_id) >= Settings.load().bots.max_parallel_agents
 
