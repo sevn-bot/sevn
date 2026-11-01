@@ -39,6 +39,7 @@ function overview(extra: Record<string, unknown> = {}) {
   return {
     as_of: now.toISOString(),
     days: days(),
+    kpis: [],
     bots: [],
     waiting: [],
     finished: [],
@@ -103,7 +104,46 @@ const full = overview({
       finished_at: iso(2 * hour),
     },
   ],
-  activity: [{ bot_id: "bot_atlas", day: today, turns: 3 }],
+  kpis: [
+    {
+      key: "spend_today",
+      label: "Spend today",
+      value: 0.8,
+      unit: "USD",
+      source: "turn usage priced with genai-prices",
+      note: "turns finished since 00:00 UTC; routing calls not included",
+      unpriced: 1,
+      subscription: 2,
+    },
+    {
+      key: "tokens_today",
+      label: "Tokens today",
+      value: 15400,
+      unit: "tokens",
+      source: "turn usage (input + output)",
+      note: "turns finished since 00:00 UTC",
+    },
+    {
+      key: "waiting",
+      label: "Waiting on you",
+      value: 2,
+      unit: "",
+      source: "pending requests",
+      note: "approvals and questions",
+    },
+    {
+      key: "running",
+      label: "Running turns",
+      value: 1,
+      unit: "",
+      source: "turns",
+      note: "host limit 3",
+      limit: 3,
+    },
+  ],
+  activity: [
+    { bot_id: "bot_atlas", day: today, turns: 3, cost_usd: 0.5, unpriced: 1 },
+  ],
 });
 
 afterEach(async () => {
@@ -257,6 +297,76 @@ test("a fleet event refreshes the overview", async () => {
     expect(requestParams(harness.requests, "fleet.overview").length).toBe(
       settled,
     );
+  } finally {
+    harness.stop();
+  }
+});
+
+test("KPI strip shows spend, tokens, waiting and running with sources", async () => {
+  const harness = await startHarness({ "fleet.overview": full });
+  const testing = await import("@testing-library/react");
+  try {
+    const Dashboard = await loadDashboard();
+    testing.render(createElement(Dashboard));
+    const spend = await testing.screen.findByTestId("kpi-spend_today");
+    expect(spend.textContent).toContain("Spend today");
+    expect(spend.textContent).toContain("$0.80");
+    expect(spend.textContent).toContain("1 unpriced");
+    expect(spend.textContent).toContain("2 on subscription");
+    expect(spend.getAttribute("title")).toContain("genai-prices");
+    expect(spend.getAttribute("title")).toContain("routing calls not included");
+    const tokens = await testing.screen.findByTestId("kpi-tokens_today");
+    expect(tokens.textContent).toContain("15.4k");
+    const running = await testing.screen.findByTestId("kpi-running");
+    expect(running.textContent).toContain("1 / 3");
+    const waiting = await testing.screen.findByTestId("kpi-waiting");
+    expect(waiting.textContent).toContain("2");
+  } finally {
+    harness.stop();
+  }
+});
+
+test("a KPI with no value says unavailable", async () => {
+  const harness = await startHarness({
+    "fleet.overview": overview({
+      kpis: [
+        {
+          key: "spend_today",
+          label: "Spend today",
+          value: null,
+          unit: "USD",
+          source: "turn usage",
+          note: "",
+        },
+      ],
+    }),
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Dashboard = await loadDashboard();
+    testing.render(createElement(Dashboard));
+    const spend = await testing.screen.findByTestId("kpi-spend_today");
+    expect(spend.textContent).toContain("unavailable");
+    expect(spend.textContent).not.toContain("$");
+  } finally {
+    harness.stop();
+  }
+});
+
+test("activity grid switches to cost", async () => {
+  const harness = await startHarness({ "fleet.overview": full });
+  const testing = await import("@testing-library/react");
+  try {
+    const Dashboard = await loadDashboard();
+    testing.render(createElement(Dashboard));
+    await testing.screen.findByTitle(`Atlas ${today}: 3 turns`);
+    const cost = await testing.screen.findByRole("button", { name: "Cost" });
+    cost.click();
+    const cell = await testing.screen.findByTitle(
+      `Atlas ${today}: $0.50, 1 unpriced`,
+    );
+    expect(cell.getAttribute("data-cost")).toBe("0.5");
+    expect(cost.getAttribute("aria-pressed")).toBe("true");
   } finally {
     harness.stop();
   }
