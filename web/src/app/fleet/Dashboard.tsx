@@ -15,8 +15,11 @@ import { createQueryClient, useEvents } from "../../client/hooks.ts";
 import { ApprovalCard } from "../approvals/ApprovalCard.tsx";
 import { agentPath, go } from "../routes.ts";
 import { ActivityGrid } from "./ActivityGrid.tsx";
+import { HostPanel } from "./HostPanel.tsx";
 import { KpiStrip } from "./KpiStrip.tsx";
+import { MetricTiles } from "./MetricTiles.tsx";
 import { QuestionCard } from "./QuestionCard.tsx";
+import { SharesPanel } from "./SharesPanel.tsx";
 import {
   age,
   clock,
@@ -90,7 +93,18 @@ function DashboardView() {
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-lg font-medium">Fleet</h1>
+        <div className="flex items-baseline gap-3">
+          <h1 className="text-lg font-medium">Fleet</h1>
+          <button
+            type="button"
+            className="text-sm text-zinc-400 underline"
+            onClick={() => {
+              go("/brief");
+            }}
+          >
+            Daily brief
+          </button>
+        </div>
         <p className="text-sm text-zinc-400">
           <span>{`Updated ${clock(data.as_of)}`}</span>
           {query.isError ? (
@@ -100,6 +114,7 @@ function DashboardView() {
       </div>
       <FleetHeader bots={data.bots} />
       <KpiStrip kpis={data.kpis} />
+      <MetricTiles metrics={data.metrics} />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <WaitingPanel overview={data} />
         <FinishedPanel
@@ -115,6 +130,8 @@ function DashboardView() {
         activity={data.activity}
         onPick={setBotFilter}
       />
+      <HostPanel host={data.host} />
+      <SharesPanel bots={data.bots} asOf={data.as_of} />
     </section>
   );
 }
