@@ -18,7 +18,13 @@ export function toLane(agent: ListedAgent): LaneAgent {
   };
 }
 
-export function Lanes({ agents }: { agents: readonly LaneAgent[] }) {
+export function Lanes({
+  agents,
+  focusedId = null,
+}: {
+  agents: readonly LaneAgent[];
+  focusedId?: string | null;
+}) {
   const others = Math.max(agents.length - 1, 0);
   return (
     <div className="space-y-2">
@@ -26,7 +32,9 @@ export function Lanes({ agents }: { agents: readonly LaneAgent[] }) {
         <details
           key={agent.id}
           open
-          className="rounded border border-zinc-800 px-3 py-2"
+          data-lane={agent.id}
+          data-focused={agent.id === focusedId ? "true" : "false"}
+          className={`rounded border px-3 py-2 ${agent.id === focusedId ? "border-zinc-300" : "border-zinc-800"}`}
         >
           <summary>{agent.title !== "" ? agent.title : agent.id}</summary>
           <p className="text-sm text-zinc-400">{agent.status}</p>

@@ -19,6 +19,21 @@ type MockServer = {
   stop: () => void;
 };
 
+const errorKey = "__error";
+
+/** A reply that makes the harness answer with an `e` frame instead of `r`. */
+export function rpcError(
+  code: string,
+  message: string,
+): Record<string, unknown> {
+  return { [errorKey]: { code, message } };
+}
+
+const noReplyKey = "__no_reply";
+
+/** A reply the harness never answers, like a request still in flight. */
+export const noReply: Record<string, unknown> = { [noReplyKey]: true };
+
 export type Harness = {
   requests: Frame[];
   tick: (kind: string, data: Record<string, unknown>) => void;
@@ -71,12 +86,16 @@ export async function startHarness(
       const reply = replies[method];
       const body =
         typeof reply === "function" ? reply(params, nth) : (reply ?? {});
+      if (body[noReplyKey] === true) {
+        return;
+      }
+      const failure = body[errorKey];
       socket.send(
-        JSON.stringify({
-          t: "res",
-          id: frame.id,
-          ...(body.__error ? { e: body.__error } : { r: body }),
-        }),
+        JSON.stringify(
+          isRecord(failure)
+            ? { t: "res", id: frame.id, e: failure }
+            : { t: "res", id: frame.id, r: body },
+        ),
       );
     });
   });
@@ -136,6 +155,11 @@ export async function loadChat(): Promise<Component> {
 export async function loadMemoriesPanel(): Promise<Component> {
   const modules = import.meta.glob("../../src/app/bots/MemoriesPanel.tsx");
   return named(modules, "MemoriesPanel");
+}
+
+export async function loadDashboard(): Promise<Component> {
+  const modules = import.meta.glob("../../src/app/fleet/Dashboard.tsx");
+  return named(modules, "Dashboard");
 }
 
 async function named(

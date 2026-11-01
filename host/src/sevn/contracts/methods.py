@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sevn.contracts.kinds import AccessName, ApprovalPolicy, NetworkFlag, RuntimeName
 from sevn.domain.agents import AgentRecord
 from sevn.domain.bots import BotRecord
+from sevn.domain.fleet import FleetOverview
 from sevn.domain.jobs import MessageRecord
 from sevn.domain.pending import PendingRecord
 from sevn.memory.store import MemoryRecord
@@ -293,6 +294,14 @@ class TurnsCancelResult(BaseModel):
     status: str
 
 
+class FleetOverviewParams(BaseModel):
+    """``bot_id`` narrows only the finished list."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    bot_id: str | None = None
+
+
 class MemoriesListParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -380,5 +389,6 @@ METHODS: dict[str, MethodSpec] = {
         _spec("memories.update", MemoriesUpdateParams, MemoryRecord, mutating=True),
         _spec("memories.delete", MemoriesDeleteParams, MemoriesDeleteResult, mutating=True),
         _spec("memories.pin", MemoriesPinParams, MemoryRecord, mutating=True),
+        _spec("fleet.overview", FleetOverviewParams, FleetOverview, mutating=False),
     )
 }

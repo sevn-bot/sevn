@@ -1,6 +1,6 @@
 import { createElement } from "react";
 import { expect, test } from "vitest";
-import { loadChat, requestParams, startHarness } from "./host.ts";
+import { loadChat, noReply, requestParams, startHarness } from "./host.ts";
 
 const botId = "bot_nimbus";
 
@@ -367,6 +367,75 @@ test("shows the tool name and arguments on the approval card", async () => {
       args: true,
       text,
     });
+  } finally {
+    testing.cleanup();
+    harness.stop();
+  }
+});
+
+test("an agent link focuses that lane and sends to it", async () => {
+  const harness = await startHarness({
+    "messages.list": { messages: [], next_cursor: null },
+    "agents.list": {
+      agents: [
+        { id: "agent_1", title: "Newsletter", status: "waiting" },
+        { id: "agent_2", title: "Fix the build", status: "idle" },
+      ],
+    },
+    "pending.list": { pending: [] },
+    "messages.send": { job_id: "job_1", agent_id: "agent_1" },
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Chat = await loadChat();
+    testing.render(createElement(Chat, { botId, agentId: "agent_1" }));
+    await testing.screen.findByText("Sending to Newsletter");
+    const lane = document.querySelector('[data-lane="agent_1"]');
+    expect(lane?.getAttribute("data-focused")).toBe("true");
+    const other = document.querySelector('[data-lane="agent_2"]');
+    expect(other?.getAttribute("data-focused")).toBe("false");
+    const input = await testing.screen.findByRole("textbox", {
+      name: "Message",
+    });
+    testing.fireEvent.change(input, { target: { value: "Option A" } });
+    (await testing.screen.findByRole("button", { name: "Send" })).click();
+    await testing.waitFor(() => {
+      expect(requestParams(harness.requests, "messages.send").length).toBe(1);
+    });
+    const sent = requestParams(harness.requests, "messages.send")[0];
+    expect(sent?.agent_id).toBe("agent_1");
+    expect(sent?.text).toBe("Option A");
+  } finally {
+    testing.cleanup();
+    harness.stop();
+  }
+});
+
+test("an agent link sends to that lane before the lane list loads", async () => {
+  const harness = await startHarness({
+    "messages.list": { messages: [], next_cursor: null },
+    // Still loading: a throw here would escape the socket handler as an
+    // uncaught error and fail the run.
+    "agents.list": noReply,
+    "pending.list": { pending: [] },
+    "messages.send": { job_id: "job_1", agent_id: "agent_9" },
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Chat = await loadChat();
+    testing.render(createElement(Chat, { botId, agentId: "agent_9" }));
+    await testing.screen.findByText("Sending to agent_9");
+    const input = await testing.screen.findByRole("textbox", {
+      name: "Message",
+    });
+    testing.fireEvent.change(input, { target: { value: "the blue room" } });
+    (await testing.screen.findByRole("button", { name: "Send" })).click();
+    await testing.waitFor(() => {
+      expect(requestParams(harness.requests, "messages.send").length).toBe(1);
+    });
+    expect(requestParams(harness.requests, "messages.send")[0]?.agent_id).toBe(
+      "agent_9",
+    );
   } finally {
     testing.cleanup();
     harness.stop();
