@@ -65,6 +65,17 @@ function DashboardView() {
   }, [events, refetch]);
 
   const data = query.data;
+  const filterGone =
+    botFilter !== null &&
+    data !== undefined &&
+    !data.bots.some((bot) => bot.id === botFilter);
+
+  useEffect(() => {
+    // A deleted bot leaves no chip to click; fall back to all bots.
+    if (filterGone) {
+      setBotFilter(null);
+    }
+  }, [filterGone]);
   if (data === undefined) {
     return (
       <section className="space-y-2">
