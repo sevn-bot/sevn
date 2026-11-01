@@ -1068,6 +1068,98 @@
       "title": "FleetKpi",
       "type": "object"
     },
+    "FleetMetric": {
+      "additionalProperties": false,
+      "description": "One metric tile: the newest report, plus every bot's when they disagree.",
+      "properties": {
+        "as_of": {
+          "format": "date-time",
+          "title": "As Of",
+          "type": "string"
+        },
+        "bot_id": {
+          "title": "Bot Id",
+          "type": "string"
+        },
+        "bot_name": {
+          "title": "Bot Name",
+          "type": "string"
+        },
+        "delta_24h": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Delta 24H"
+        },
+        "freshness_minutes": {
+          "title": "Freshness Minutes",
+          "type": "integer"
+        },
+        "key": {
+          "title": "Key",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "reports": {
+          "items": {
+            "$ref": "#/$defs/MetricReport"
+          },
+          "title": "Reports",
+          "type": "array"
+        },
+        "shareable": {
+          "title": "Shareable",
+          "type": "boolean"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/MetricStatus"
+        },
+        "unit": {
+          "title": "Unit",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value"
+        }
+      },
+      "required": [
+        "key",
+        "label",
+        "value",
+        "unit",
+        "source",
+        "as_of",
+        "bot_id",
+        "bot_name",
+        "status",
+        "delta_24h",
+        "freshness_minutes",
+        "shareable",
+        "reports"
+      ],
+      "title": "FleetMetric",
+      "type": "object"
+    },
     "FleetOption": {
       "additionalProperties": false,
       "description": "One answer a question offers.",
@@ -1132,6 +1224,13 @@
           "title": "Kpis",
           "type": "array"
         },
+        "metrics": {
+          "items": {
+            "$ref": "#/$defs/FleetMetric"
+          },
+          "title": "Metrics",
+          "type": "array"
+        },
         "projection_7d_usd": {
           "title": "Projection 7D Usd",
           "type": "number"
@@ -1160,6 +1259,7 @@
         "days",
         "kpis",
         "bots",
+        "metrics",
         "upcoming",
         "projection_7d_usd",
         "projection_unpriced",
@@ -1961,6 +2061,58 @@
       ],
       "title": "MessagesSendResult",
       "type": "object"
+    },
+    "MetricReport": {
+      "additionalProperties": false,
+      "description": "One bot's latest value for a key.",
+      "properties": {
+        "as_of": {
+          "format": "date-time",
+          "title": "As Of",
+          "type": "string"
+        },
+        "bot_id": {
+          "title": "Bot Id",
+          "type": "string"
+        },
+        "bot_name": {
+          "title": "Bot Name",
+          "type": "string"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value"
+        }
+      },
+      "required": [
+        "bot_id",
+        "bot_name",
+        "value",
+        "as_of",
+        "source"
+      ],
+      "title": "MetricReport",
+      "type": "object"
+    },
+    "MetricStatus": {
+      "enum": [
+        "ok",
+        "stale",
+        "error",
+        "conflict"
+      ],
+      "type": "string"
     },
     "ModelInfo": {
       "additionalProperties": false,

@@ -449,6 +449,7 @@ def _register_feature_tools() -> None:
         "sevn.tools.history",
         "sevn.tools.shell",
         "sevn.tools.routine",
+        "sevn.tools.metric",
     ):
         importlib.import_module(module)
     from sevn.tools.shell import shell_toolset
