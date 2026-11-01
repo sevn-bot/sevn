@@ -11,6 +11,35 @@ _PROFILE = Path(__file__).resolve().parent / "profiles" / "sevn-workspace.sb"
 _SANDBOX_EXEC = "/usr/bin/sandbox-exec"
 _SHELL = "/bin/sh"
 
+# macOS mktemp takes _CS_DARWIN_USER_TEMP_DIR before TMPDIR for bare and -t
+# calls (mktemp(1)), and the profile keeps that host directory read-only, so
+# setting TMPDIR alone cannot fix them. This shim builds those templates inside
+# $TMPDIR. Explicit templates and any other flag pass straight through.
+_MKTEMP_SHIM = """#!/bin/sh
+real=/usr/bin/mktemp
+flags=""
+prefix=tmp
+want_prefix=0
+for arg in "$@"; do
+  if [ "$want_prefix" = 1 ]; then
+    prefix=$arg
+    want_prefix=0
+    continue
+  fi
+  case "$arg" in
+    -t) want_prefix=1 ;;
+    -t*) prefix=${arg#-t} ;;
+    -d | -q | -u) flags="$flags $arg" ;;
+    *) exec "$real" "$@" ;;
+  esac
+done
+if [ -z "$TMPDIR" ] || [ "$want_prefix" = 1 ]; then
+  exec "$real" "$@"
+fi
+# shellcheck disable=SC2086
+exec "$real" $flags "${TMPDIR%/}/$prefix.XXXXXXXXXX"
+"""
+
 
 def argv(command: str, *, workspace: Path, shared: Path, network: bool) -> list[str]:
     """Run ``command`` under ``sevn-workspace.sb``."""
@@ -52,3 +81,17 @@ def argv(command: str, *, workspace: Path, shared: Path, network: bool) -> list[
         "-c",
         command,
     ]
+
+
+def install_shims(folder: Path) -> Path:
+    """Write the shell shims into ``folder`` and return it, for the front of ``PATH``.
+
+    ``folder`` must be inside the workspace: the profile denies reads of the home,
+    where a development checkout of the package lives.
+    """
+    folder.mkdir(parents=True, exist_ok=True)
+    shim = folder / "mktemp"
+    if not shim.is_file() or shim.read_text(encoding="utf-8") != _MKTEMP_SHIM:
+        shim.write_text(_MKTEMP_SHIM, encoding="utf-8")
+    shim.chmod(0o755)
+    return folder

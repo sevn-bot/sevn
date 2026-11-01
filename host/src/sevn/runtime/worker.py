@@ -17,8 +17,8 @@ from sevn.protocol.hub import Hub
 from sevn.runtime.base import Runtime, ToolDecision
 from sevn.runtime.runtimes.claude import ClaudeRuntime, installed_client
 from sevn.runtime.runtimes.pydantic_ai import PydanticAIRuntime
-from sevn.runtime.turn import (
-    TurnRunner,
+from sevn.runtime.turn import TurnRunner
+from sevn.runtime.turn_end import (
     cancel_persisted_waiting,
     persist_queued_cancel,
     persist_running_cancel,
@@ -74,6 +74,7 @@ class Worker:
         self._tasks: dict[str, asyncio.Task[None]] = {}
         self._resumes: set[asyncio.Task[None]] = set()
         self._again: set[str] = set()
+        self._interrupted: set[asyncio.Task[None]] = set()
         self._board = _Board()
         self._closed = False
 
@@ -111,6 +112,7 @@ class Worker:
         if task is None or task.done():
             started = asyncio.create_task(self._pump(agent_id))
             started.add_done_callback(_log_task)
+            started.add_done_callback(lambda done: self._after_pump(agent_id, done))
             self._tasks[agent_id] = started
 
     async def settle(self, agent_id: str) -> None:
@@ -145,6 +147,7 @@ class Worker:
                 await task
         self._tasks.clear()
         self._resumes.clear()
+        self._interrupted.clear()
 
     async def resume(
         self,
@@ -166,7 +169,7 @@ class Worker:
                 finally:
                     self._slots.release()
         finally:
-            self.kick(agent_id)
+            await self._release(agent_id)
 
     async def cancel(self, turn_id: str) -> str:
         """Cancel a queued, live or waiting turn. A finished turn keeps its stored status."""
@@ -174,7 +177,7 @@ class Worker:
         self._board.cancel(turn_id)
         if await cancel_persisted_waiting(self.hub, turn_id):
             agent_id = live if live is not None else await _agent_for_turn(turn_id)
-            self.kick(agent_id)
+            await self._release(agent_id)
             return "cancelled"
         if await persist_queued_cancel(self.hub, turn_id):
             return "cancelled"
@@ -185,6 +188,10 @@ class Worker:
         await persist_running_cancel(self.hub, turn_id)
         runtime = await self._choose(live)
         await runtime.interrupt(live)
+        pump = self._tasks.get(live)
+        if pump is not None and pump.cancelling():
+            # The interrupt cancelled this pump itself (the turn ran in it).
+            self._interrupted.add(pump)
         self.kick(live)
         return "cancelled"
 
@@ -221,6 +228,37 @@ class Worker:
                     logger.error("job stayed queued after its turn")
                     return
                 await self._open_slots(agent_id)
+
+    def _after_pump(self, agent_id: str, task: asyncio.Task[None]) -> None:
+        """An interrupted turn cancels its pump before the pump's own wake-ups run.
+
+        Release the agent from here instead, or jobs queued on it and lanes queued
+        behind the bot's cap stay queued until the next message or a restart.
+        """
+        interrupted = task in self._interrupted
+        self._interrupted.discard(task)
+        # Only the pump cancel() interrupted counts: loop shutdown cancels pumps
+        # too, and a task started while the loop closes is never run or reaped.
+        if not task.cancelled() or not interrupted or self._closed:
+            return
+        released = asyncio.create_task(self._release(agent_id))
+        self._resumes.add(released)
+        released.add_done_callback(self._resumes.discard)
+
+    async def _release(self, agent_id: str) -> None:
+        """A turn outside the pump ended: wake this lane, then the lanes queued on its slot.
+
+        The pump frees a slot itself after an ordinary job. A resumed approval, a
+        cancelled waiting turn or an interrupted pump frees one without passing
+        through it.
+        """
+        self.kick(agent_id)
+        if self._closed:
+            return
+        try:
+            await self._open_slots(agent_id)
+        except Exception:  # noqa: BLE001 — a failed wake-up must not fail the resume or cancel
+            logger.exception("could not wake queued lanes")
 
     async def _run(self, job_id: str) -> bool:
         """Run one job. True means it is still queued and must not be retried in a loop."""
