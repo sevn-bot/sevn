@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from starlette.testclient import TestClient
 
 _SECRET_TEXTS = (
     "Which subject line for the secret launch?",
@@ -118,6 +119,12 @@ def _create(**kwargs: Any) -> tuple[dict[str, Any], str]:
     return record.model_dump(mode="json"), path
 
 
+def _web(client: object) -> TestClient:
+    """The test client the ``host_app`` fixture yields as ``object``."""
+    assert isinstance(client, TestClient)
+    return client
+
+
 def _rows(home: Path, sql: str, args: tuple[object, ...] = ()) -> list[sqlite3.Row]:
     with sqlite3.connect(home / "sevn.db") as connection:
         connection.row_factory = sqlite3.Row
@@ -136,7 +143,7 @@ def test_a_share_link_serves_a_redacted_snapshot(
     assert len(secret) >= 40
     stored = _rows(tmp_path, "SELECT secret_hash FROM share_links WHERE id = ?", (share_id,))
     assert secret not in stored[0]["secret_hash"]
-    response = client.get(f"{path}/data")  # type: ignore[attr-defined]
+    response = _web(client).get(f"{path}/data")
     assert response.status_code == 200
     assert response.headers["cache-control"] == "no-store"
     assert response.headers["referrer-policy"] == "no-referrer"
@@ -170,7 +177,7 @@ def test_a_bot_scoped_link_shows_only_that_bot(
     _app, _token, client = host_app
     bots = asyncio.run(_seed(tmp_path))
     _record, path = _create(label="Nimbus only", bot_id=bots["nimbus"], expires_in_hours=1)
-    body = client.get(f"{path}/data").json()  # type: ignore[attr-defined]
+    body = _web(client).get(f"{path}/data").json()
     assert body["scope_bot_name"] == "Nimbus"
     assert [item["name"] for item in body["bots"]] == ["Nimbus"]
     assert [tile["key"] for tile in body["metrics"]] == ["followers"]
@@ -193,11 +200,11 @@ def test_wrong_revoked_and_expired_links_are_not_found(
     record, path = _create(label="Soon gone", bot_id=None, expires_in_hours=1)
     share_id = record["id"]
     responses = [
-        client.get(f"/share/{share_id}/wrong-secret/data"),  # type: ignore[attr-defined]
-        client.get(f"/share/shr_missing/{path.rsplit('/', 1)[-1]}/data"),  # type: ignore[attr-defined]
+        _web(client).get(f"/share/{share_id}/wrong-secret/data"),
+        _web(client).get(f"/share/shr_missing/{path.rsplit('/', 1)[-1]}/data"),
     ]
     asyncio.run(ShareService().revoke(share_id))
-    responses.append(client.get(f"{path}/data"))  # type: ignore[attr-defined]
+    responses.append(_web(client).get(f"{path}/data"))
     _second, live = _create(label="Expired", bot_id=None, expires_in_hours=1)
     with sqlite3.connect(tmp_path / "sevn.db") as connection:
         connection.execute(
@@ -205,7 +212,7 @@ def test_wrong_revoked_and_expired_links_are_not_found(
             ((datetime.now(UTC) - timedelta(minutes=1)).isoformat(), live.split("/")[2]),
         )
         connection.commit()
-    responses.append(client.get(f"{live}/data"))  # type: ignore[attr-defined]
+    responses.append(_web(client).get(f"{live}/data"))
     for response in responses:
         assert response.status_code == 404
         assert response.json() == {"error": "not found"}
@@ -215,7 +222,7 @@ def test_wrong_revoked_and_expired_links_are_not_found(
 
 def test_the_share_page_is_the_spa(host_app: tuple[object, str, object]) -> None:
     _app, _token, client = host_app
-    response = client.get("/share/shr_x/secret")  # type: ignore[attr-defined]
+    response = _web(client).get("/share/shr_x/secret")
     assert response.status_code == 200
     assert "<title>sevn</title>" in response.text
     assert response.headers["referrer-policy"] == "no-referrer"
@@ -253,3 +260,24 @@ def test_list_and_revoke_from_the_protocol(
     revoked = asyncio.run(ShareService().revoke(record["id"]))
     assert revoked.status == "revoked"
     assert revoked.revoked_at is not None
+
+
+async def test_the_op_log_keeps_no_share_secret(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """shares.create is idempotent, but its stored replay must not hold the secret."""
+    from support.chat import connected, fetch_all, load_modules, mint_id, ok, request
+
+    load_modules("sevn.api.shares")
+    async with connected(tmp_path, monkeypatch) as (_host, client):
+        op_id = mint_id("op_")
+        params = {"label": "Investors", "expires_in_hours": 24, "op_id": op_id}
+        first = ok((await request(client, "shares.create", params))[0])
+        secret = str(first["path"]).rsplit("/", 1)[-1]
+        assert len(secret) > 20
+        stored = fetch_all(tmp_path, "SELECT result FROM op_log WHERE op_id = ?", (op_id,))
+        assert stored and secret not in str(stored[0]["result"])
+        again = ok((await request(client, "shares.create", params))[0])
+        assert again["share"]["id"] == first["share"]["id"]
+        assert secret not in json.dumps(again)
+        assert again["path"] == ""
