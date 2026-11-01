@@ -102,12 +102,18 @@ export type FleetBot = {
   waiting: number;
 };
 
+export type FleetOption = { id: string; label: string };
+
 export type FleetWaiting = {
   id: string;
   kind: string;
   text: string;
   name: string;
   args: Record<string, unknown>;
+  options: FleetOption[];
+  priority: "low" | "normal" | "high";
+  due_by: string | null;
+  blocking: boolean;
   bot_id: string;
   bot_name: string;
   agent_id: string;
@@ -235,7 +241,9 @@ export type MethodParams = {
   "pending.list": Record<string, never>;
   "pending.answer": {
     pending_id: string;
-    answer: "approve" | "deny";
+    answer?: "approve" | "deny";
+    option_id?: string;
+    text?: string;
     op_id?: string;
   };
   "turns.snapshot": { turn_id: string };
@@ -270,7 +278,7 @@ export type MethodResult = {
   "memories.delete": { id: string };
   "memories.pin": Memory;
   "pending.list": { pending: PendingItem[] };
-  "pending.answer": { id: string; status: string };
+  "pending.answer": { id: string; status: string; job_id?: string | null };
   "turns.snapshot": { text: string; status: string };
   "turns.cancel": { turn_id: string; status: string };
   "fleet.overview": FleetOverview;

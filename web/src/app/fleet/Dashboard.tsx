@@ -16,7 +16,15 @@ import { ApprovalCard } from "../approvals/ApprovalCard.tsx";
 import { agentPath, go } from "../routes.ts";
 import { ActivityGrid } from "./ActivityGrid.tsx";
 import { KpiStrip } from "./KpiStrip.tsx";
-import { age, clock, olderThan, staleAfterMs, stamp } from "./time.ts";
+import { QuestionCard } from "./QuestionCard.tsx";
+import {
+  age,
+  clock,
+  dueLabel,
+  olderThan,
+  staleAfterMs,
+  stamp,
+} from "./time.ts";
 
 const refreshKinds = new Set([
   "pending.created",
@@ -223,10 +231,15 @@ function WaitingPanel({ overview }: { overview: FleetOverview }) {
 
 function WaitingCard({ item, asOf }: { item: FleetWaiting; asOf: string }) {
   const stale = olderThan(item.created_at, asOf, staleAfterMs);
+  const overdue =
+    item.due_by !== null && Date.parse(item.due_by) < Date.parse(asOf);
   return (
     <li
+      data-pending={item.id}
       data-stale={stale ? "true" : "false"}
-      className={`space-y-2 rounded border px-3 py-2 ${stale ? "border-amber-600" : "border-zinc-800"}`}
+      data-priority={item.priority}
+      data-overdue={overdue ? "true" : "false"}
+      className={`space-y-2 rounded border px-3 py-2 ${stale || overdue ? "border-amber-600" : "border-zinc-800"}`}
     >
       <div className="flex flex-wrap items-baseline gap-x-2 text-sm text-zinc-400">
         <span className="text-zinc-200">{item.bot_name}</span>
@@ -234,6 +247,23 @@ function WaitingCard({ item, asOf }: { item: FleetWaiting; asOf: string }) {
         <span className={stale ? "text-amber-400" : ""}>
           {`waiting ${age(item.created_at, asOf)}`}
         </span>
+        {item.priority !== "normal" ? (
+          <span
+            className={
+              item.priority === "high" ? "text-amber-300" : "text-zinc-500"
+            }
+          >
+            {item.priority}
+          </span>
+        ) : null}
+        {item.due_by !== null ? (
+          <span className={overdue ? "text-red-400" : ""}>
+            {dueLabel(item.due_by, asOf)}
+          </span>
+        ) : null}
+        {item.blocking ? null : (
+          <span className="text-zinc-500">not blocking</span>
+        )}
       </div>
       {item.kind === "approval" ? (
         <ApprovalCard
@@ -243,7 +273,7 @@ function WaitingCard({ item, asOf }: { item: FleetWaiting; asOf: string }) {
           args={item.args}
         />
       ) : (
-        <p>{item.text}</p>
+        <QuestionCard item={item} />
       )}
       <OpenButton botId={item.bot_id} agentId={item.agent_id} />
     </li>
