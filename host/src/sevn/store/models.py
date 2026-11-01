@@ -9,6 +9,7 @@ from sqlalchemy import (
     JSON,
     Boolean,
     DateTime,
+    Float,
     ForeignKey,
     Integer,
     LargeBinary,
@@ -255,6 +256,49 @@ class Routine(Base):
     last_run: Mapped[datetime | None] = mapped_column(_IsoDateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(_IsoDateTime, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(_IsoDateTime, nullable=False)
+
+
+class MetricPoint(Base):
+    """One value a bot reported for a metric (plan fleet-dashboards, phase 6)."""
+
+    __tablename__ = "metric_points"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    bot_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("bots.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    key: Mapped[str] = mapped_column(String, nullable=False)
+    label: Mapped[str] = mapped_column(String, nullable=False)
+    value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    unit: Mapped[str] = mapped_column(String, nullable=False)
+    source: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    as_of: Mapped[datetime] = mapped_column(_IsoDateTime, nullable=False)
+    freshness_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
+    shareable: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(_IsoDateTime, nullable=False)
+
+
+class ShareLink(Base):
+    """A read-only dashboard link. Only a hash of its secret is stored."""
+
+    __tablename__ = "share_links"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    secret_hash: Mapped[str] = mapped_column(String, nullable=False)
+    label: Mapped[str] = mapped_column(String, nullable=False)
+    bot_id: Mapped[str | None] = mapped_column(
+        String,
+        ForeignKey("bots.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(_IsoDateTime, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(_IsoDateTime, nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(_IsoDateTime, nullable=True)
+    last_opened_at: Mapped[datetime | None] = mapped_column(_IsoDateTime, nullable=True)
+    opens: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
 
 class PendingRequest(Base):
