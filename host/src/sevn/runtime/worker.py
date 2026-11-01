@@ -166,7 +166,7 @@ class Worker:
                 finally:
                     self._slots.release()
         finally:
-            self.kick(agent_id)
+            await self._release(agent_id)
 
     async def cancel(self, turn_id: str) -> str:
         """Cancel a queued, live or waiting turn. A finished turn keeps its stored status."""
@@ -174,7 +174,7 @@ class Worker:
         self._board.cancel(turn_id)
         if await cancel_persisted_waiting(self.hub, turn_id):
             agent_id = live if live is not None else await _agent_for_turn(turn_id)
-            self.kick(agent_id)
+            await self._release(agent_id)
             return "cancelled"
         if await persist_queued_cancel(self.hub, turn_id):
             return "cancelled"
@@ -221,6 +221,20 @@ class Worker:
                     logger.error("job stayed queued after its turn")
                     return
                 await self._open_slots(agent_id)
+
+    async def _release(self, agent_id: str) -> None:
+        """A turn outside the pump ended: wake this lane, then the lanes queued on its slot.
+
+        The pump frees a slot itself after an ordinary job. A resumed approval or a
+        cancelled waiting turn frees one without passing through it.
+        """
+        self.kick(agent_id)
+        if self._closed:
+            return
+        try:
+            await self._open_slots(agent_id)
+        except Exception:  # noqa: BLE001 — a failed wake-up must not fail the resume or cancel
+            logger.exception("could not wake queued lanes")
 
     async def _run(self, job_id: str) -> bool:
         """Run one job. True means it is still queued and must not be retried in a loop."""

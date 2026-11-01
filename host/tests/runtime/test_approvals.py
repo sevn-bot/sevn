@@ -196,6 +196,48 @@ async def test_waiting_turn_survives_restart(
         )
 
 
+async def test_resumed_approval_wakes_a_queued_sibling_lane(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With a cap of one, finishing a resumed turn must start the lane queued behind it."""
+    monkeypatch.setenv("SEVN_BOTS__MAX_PARALLEL_AGENTS", "1")
+    load_modules("sevn.api.bots", "sevn.api.messages", "sevn.api.pending")
+    async with connected(tmp_path, monkeypatch) as (host, client):
+        await _arm(host)
+        bot = await _bot(client)
+        await request(
+            client,
+            "messages.send",
+            {"bot_id": bot["id"], "text": "run it", "op_id": mint_id("op_")},
+        )
+        item = await _wait_pending(tmp_path, client)
+        frame, _earlier = await request(
+            client,
+            "messages.send",
+            {"bot_id": bot["id"], "text": "/new second task", "op_id": mint_id("op_")},
+        )
+        queued = ok(frame)
+        assert queued["agent_id"] != item["agent_id"]
+        assert (
+            fetch_all(tmp_path, "SELECT status FROM jobs WHERE id = ?", (queued["job_id"],))[0][
+                "status"
+            ]
+            == "queued"
+        )
+        frame, _earlier = await request(
+            client,
+            "pending.answer",
+            {"pending_id": item["id"], "answer": "deny", "op_id": mint_id("op_")},
+        )
+        ok(frame)
+        await poll_rows(
+            tmp_path,
+            "SELECT status FROM jobs WHERE id = ?",
+            (queued["job_id"],),
+            lambda rows: bool(rows) and rows[0]["status"] == "done",
+        )
+
+
 async def test_answer_twice_rejected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     load_modules("sevn.api.bots", "sevn.api.messages", "sevn.api.pending")
     async with connected(tmp_path, monkeypatch) as (host, client):
