@@ -309,23 +309,36 @@ def _due(body: dict[str, object]) -> datetime | None:
     return parsed.astimezone(UTC)
 
 
+async def finished_since(since: datetime, *, status: str, limit: int) -> list[FleetFinished]:
+    """The newest ``limit`` turns that ended with ``status`` since ``since``."""
+    async with open_session() as session:
+        names = {bot.id: bot.name for bot in await session.scalars(select(BotRow))}
+        return await _finished(session, names, None, statuses=(status,), since=since, limit=limit)
+
+
 async def _finished(
     session: AsyncSession,
     names: dict[str, str],
     bot_id: str | None,
+    *,
+    statuses: tuple[str, ...] = _ENDED,
+    since: datetime | None = None,
+    limit: int = FINISHED_LIMIT,
 ) -> list[FleetFinished]:
     stmt = (
         select(TurnRow, AgentRow)
         .join(AgentRow, TurnRow.agent_id == AgentRow.id)
-        .where(TurnRow.status.in_(_ENDED))
+        .where(TurnRow.status.in_(statuses))
         .where(TurnRow.finished_at.is_not(None))
     )
     if bot_id is not None:
         stmt = stmt.where(AgentRow.bot_id == bot_id)
+    if since is not None:
+        stmt = stmt.where(TurnRow.finished_at >= since)
     rows = list(
         (
             await session.execute(
-                stmt.order_by(TurnRow.finished_at.desc(), TurnRow.id.desc()).limit(FINISHED_LIMIT)
+                stmt.order_by(TurnRow.finished_at.desc(), TurnRow.id.desc()).limit(limit)
             )
         ).all()
     )

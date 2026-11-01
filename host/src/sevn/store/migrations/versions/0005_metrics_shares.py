@@ -29,6 +29,8 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["bot_id"], ["bots.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
+    # Tiles read each bot's latest point per key and one 24-48h lookup.
+    op.create_index("ix_metric_points_key_bot_as_of", "metric_points", ["key", "bot_id", "as_of"])
     op.create_table(
         "share_links",
         sa.Column("id", sa.String(), nullable=False),
@@ -47,4 +49,5 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_table("share_links")
+    op.drop_index("ix_metric_points_key_bot_as_of", table_name="metric_points")
     op.drop_table("metric_points")

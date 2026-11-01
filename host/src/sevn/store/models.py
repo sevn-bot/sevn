@@ -11,6 +11,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     LargeBinary,
     String,
@@ -262,6 +263,7 @@ class MetricPoint(Base):
     """One value a bot reported for a metric (plan fleet-dashboards, phase 6)."""
 
     __tablename__ = "metric_points"
+    __table_args__ = (Index("ix_metric_points_key_bot_as_of", "key", "bot_id", "as_of"),)
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     bot_id: Mapped[str] = mapped_column(

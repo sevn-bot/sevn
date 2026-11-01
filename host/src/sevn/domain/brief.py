@@ -15,9 +15,16 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 
 from sevn.domain.cron import parse, runs_between
-from sevn.domain.fleet import FleetFinished, FleetKpi, FleetOverview, FleetWaiting, overview
+from sevn.domain.fleet import (
+    FleetFinished,
+    FleetKpi,
+    FleetOverview,
+    FleetWaiting,
+    finished_since,
+    overview,
+)
 from sevn.domain.fleet_routines import FleetRoutine
-from sevn.domain.metrics import FleetMetric
+from sevn.domain.metrics import FleetMetric, all_tiles
 from sevn.domain.session import open_session
 from sevn.store.models import Agent as AgentRow
 from sevn.store.models import Bot as BotRow
@@ -83,26 +90,26 @@ async def brief() -> FleetBrief:
     since = now - _DAY
     done, failed, failed_bots = await _ended(since)
     routines, today_usd, today_unpriced = await _today(board.upcoming, now)
+    # The dashboard caps its metric strip and finished list; the brief does not.
+    metrics = await all_tiles(now)
     return FleetBrief(
         built_at=now,
         since=since,
         kpis=board.kpis,
         metric_changes=[
             metric
-            for metric in board.metrics
+            for metric in metrics
             if metric.delta_24h not in (None, 0) or metric.status != "ok"
         ],
         decisions=board.waiting[:_TOP],
         decisions_total=len(board.waiting),
         finished_done=done,
         finished_failed=failed,
-        finished_top=[
-            item for item in board.finished if item.status == "done" and item.finished_at >= since
-        ][:_TOP],
+        finished_top=await finished_since(since, status="done", limit=_TOP),
         routines_today=routines,
         routines_today_usd=round(today_usd, 6),
         routines_today_unpriced=today_unpriced,
-        broken=_issues(board, now, failed, failed_bots),
+        broken=_issues(board, metrics, now, failed, failed_bots),
     )
 
 
@@ -164,7 +171,11 @@ async def _today(
 
 
 def _issues(
-    board: FleetOverview, now: datetime, failed: int, failed_bots: list[str]
+    board: FleetOverview,
+    metrics: list[FleetMetric],
+    now: datetime,
+    failed: int,
+    failed_bots: list[str],
 ) -> list[BriefIssue]:
     issues: list[BriefIssue] = []
     if failed:
@@ -188,7 +199,7 @@ def _issues(
     if overdue:
         noun = "question" if overdue == 1 else "questions"
         issues.append(BriefIssue(kind="overdue_question", text=f"{overdue} overdue {noun}"))
-    for metric in board.metrics:
+    for metric in metrics:
         if metric.status == "stale":
             issues.append(
                 BriefIssue(kind="stale_metric", text=f"{metric.label} is stale ({metric.source})")
