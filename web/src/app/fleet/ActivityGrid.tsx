@@ -1,4 +1,32 @@
+import { useState } from "react";
 import type { FleetBot, FleetDay } from "../../client/connection.ts";
+import { formatUsd } from "./KpiStrip.tsx";
+
+type View = "turns" | "cost";
+
+function costShade(cost: number): string {
+  if (cost <= 0) {
+    return "bg-zinc-900";
+  }
+  if (cost < 0.1) {
+    return "bg-sky-900";
+  }
+  if (cost < 1) {
+    return "bg-sky-700";
+  }
+  if (cost < 5) {
+    return "bg-sky-500";
+  }
+  return "bg-sky-300";
+}
+
+function costLabel(row: FleetDay | undefined): string {
+  if (row === undefined) {
+    return "$0.00";
+  }
+  const money = formatUsd(row.cost_usd);
+  return row.unpriced > 0 ? `${money}, ${row.unpriced} unpriced` : money;
+}
 
 function shade(turns: number): string {
   if (turns <= 0) {
@@ -31,19 +59,37 @@ export function ActivityGrid({
   activity: FleetDay[];
   onPick: (botId: string) => void;
 }) {
-  const counts = new Map<string, number>();
+  const [view, setView] = useState<View>("turns");
+  const rows = new Map<string, FleetDay>();
   const active = new Set<string>();
   for (const row of activity) {
-    counts.set(`${row.bot_id}|${row.day}`, row.turns);
+    rows.set(`${row.bot_id}|${row.day}`, row);
     if (row.turns > 0) {
       active.add(row.bot_id);
     }
   }
   return (
     <section aria-labelledby="fleet-activity" className="space-y-2">
-      <h2 id="fleet-activity" className="font-medium">
-        {`Activity, last ${days.length} days`}
-      </h2>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="fleet-activity" className="font-medium">
+          {`Activity, last ${days.length} days`}
+        </h2>
+        <div className="flex gap-1">
+          {(["turns", "cost"] as const).map((option) => (
+            <button
+              key={option}
+              type="button"
+              aria-pressed={view === option}
+              className={`rounded-full border px-2 py-0.5 text-xs ${view === option ? "border-zinc-100 bg-zinc-100 text-zinc-950" : "border-zinc-700 text-zinc-300"}`}
+              onClick={() => {
+                setView(option);
+              }}
+            >
+              {option === "turns" ? "Turns" : "Cost"}
+            </button>
+          ))}
+        </div>
+      </div>
       {bots.length === 0 ? (
         <p className="text-sm text-zinc-400">No bots yet</p>
       ) : (
@@ -89,13 +135,20 @@ export function ActivityGrid({
                       ) : null}
                     </th>
                     {days.map((day) => {
-                      const turns = counts.get(`${bot.id}|${day}`) ?? 0;
+                      const row = rows.get(`${bot.id}|${day}`);
+                      const turns = row?.turns ?? 0;
+                      const cost = row?.cost_usd ?? 0;
                       return (
                         <td
                           key={day}
-                          title={`${bot.name} ${day}: ${turnsLabel(turns)}`}
+                          title={
+                            view === "turns"
+                              ? `${bot.name} ${day}: ${turnsLabel(turns)}`
+                              : `${bot.name} ${day}: ${costLabel(row)}`
+                          }
                           data-turns={turns}
-                          className={`h-4 w-4 rounded-sm ${shade(turns)}`}
+                          data-cost={cost}
+                          className={`h-4 w-4 rounded-sm ${view === "turns" ? shade(turns) : costShade(cost)}`}
                         />
                       );
                     })}

@@ -127,11 +127,30 @@ export type FleetFinished = {
   finished_at: string;
 };
 
-export type FleetDay = { bot_id: string; day: string; turns: number };
+export type FleetDay = {
+  bot_id: string;
+  day: string;
+  turns: number;
+  cost_usd: number;
+  unpriced: number;
+};
+
+export type FleetKpi = {
+  key: string;
+  label: string;
+  value: number | null;
+  unit: string;
+  source: string;
+  note: string;
+  limit?: number | null;
+  unpriced?: number | null;
+  subscription?: number | null;
+};
 
 export type FleetOverview = {
   as_of: string;
   days: string[];
+  kpis: FleetKpi[];
   bots: FleetBot[];
   waiting: FleetWaiting[];
   finished: FleetFinished[];
