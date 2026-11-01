@@ -650,3 +650,19 @@ async def test_provider_error_after_start_fails_turn_without_storing_it(
             assert _PROVIDER_CANARY not in json.dumps(body)
     finally:
         use_model(None)
+
+
+async def test_cancel_running_turn_marks_its_cost_unknown(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The open run never reported usage, so its cost is unknown, not 0."""
+    async with _cancelled_running_turn(tmp_path, monkeypatch, "cancel-and-count") as (
+        _host,
+        _client,
+        _bot,
+        _job_id,
+    ):
+        rows = fetch_all(tmp_path, "SELECT usage FROM turns")
+        usage = json.loads(str(rows[0]["usage"]))
+        assert usage["cost_source"] == "unknown"
+        assert usage["cost_usd"] is None

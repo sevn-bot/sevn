@@ -563,3 +563,36 @@ async def test_pending_list_returns_deferred_tool_name_and_args(
         listed = {"name": item.get("name"), "args": item.get("args")}
         stored = {"name": payload.get("name"), "args": payload.get("args")}
         assert listed == stored == {"name": "shell", "args": {"command": "echo hi"}}, item
+
+
+async def test_cancel_persisted_waiting_keeps_the_run_usage(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The run that asked for approval finished, so cancelling keeps what it used."""
+    load_modules("sevn.api.bots", "sevn.api.messages", "sevn.api.pending")
+    async with connected(tmp_path, monkeypatch) as (host, client):
+        await _arm(host)
+        bot = await _bot(client)
+        await request(
+            client,
+            "messages.send",
+            {"bot_id": bot["id"], "text": "run it", "op_id": mint_id("op_")},
+        )
+        await _wait_pending(tmp_path, client)
+        waiting = fetch_all(tmp_path, "SELECT id, usage FROM turns")
+        before = _stored_object(waiting[0]["usage"])
+        assert before["requests"] == 1
+        turn_id = str(waiting[0]["id"])
+        frame, _earlier = await request(
+            client,
+            "turns.cancel",
+            {"turn_id": turn_id, "op_id": mint_id("op_")},
+        )
+        ok(frame)
+        rows = await poll_rows(
+            tmp_path,
+            "SELECT status, usage FROM turns WHERE id = ?",
+            (turn_id,),
+            lambda found: bool(found) and found[0]["status"] == "cancelled",
+        )
+        assert _stored_object(rows[0]["usage"]) == before
