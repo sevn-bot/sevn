@@ -71,7 +71,13 @@ export async function startHarness(
       const reply = replies[method];
       const body =
         typeof reply === "function" ? reply(params, nth) : (reply ?? {});
-      socket.send(JSON.stringify({ t: "res", id: frame.id, r: body }));
+      socket.send(
+        JSON.stringify({
+          t: "res",
+          id: frame.id,
+          ...(body.__error ? { e: body.__error } : { r: body }),
+        }),
+      );
     });
   });
   const clientName = "../../src/client/index.ts";

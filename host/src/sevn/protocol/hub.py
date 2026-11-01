@@ -23,7 +23,9 @@ from sevn.store.outbox import Outbox
 type OpWork = Callable[[], Awaitable[Mapping[str, object]]]
 
 _OP_SEP = "\x1f"
-_active_op: ContextVar[tuple[str, str] | None] = ContextVar("sevn_active_op", default=None)
+_active_op: ContextVar[tuple[str, str, asyncio.Task[object] | None] | None] = ContextVar(
+    "sevn_active_op", default=None
+)
 
 
 class Peer(Protocol):
@@ -69,7 +71,15 @@ class Hub:
             self._peers.pop(id(peer), None)
 
     async def emit(self, type: str, entity: str, payload: Mapping[str, object]) -> Event:
-        event = await self.outbox.append(type, entity, payload, op=_active_op.get())
+        active = _active_op.get()
+        # Background tasks inherit ContextVars but are not part of the request
+        # transaction. They must not race its result with a late pending marker.
+        op = (
+            (active[0], active[1])
+            if active is not None and active[2] is asyncio.current_task()
+            else None
+        )
+        event = await self.outbox.append(type, entity, payload, op=op)
         await self._fanout(_event_frame(event))
         return event
 
@@ -120,7 +130,7 @@ class Hub:
                 if found.result.get("_pending") is True:
                     raise ProtocolError("op_in_progress", "op is still running")
                 return dict(found.result)
-            token = _active_op.set((op_id, stored_method))
+            token = _active_op.set((op_id, stored_method, asyncio.current_task()))
             try:
                 result = dict(await work())
             except Exception:

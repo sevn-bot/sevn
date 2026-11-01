@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sevn.config import Settings
 from sevn.domain.agents import AgentService, occupying, queued_agent_ids
 from sevn.domain.errors import DomainError
-from sevn.domain.jobs import park_job
+from sevn.domain.jobs import job_lock, park_job
 from sevn.domain.session import open_session
 from sevn.log import logger
 from sevn.protocol.hub import Hub
@@ -24,6 +24,8 @@ from sevn.runtime.turn_end import (
     persist_running_cancel,
     record_turn_failure,
 )
+from sevn.store.db import utcnow
+from sevn.store.models import Agent as AgentRow
 from sevn.store.models import Job as JobRow
 from sevn.store.models import Turn as TurnRow
 
@@ -35,10 +37,14 @@ class _Board:
         self._text: dict[str, str] = {}
         self._agent: dict[str, str] = {}
         self._cancelled: set[str] = set()
+        self._tasks: dict[str, asyncio.Task[object]] = {}
 
     def open_turn(self, turn_id: str, agent_id: str) -> None:
         self._agent[turn_id] = agent_id
         self._text[turn_id] = ""
+        task = asyncio.current_task()
+        if task is not None:
+            self._tasks[turn_id] = task
 
     def append(self, turn_id: str, text: str) -> None:
         self._text[turn_id] = self._text.get(turn_id, "") + text
@@ -55,7 +61,11 @@ class _Board:
     def agent_id(self, turn_id: str) -> str | None:
         return self._agent.get(turn_id)
 
+    def task(self, turn_id: str) -> asyncio.Task[object] | None:
+        return self._tasks.get(turn_id)
+
     def forget(self, turn_id: str) -> None:
+        self._tasks.pop(turn_id, None)
         self._text.pop(turn_id, None)
         self._agent.pop(turn_id, None)
         self._cancelled.discard(turn_id)
@@ -74,7 +84,10 @@ class Worker:
         self._tasks: dict[str, asyncio.Task[None]] = {}
         self._resumes: set[asyncio.Task[None]] = set()
         self._again: set[str] = set()
-        self._interrupted: set[asyncio.Task[None]] = set()
+        self._admission = asyncio.Lock()
+        self._lane_cancel = asyncio.Lock()
+        self._cancelling_agents: set[str] = set()
+        self._reserved: set[str] = set()
         self._board = _Board()
         self._closed = False
 
@@ -92,27 +105,36 @@ class Worker:
             return False
         return self._pydantic.enqueue(agent_id, text)
 
-    async def interrupt_and_requeue(self, job_id: str, agent_id: str) -> None:
+    async def interrupt_and_requeue(
+        self, job_id: str, agent_id: str, *, start_new: bool = False
+    ) -> None:
         """Cancel the open turn for ``job_id`` and leave that job queued on ``agent_id``.
 
         A waiting turn is cancelled too, so its pending requests are resolved
         and the old agent is not left waiting on a job it no longer owns.
         """
-        turn_id = await _open_turn_for_job(job_id)
-        if turn_id is not None:
-            await self.cancel(turn_id)
-        await park_job(job_id, agent_id)
+        async with job_lock(job_id):
+            async with open_session() as session:
+                job = await session.get(JobRow, job_id)
+                if job is None:
+                    raise DomainError("not_found", "job not found")
+                if job.status in {"done", "cancelled", "failed"}:
+                    raise DomainError("invalid_params", "message already finished")
+            turn_id = await _open_turn_for_job(job_id)
+            if turn_id is not None:
+                if await self._cancel(turn_id) != "cancelled":
+                    raise DomainError("invalid_params", "message already finished")
+            await park_job(job_id, agent_id, start_new=start_new)
 
     def kick(self, agent_id: str) -> None:
         """Wake the agent's pump. Safe to call again while a turn is running."""
-        if self._closed:
+        if self._closed or agent_id in self._cancelling_agents:
             return
         self._again.add(agent_id)
         task = self._tasks.get(agent_id)
         if task is None or task.done():
             started = asyncio.create_task(self._pump(agent_id))
             started.add_done_callback(_log_task)
-            started.add_done_callback(lambda done: self._after_pump(agent_id, done))
             self._tasks[agent_id] = started
 
     async def settle(self, agent_id: str) -> None:
@@ -132,6 +154,8 @@ class Worker:
         decisions: tuple[ToolDecision, ...],
     ) -> None:
         """Continue an approved turn without holding the request that answered it."""
+        if self._closed or agent_id in self._cancelling_agents:
+            return
         task = asyncio.create_task(self.resume(agent_id, turn_id, decisions))
         self._resumes.add(task)
         task.add_done_callback(self._resumes.discard)
@@ -147,7 +171,6 @@ class Worker:
                 await task
         self._tasks.clear()
         self._resumes.clear()
-        self._interrupted.clear()
 
     async def resume(
         self,
@@ -158,6 +181,8 @@ class Worker:
         runtime = await self._choose(agent_id)
         try:
             async with self._lock(agent_id):
+                if self._closed or agent_id in self._cancelling_agents:
+                    return
                 await self._slots.acquire()
                 try:
                     runner = TurnRunner(self.hub, runtime, watch=self._board)
@@ -171,29 +196,94 @@ class Worker:
         finally:
             await self._release(agent_id)
 
-    async def cancel(self, turn_id: str) -> str:
-        """Cancel a queued, live or waiting turn. A finished turn keeps its stored status."""
-        live = self._board.agent_id(turn_id)
-        self._board.cancel(turn_id)
-        if await cancel_persisted_waiting(self.hub, turn_id):
-            agent_id = live if live is not None else await _agent_for_turn(turn_id)
+    async def cancel_agent(self, agent_id: str) -> None:
+        """Stop the lane and its queued follow-ups before marking it done."""
+        async with self._lane_cancel:
+            self._cancelling_agents.add(agent_id)
+            try:
+                async with open_session() as session:
+                    jobs = list(
+                        await session.scalars(
+                            select(JobRow.id).where(
+                                JobRow.agent_id == agent_id,
+                                JobRow.status.in_(("queued", "started")),
+                            )
+                        )
+                    )
+                for job_id in jobs:
+                    async with job_lock(job_id):
+                        async with open_session() as session:
+                            job = await session.get(JobRow, job_id)
+                            if job is None or job.agent_id != agent_id:
+                                continue
+                            turns = list(
+                                await session.scalars(
+                                    select(TurnRow).where(
+                                        TurnRow.agent_id == agent_id,
+                                        TurnRow.status.in_(("queued", "running", "waiting")),
+                                    )
+                                )
+                            )
+                        for turn in turns:
+                            if job_id in turn.job_ids:
+                                await self._cancel(turn.id)
+                        async with open_session() as session:
+                            job = await session.get(JobRow, job_id)
+                            if (
+                                job is not None
+                                and job.agent_id == agent_id
+                                and job.status == "queued"
+                            ):
+                                job.status = "cancelled"
+                                job.finished_at = utcnow()
+                                await session.commit()
+                await AgentService().set_status(agent_id, "done")
+            finally:
+                self._cancelling_agents.discard(agent_id)
+            # Messages arriving after the cancellation snapshot are new work.
             await self._release(agent_id)
-            return "cancelled"
-        if await persist_queued_cancel(self.hub, turn_id):
-            return "cancelled"
-        if live is None:
-            if await persist_running_cancel(self.hub, turn_id):
-                return "cancelled"
-            return await _turn_status(turn_id)
-        await persist_running_cancel(self.hub, turn_id)
-        runtime = await self._choose(live)
-        await runtime.interrupt(live)
-        pump = self._tasks.get(live)
-        if pump is not None and pump.cancelling():
-            # The interrupt cancelled this pump itself (the turn ran in it).
-            self._interrupted.add(pump)
-        self.kick(live)
-        return "cancelled"
+
+    async def cancel(self, turn_id: str) -> str:
+        """Serialize cancellation with claiming and registering the turn."""
+        async with open_session() as session:
+            turn = await session.get(TurnRow, turn_id)
+            if turn is None:
+                raise DomainError("not_found", "turn not found")
+            job_id = next(iter(turn.job_ids), None)
+        if job_id is None:
+            return await self._cancel(turn_id)
+        async with job_lock(job_id):
+            return await self._cancel(turn_id)
+
+    async def _cancel(self, turn_id: str) -> str:
+        """Stop live execution before releasing locks or waking queued work."""
+        status = await _turn_status(turn_id)
+        if status in {"done", "cancelled", "failed", "interrupted"}:
+            return status
+        live = self._board.agent_id(turn_id)
+        task = self._board.task(turn_id)
+        self._board.cancel(turn_id)
+        if live is not None:
+            runtime = await self._choose(live)
+            if self._board.agent_id(turn_id) == live:
+                await runtime.interrupt(live)
+                if (
+                    task is not None
+                    and task is not asyncio.current_task()
+                    and self._board.task(turn_id) is task
+                ):
+                    if not task.done() and not task.cancelling():
+                        task.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await task
+        changed = (
+            await cancel_persisted_waiting(self.hub, turn_id)
+            or await persist_queued_cancel(self.hub, turn_id)
+            or await persist_running_cancel(self.hub, turn_id)
+        )
+        if changed or live is not None:
+            await self._release(live if live is not None else await _agent_for_turn(turn_id))
+        return "cancelled" if changed else await _turn_status(turn_id)
 
     async def snapshot(self, turn_id: str) -> tuple[str, str]:
         status = await _turn_status(turn_id)
@@ -208,7 +298,7 @@ class Worker:
 
     async def _pump(self, agent_id: str) -> None:
         async with self._lock(agent_id):
-            while not self._closed:
+            while not self._closed and agent_id not in self._cancelling_agents:
                 self._again.discard(agent_id)
                 if await _agent_is_waiting(agent_id):
                     if agent_id in self._again:
@@ -219,31 +309,44 @@ class Worker:
                     if agent_id in self._again:
                         continue
                     return
-                await self._slots.acquire()
+                if not await self._reserve(agent_id):
+                    if agent_id in self._again:
+                        continue
+                    return
                 try:
-                    stuck = await self._run(job_id)
+                    async with self._slots:
+                        stuck = await self._run(job_id, agent_id)
                 finally:
-                    self._slots.release()
+                    self._reserved.discard(agent_id)
                 if stuck:
                     logger.error("job stayed queued after its turn")
                     return
                 await self._open_slots(agent_id)
 
-    def _after_pump(self, agent_id: str, task: asyncio.Task[None]) -> None:
-        """An interrupted turn cancels its pump before the pump's own wake-ups run.
-
-        Release the agent from here instead, or jobs queued on it and lanes queued
-        behind the bot's cap stay queued until the next message or a restart.
-        """
-        interrupted = task in self._interrupted
-        self._interrupted.discard(task)
-        # Only the pump cancel() interrupted counts: loop shutdown cancels pumps
-        # too, and a task started while the loop closes is never run or reaped.
-        if not task.cancelled() or not interrupted or self._closed:
-            return
-        released = asyncio.create_task(self._release(agent_id))
-        self._resumes.add(released)
-        released.add_done_callback(self._resumes.discard)
+    async def _reserve(self, agent_id: str) -> bool:
+        """Serialize admission until the runner persists the running status."""
+        async with self._admission:
+            agent = await AgentService().get(agent_id)
+            async with open_session() as session:
+                active = set(
+                    await session.scalars(
+                        select(AgentRow.id).where(
+                            AgentRow.bot_id == agent.bot_id,
+                            AgentRow.status.in_(("running", "waiting")),
+                        )
+                    )
+                )
+                reserved = set(
+                    await session.scalars(
+                        select(AgentRow.id).where(
+                            AgentRow.bot_id == agent.bot_id, AgentRow.id.in_(self._reserved)
+                        )
+                    )
+                )
+            if len((active | reserved) - {agent_id}) >= Settings.load().bots.max_parallel_agents:
+                return False
+            self._reserved.add(agent_id)
+            return True
 
     async def _release(self, agent_id: str) -> None:
         """A turn outside the pump ended: wake this lane, then the lanes queued on its slot.
@@ -260,12 +363,12 @@ class Worker:
         except Exception:  # noqa: BLE001 — a failed wake-up must not fail the resume or cancel
             logger.exception("could not wake queued lanes")
 
-    async def _run(self, job_id: str) -> bool:
+    async def _run(self, job_id: str, agent_id: str) -> bool:
         """Run one job. True means it is still queued and must not be retried in a loop."""
-        runtime = await self._choose(await _agent_id_for_job(job_id))
+        runtime = await self._choose(agent_id)
         runner = TurnRunner(self.hub, runtime, watch=self._board)
         try:
-            await runner.run(job_id)
+            await runner.run(job_id, agent_id=agent_id)
         except Exception as exc:  # noqa: BLE001 — one failed turn must not stop the agent pump
             logger.exception("turn failed")
             await record_turn_failure(self.hub, exc, job_id=job_id)
@@ -282,6 +385,9 @@ class Worker:
             return
         for other in await queued_agent_ids(agent.bot_id):
             if other == agent_id or slots <= 0:
+                continue
+            candidate = await AgentService().get(other)
+            if candidate.status in {"running", "waiting"} or other in self._reserved:
                 continue
             self.kick(other)
             slots -= 1
@@ -371,14 +477,6 @@ async def _turn_status(turn_id: str) -> str:
         if row is None:
             raise DomainError("not_found", "turn not found")
         return row.status
-
-
-async def _agent_id_for_job(job_id: str) -> str | None:
-    async with open_session() as session:
-        row = await session.get(JobRow, job_id)
-        if row is None:
-            return None
-        return row.agent_id
 
 
 async def _open_turn_for_job(job_id: str) -> str | None:

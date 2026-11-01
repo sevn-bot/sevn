@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 from typing import cast
+from weakref import WeakValueDictionary
 
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import and_, or_, select
 
 from sevn.domain.errors import DomainError
+from sevn.domain.ids import new_id
 from sevn.domain.session import open_session
 from sevn.store.db import utcnow
 from sevn.store.models import Agent as AgentRow
@@ -19,6 +22,12 @@ from sevn.store.models import Thread as ThreadRow
 from sevn.store.models import Turn as TurnRow
 
 _PAGE = 50
+_job_locks: WeakValueDictionary[str, asyncio.Lock] = WeakValueDictionary()
+
+
+def job_lock(job_id: str) -> asyncio.Lock:
+    """Serialize claiming a job with moving it to another lane."""
+    return _job_locks.setdefault(job_id, asyncio.Lock())
 
 
 class JobRecord(BaseModel):
@@ -132,31 +141,76 @@ async def page_messages(bot_id: str, cursor: str | None) -> MessagePage:
     return MessagePage(messages=[_message(row) for row in page], next_cursor=next_cursor)
 
 
-async def park_job(job_id: str, agent_id: str) -> None:
-    """Leave ``job_id`` queued on ``agent_id`` and move a not-yet-started turn with it."""
+async def park_job(job_id: str, agent_id: str, *, start_new: bool = False) -> None:
+    """Queue ``job_id`` on ``agent_id``, preserving its original user message."""
     async with open_session() as session:
         job = await session.get(JobRow, job_id)
         if job is None:
             raise DomainError("not_found", "job not found")
+        if job.status in {"done", "failed", "interrupted"}:
+            raise DomainError("invalid_params", "message already finished")
         agent = await session.get(AgentRow, agent_id)
         if agent is None:
             raise DomainError("not_found", "agent not found")
+        old_agent_id = job.agent_id
         job.agent_id = agent_id
         job.status = "queued"
         job.started_at = None
         job.finished_at = None
-        turns = list(await session.scalars(select(TurnRow).where(TurnRow.status == "queued")))
+        turns = list(
+            await session.scalars(
+                select(TurnRow).where(
+                    TurnRow.agent_id == old_agent_id,
+                    TurnRow.status.in_(("queued", "cancelled")),
+                )
+            )
+        )
         for turn in turns:
             if job_id not in turn.job_ids:
                 continue
-            turn.agent_id = agent_id
-            turn.thread_id = agent.thread_id
             messages = list(
-                await session.scalars(select(Message).where(Message.turn_id == turn.id))
+                await session.scalars(
+                    select(Message).where(Message.turn_id == turn.id, Message.role == "user")
+                )
             )
+            if turn.status == "cancelled":
+                if not messages:
+                    continue
+                # Keep the cancelled attempt and its assistant output as history.
+                # The rerouted job owns the same user message in a fresh turn.
+                turn = TurnRow(
+                    id=new_id("turn_"),
+                    agent_id=agent_id,
+                    thread_id=agent.thread_id,
+                    job_ids=[job_id],
+                    status="queued",
+                    model=turn.model,
+                    usage={},
+                    model_messages=None,
+                    started_at=utcnow(),
+                    finished_at=None,
+                )
+                session.add(turn)
+                await session.flush()
+            else:
+                turn.agent_id = agent_id
+                turn.thread_id = agent.thread_id
             for message in messages:
+                message.turn_id = turn.id
                 message.agent_id = agent_id
                 message.thread_id = agent.thread_id
+                message.parts = [
+                    part
+                    for part in message.parts
+                    if not isinstance(part, dict)
+                    or cast("dict[str, object]", part).get("type") not in {"routing", "routing_ask"}
+                ] + [
+                    {
+                        "type": "routing",
+                        "intent": "new_request" if start_new else "follow_up",
+                        "title": agent.title,
+                    }
+                ]
         await session.commit()
 
 

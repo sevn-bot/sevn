@@ -311,7 +311,6 @@ export function connect(options: ConnectOptions): Promise<Connection> {
   const token = options.token;
   let lastSeq = options.lastSeq ?? 0;
   let nextSeq = lastSeq + 1;
-  let knownHostSeq = lastSeq;
   // Only the first welcome may skip ahead to the host's seq. After a
   // reconnect, a zero cursor still means "replay from the start": events can
   // land while we are offline, before we ever saw one.
@@ -324,6 +323,8 @@ export function connect(options: ConnectOptions): Promise<Connection> {
   let stopped = false;
   let settled = false;
   let reconnecting = false;
+  let catchingUp: Promise<void> | null = null;
+  let catchUpAgain = false;
   let nextId = 1;
   const buffered = new Map<number, ProtocolEvent>();
   let pending = new Map<string, Pending>();
@@ -447,20 +448,18 @@ export function connect(options: ConnectOptions): Promise<Connection> {
     }
     const next = new WebSocket(url);
     socket = next;
-    if (!settled) {
-      if (connectTimer !== undefined) {
-        clearTimeout(connectTimer);
-      }
-      connectTimer = setTimeout(() => {
-        connectTimer = undefined;
-        if (settled || stopped) {
-          return;
-        }
-        fail(new Error("connect timeout"));
-        stopped = true;
-        next.close();
-      }, CONNECT_TIMEOUT_MS);
+    if (connectTimer !== undefined) {
+      clearTimeout(connectTimer);
     }
+    connectTimer = setTimeout(() => {
+      connectTimer = undefined;
+      if (stopped || socket !== next) {
+        return;
+      }
+      socket = null;
+      next.close();
+      onClose(1006);
+    }, CONNECT_TIMEOUT_MS);
     next.addEventListener("open", () => {
       if (socket !== next) {
         return;
@@ -486,7 +485,7 @@ export function connect(options: ConnectOptions): Promise<Connection> {
       onMessage(messageText(event));
     });
     next.addEventListener("close", (event) => {
-      if (socket !== next && socket !== null) {
+      if (socket !== next) {
         return;
       }
       if (socket === next) {
@@ -508,12 +507,15 @@ export function connect(options: ConnectOptions): Promise<Connection> {
       return;
     }
     if (frame.t === "welcome") {
+      if (connectTimer !== undefined) {
+        clearTimeout(connectTimer);
+        connectTimer = undefined;
+      }
       backoff = INITIAL_BACKOFF_MS;
       emitStatus("connected");
       succeed();
       const hostSeq =
         typeof frame.host_seq === "number" ? frame.host_seq : lastSeq;
-      knownHostSeq = hostSeq;
       if (hostSeq < lastSeq) {
         lastSeq = 0;
         nextSeq = 1;
@@ -540,6 +542,10 @@ export function connect(options: ConnectOptions): Promise<Connection> {
   }
 
   function onClose(code: number): void {
+    if (connectTimer !== undefined) {
+      clearTimeout(connectTimer);
+      connectTimer = undefined;
+    }
     rejectPending(new Error("closed"));
     if (stopped) {
       return;
@@ -551,11 +557,8 @@ export function connect(options: ConnectOptions): Promise<Connection> {
       stopped = true;
       return;
     }
-    if (code === 4008 && knownHostSeq > lastSeq) {
-      lastSeq = knownHostSeq;
-      nextSeq = knownHostSeq + 1;
-      buffered.clear();
-    }
+    // A slow-consumer close does not acknowledge queued or replayed events.
+    // Reconnect from the last contiguous event actually delivered.
     if (reconnecting) {
       return;
     }
@@ -667,12 +670,25 @@ export function connect(options: ConnectOptions): Promise<Connection> {
     }
   }
 
-  async function catchUp(start: number): Promise<void> {
+  function catchUp(start: number): Promise<void> {
+    if (catchingUp !== null) {
+      catchUpAgain = true;
+      return catchingUp;
+    }
+    const flight = replay(start).finally(() => {
+      if (catchingUp === flight) catchingUp = null;
+    });
+    catchingUp = flight;
+    return flight;
+  }
+
+  async function replay(start: number): Promise<void> {
     let seq = start;
     for (;;) {
       if (stopped) {
         return;
       }
+      catchUpAgain = false;
       let page: MethodResult["sync.since"];
       try {
         page = await request("sync.since", { seq, limit: SYNC_LIMIT });
@@ -691,15 +707,16 @@ export function connect(options: ConnectOptions): Promise<Connection> {
         }
         throw error;
       }
-      if (typeof page.host_seq === "number") {
-        knownHostSeq = page.host_seq;
-      }
       if (
         page.more === true &&
         typeof page.next_seq === "number" &&
         page.next_seq > seq
       ) {
         seq = page.next_seq;
+        continue;
+      }
+      if (catchUpAgain) {
+        seq = lastSeq;
         continue;
       }
       return;

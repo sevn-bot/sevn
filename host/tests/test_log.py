@@ -7,18 +7,22 @@ import logging
 import secrets
 from collections.abc import Iterator
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
+if TYPE_CHECKING:
+    from loguru import Message
+
 
 @pytest.fixture
-def captured_log(tmp_path: Path) -> Iterator[tuple[list[object], Path]]:
+def captured_log(tmp_path: Path) -> Iterator[tuple[list[Message], Path]]:
     from sevn.log import logger, setup
 
     logger.remove()
     log_path = tmp_path / "sevnd.log"
     setup(level="DEBUG", json_file=log_path)
-    found: list[object] = []
+    found: list[Message] = []
     sink_id = logger.add(lambda message: found.append(message))
     try:
         yield found, log_path
@@ -49,7 +53,7 @@ def _secret(kind: str) -> str:
 
 
 def _assert_marker(
-    found: list[object],
+    found: list[Message],
     log_path: Path,
     value: str,
     marker: str,
@@ -58,7 +62,7 @@ def _assert_marker(
     extras: list[str] = []
     formatted: list[str] = []
     for item in found:
-        record = item.record  # type: ignore[attr-defined]
+        record = item.record
         messages.append(str(record["message"]))
         extras.append(str(record["extra"]))
         formatted.append(str(item))
@@ -73,7 +77,7 @@ def _assert_marker(
 @pytest.mark.parametrize("kind", ["openai", "anthropic", "github", "slack", "bearer", "aws"])
 def test_redacts_patterns(
     kind: str,
-    captured_log: tuple[list[object], Path],
+    captured_log: tuple[list[Message], Path],
 ) -> None:
     from sevn.log import logger
 
@@ -85,7 +89,7 @@ def test_redacts_patterns(
 
 
 def test_redacts_registered_secret(
-    captured_log: tuple[list[object], Path],
+    captured_log: tuple[list[Message], Path],
 ) -> None:
     from sevn.log import logger
     from sevn.secrets.registry import register
@@ -98,29 +102,27 @@ def test_redacts_registered_secret(
     _assert_marker(found, log_path, value, "«redacted:opencode/api_key»")
 
 
-def test_stdlib_logging_is_intercepted(captured_log: tuple[list[object], Path]) -> None:
+def test_stdlib_logging_is_intercepted(captured_log: tuple[list[Message], Path]) -> None:
     found, _log_path = captured_log
     logging.getLogger("uvicorn.error").warning("hi")
     matched = [
-        item
-        for item in found
-        if item.record["name"] == "uvicorn.error" and "hi" in str(item)  # type: ignore[attr-defined]
+        item for item in found if item.record["name"] == "uvicorn.error" and "hi" in str(item)
     ]
     assert matched
 
 
-def test_contextualize_binds_ids(captured_log: tuple[list[object], Path]) -> None:
+def test_contextualize_binds_ids(captured_log: tuple[list[Message], Path]) -> None:
     from sevn.log import logger
 
     found, _log_path = captured_log
     with logger.contextualize(bot_id="bot_1", agent_id="agent_2"):
         logger.info("bound")
-    extra = found[-1].record["extra"]  # type: ignore[attr-defined]
+    extra = found[-1].record["extra"]
     assert extra["bot_id"] == "bot_1"
     assert extra["agent_id"] == "agent_2"
 
 
-def test_exception_text_is_redacted(captured_log: tuple[list[object], Path]) -> None:
+def test_exception_text_is_redacted(captured_log: tuple[list[Message], Path]) -> None:
     from sevn.log import logger
     from sevn.secrets.registry import register
 
@@ -140,7 +142,7 @@ def test_exception_text_is_redacted(captured_log: tuple[list[object], Path]) -> 
     assert value not in payload["exception"]
 
 
-def test_nested_extra_is_redacted(captured_log: tuple[list[object], Path]) -> None:
+def test_nested_extra_is_redacted(captured_log: tuple[list[Message], Path]) -> None:
     from sevn.log import logger
     from sevn.secrets.registry import register
 
@@ -150,14 +152,14 @@ def test_nested_extra_is_redacted(captured_log: tuple[list[object], Path]) -> No
     logger.bind(nested={"token": value}).warning("nested")
     logger.complete()
     text = log_path.read_text(encoding="utf-8")
-    extra = str(found[-1].record["extra"])  # type: ignore[attr-defined]  # loguru Message
+    extra = str(found[-1].record["extra"])
     assert value not in text
     assert value not in extra
     assert "«redacted:opencode/api_key»" in text
     assert "«redacted:opencode/api_key»" in extra
 
 
-def test_json_file_lines(captured_log: tuple[list[object], Path]) -> None:
+def test_json_file_lines(captured_log: tuple[list[Message], Path]) -> None:
     from sevn.log import logger
 
     _found, log_path = captured_log
