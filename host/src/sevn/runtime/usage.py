@@ -49,12 +49,16 @@ def price_responses(responses: Iterable[object]) -> tuple[float | None, CostSour
         provider = getattr(response, "provider_name", None)
         if isinstance(provider, str) and provider in _LOCAL_PROVIDERS:
             continue
+        model = getattr(response, "model_name", None)
         cost = getattr(response, "cost", None)
-        if not callable(cost):
+        if not isinstance(model, str) or model == "" or not callable(cost):
             return None, "unknown"
         try:
             calculation = cost()
-        except LookupError:
+        except (LookupError, ValueError):
+            # ``cost()`` lets pricing errors through: an unknown model is a
+            # LookupError, usage it cannot split (cache reads above the input)
+            # is a ValueError. Pricing must never fail the turn.
             return None, "unknown"
         total += float(getattr(calculation, "total_price", 0))
         priced = True
@@ -91,7 +95,11 @@ def cost_source_of(usage: Mapping[str, object]) -> CostSource:
 
 
 def tokens_of(usage: Mapping[str, object]) -> int:
-    """Input plus output tokens. Cache tokens are part of input on every provider."""
+    """Input plus output tokens.
+
+    In this shape ``input_tokens`` already includes cache reads and writes.
+    Each runtime normalizes to that; Anthropic's raw count leaves them out.
+    """
     return _int(usage.get("input_tokens")) + _int(usage.get("output_tokens"))
 
 

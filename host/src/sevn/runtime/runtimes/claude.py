@@ -631,18 +631,28 @@ def _claude_usage(native: dict[str, object]) -> dict[str, object]:
     raw = _json_object(native.get("usage")) or {}
     estimate = native.get("total_cost_usd")
     turns = native.get("num_turns")
+    cache_read = _count(raw.get("cache_read_input_tokens"))
+    cache_write = _count(raw.get("cache_creation_input_tokens"))
     return usage_record(
         {
             "requests": turns if isinstance(turns, int) else 0,
-            "input_tokens": raw.get("input_tokens"),
+            # Anthropic's input_tokens leaves out cache reads and writes. The
+            # shared shape, like pydantic-ai, counts them in the input.
+            "input_tokens": _count(raw.get("input_tokens")) + cache_read + cache_write,
             "output_tokens": raw.get("output_tokens"),
-            "cache_read_tokens": raw.get("cache_read_input_tokens"),
-            "cache_write_tokens": raw.get("cache_creation_input_tokens"),
+            "cache_read_tokens": cache_read,
+            "cache_write_tokens": cache_write,
         },
         cost_usd=None,
         cost_source="subscription",
         estimated_usd=float(estimate) if isinstance(estimate, int | float) else None,
     )
+
+
+def _count(value: object) -> int:
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    return 0
 
 
 def _map_error(native: dict[str, object]) -> RuntimeEvent:
