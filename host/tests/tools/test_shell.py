@@ -495,3 +495,11 @@ async def test_workspace_shell_has_a_writable_tmpdir(
     made = await execute(bot.id, agent.id, 'f=$(mktemp) && printf ok > "$f" && cat "$f"')
     assert made.returncode == 0, made.stderr
     assert made.stdout == "ok"
+    # macOS mktemp ignores TMPDIR for these forms unless the shell's shim handles them.
+    for form in ("mktemp -d", "mktemp -t sevn", "mktemp -d -t sevn"):
+        placed = await execute(bot.id, agent.id, form)
+        assert placed.returncode == 0, (form, placed.stderr)
+        assert _inside_scratch(placed.stdout.strip(), bot.workspace_path, agent.id), (
+            form,
+            placed.stdout,
+        )

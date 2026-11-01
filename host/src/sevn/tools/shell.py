@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import os
 import signal
+import sys
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
@@ -22,6 +23,7 @@ from sevn.sandbox.policy import (
     workspace_argv,
 )
 from sevn.sandbox.risk import Risk, risk_of
+from sevn.sandbox.seatbelt import install_shims
 from sevn.store.db import utcnow
 from sevn.store.models import Agent as AgentRow
 from sevn.store.models import Bot as BotRow
@@ -102,6 +104,9 @@ async def execute(
         tmp = await _scratch_tmp(target.root.resolve(), agent_id)
         for name in ("TMPDIR", "TMP", "TEMP"):
             env[name] = str(tmp)
+        if sys.platform == "darwin":
+            shims = await asyncio.to_thread(install_shims, tmp.parent / ".bin")
+            env["PATH"] = f"{shims}{os.pathsep}{env.get('PATH', '')}"
     ran = await _run(argv, target.root.resolve(), env)
     return ShellResult(
         executed=True,
