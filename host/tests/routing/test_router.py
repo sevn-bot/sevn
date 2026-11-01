@@ -553,12 +553,12 @@ async def test_idle_ttl_to_done_then_archived(
                 bot = await _create_bot(client)
                 sent = await _send(client, bot["id"], "one note")
                 await poll_agent(tmp_path, str(sent["agent_id"]), "idle")
-                frozen.move_to(start + timedelta(hours=24, seconds=1))
+                # idle_since is stamped after the turn ends, on a ticking clock, so
+                # leave a wide margin past each deadline instead of one second.
+                frozen.move_to(start + timedelta(hours=48))
                 await expire_agents()
                 assert await poll_agent(tmp_path, str(sent["agent_id"]), "done") == "done"
-                frozen.move_to(
-                    start + timedelta(hours=24, seconds=1) + timedelta(days=7, seconds=1)
-                )
+                frozen.move_to(start + timedelta(hours=48) + timedelta(days=8))
                 await expire_agents()
                 assert await poll_agent(tmp_path, str(sent["agent_id"]), "archived") == "archived"
     finally:

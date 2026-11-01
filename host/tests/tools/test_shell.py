@@ -355,7 +355,7 @@ def _outside_tmp_home() -> Path | None:
     import tempfile
 
     # mkdtemp makes a private 0700 directory, so the shared /var/tmp is safe here.
-    root = Path("/var/tmp")  # noqa: S108
+    root = Path("/var/tmp")  # noqa: S108 — mkdtemp below makes it private
     if not root.is_dir() or not os.access(root, os.W_OK):
         return None
     return Path(tempfile.mkdtemp(prefix="sevn-sibling-", dir=root))
@@ -496,7 +496,11 @@ async def test_workspace_shell_has_a_writable_tmpdir(
     assert made.returncode == 0, made.stderr
     assert made.stdout == "ok"
     # macOS mktemp ignores TMPDIR for these forms unless the shell's shim handles them.
-    for form in ("mktemp -d", "mktemp -t sevn", "mktemp -d -t sevn"):
+    forms = ["mktemp -d", "mktemp -t sevn.XXXXXX"]
+    if sys.platform == "darwin":
+        # BSD-only: GNU mktemp reads the -t argument as a template and needs X's.
+        forms += ["mktemp -t sevn", "mktemp -d -t sevn"]
+    for form in forms:
         placed = await execute(bot.id, agent.id, form)
         assert placed.returncode == 0, (form, placed.stderr)
         assert _inside_scratch(placed.stdout.strip(), bot.workspace_path, agent.id), (
