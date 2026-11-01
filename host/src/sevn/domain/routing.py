@@ -377,6 +377,7 @@ async def queue_on_lane(
     path: str,
     hub: Hub,
     routine_id: str | None = None,
+    job_id: str | None = None,
 ) -> str:
     """Queue ``text`` as the user's next message on ``agent``, without routing.
 
@@ -384,7 +385,7 @@ async def queue_on_lane(
     unless a new lane would go past the bot's parallel cap; then it waits
     like any held job. Returns the job id.
     """
-    job_id = new_id("job_")
+    job_id = job_id if job_id is not None else new_id("job_")
     decision = RouteDecision(
         intent=intent,
         target_agent_id=agent.id,

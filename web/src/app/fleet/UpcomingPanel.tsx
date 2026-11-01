@@ -19,10 +19,15 @@ function soon(item: FleetRoutine, asOf: string): boolean {
 
 export function UpcomingPanel({ overview }: { overview: FleetOverview }) {
   const [all, setAll] = useState(false);
+  // A routine the owner just paused or resumed stays in view, even when its
+  // next run moves past the next 24 hours.
+  const [touched, setTouched] = useState<ReadonlySet<string>>(new Set());
   const items = overview.upcoming;
   const shown = all
     ? items
-    : items.filter((item) => soon(item, overview.as_of));
+    : items.filter(
+        (item) => soon(item, overview.as_of) || touched.has(item.id),
+      );
   return (
     <section aria-labelledby="fleet-upcoming" className="space-y-2">
       <h2 id="fleet-upcoming" className="font-medium">
@@ -35,7 +40,14 @@ export function UpcomingPanel({ overview }: { overview: FleetOverview }) {
       ) : (
         <ul className="space-y-1">
           {shown.map((item) => (
-            <RoutineRow key={item.id} item={item} asOf={overview.as_of} />
+            <RoutineRow
+              key={item.id}
+              item={item}
+              asOf={overview.as_of}
+              onActed={() => {
+                setTouched((before) => new Set(before).add(item.id));
+              }}
+            />
           ))}
         </ul>
       )}
@@ -100,10 +112,30 @@ function whenLine(item: FleetRoutine, asOf: string): string {
   if (item.next_run === null) {
     return "";
   }
+  if (overdue(item, asOf)) {
+    return `overdue ${age(item.next_run, asOf)}`;
+  }
   return `next in ${age(asOf, item.next_run)}`;
 }
 
-function RoutineRow({ item, asOf }: { item: FleetRoutine; asOf: string }) {
+/** An active routine whose next run has passed: the scheduler missed it. */
+function overdue(item: FleetRoutine, asOf: string): boolean {
+  return (
+    item.status === "active" &&
+    item.next_run !== null &&
+    Date.parse(item.next_run) < Date.parse(asOf)
+  );
+}
+
+function RoutineRow({
+  item,
+  asOf,
+  onActed,
+}: {
+  item: FleetRoutine;
+  asOf: string;
+  onActed: () => void;
+}) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -117,6 +149,7 @@ function RoutineRow({ item, asOf }: { item: FleetRoutine; asOf: string }) {
     try {
       await call(method, { routine_id: item.id });
       setConfirming(false);
+      onActed();
     } catch {
       setFailed(true);
     } finally {
@@ -129,6 +162,7 @@ function RoutineRow({ item, asOf }: { item: FleetRoutine; asOf: string }) {
       data-routine={item.id}
       data-status={item.status}
       data-candidate={item.candidate_to_cancel ? "true" : "false"}
+      data-overdue={overdue(item, asOf) ? "true" : "false"}
       className={`space-y-1 rounded border px-3 py-2 text-sm ${item.candidate_to_cancel ? "border-amber-700" : "border-zinc-800"}`}
     >
       <div className="flex flex-wrap items-baseline gap-x-2">
@@ -136,7 +170,9 @@ function RoutineRow({ item, asOf }: { item: FleetRoutine; asOf: string }) {
         <span className="text-zinc-400">{item.bot_name}</span>
         <span
           className={
-            item.status === "paused" ? "text-amber-400" : "text-zinc-400"
+            item.status === "paused" || overdue(item, asOf)
+              ? "text-amber-400"
+              : "text-zinc-400"
           }
         >
           {whenLine(item, asOf)}

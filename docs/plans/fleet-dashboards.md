@@ -133,9 +133,11 @@ PR #15 was written before this section named plan 0050 as the owner of the routi
 - `domain/cron.py` evaluates the schedule on the routine's wall clock: a time daylight saving skips does not run, a repeated time runs once.
 - `routines.list`, `create`, `update`, `pause`, `resume`, `cancel`. Writes are owner only, with `op_id`, and emit `routine.updated`.
 - `sevn serve` checks every 30 seconds. A due routine runs on a new lane named after it, with `origin="routine"`, and emits `routine.run`. After downtime it runs once. A paused bot skips the slot. Resume starts from the next slot.
-- A run is useful unless it calls the `routine.silent` tool. The prompt reminds the bot of that tool.
+- `domain/cron.py` follows cron's day rule: when either day field starts with `*` (including a step such as `*/2`) both must match; only two restricted day fields match on either.
+- Each occurrence has one job id, derived from the routine and its slot. A sweep that stopped after queueing the job finds it on the retry and only moves the cursor, so an occurrence never runs twice. `routine.run` is sent after the cursor moves.
+- A run is useful unless it says it was silent: a pydantic-ai bot calls the `routine.silent` tool; a Claude bot, which gets no sevn tools, starts its reply with `[silent]`. The prompt tells each runtime its own way.
 - Budgets: `budgets.daily_usd_per_bot` and `budgets.daily_usd_host` (USD, priced turns since 00:00 UTC). At the cap, routines pause with `paused_reason="budget"`. The spend tile shows the host budget and turns amber at 80 percent, red at 100.
-- Dashboard column "Upcoming": next run, cost per run and over 30 days, last useful run, "candidate to cancel" after 14 days with nothing useful, the next 7 days' projected cost (routines with no known cost are counted apart), Pause, Resume, Cancel with a confirm, and a New routine form.
+- Dashboard column "Upcoming": next run (or "overdue" when the slot has passed), cost per run and over 30 days, last useful run, "candidate to cancel" after 14 days with nothing useful, the next 7 days' projected cost (routines with no known cost are counted apart), Pause, Resume, Cancel with a confirm, and a New routine form. A routine the owner just paused or resumed stays in the list.
 - Not done: notifications (`notify.priority`); sevn has no notification channel yet. Bots cannot create routines themselves yet. A per-bot budget warning at 80 percent is not shown yet; only the host budget level is.
 
 ## Phase 5: coordinator

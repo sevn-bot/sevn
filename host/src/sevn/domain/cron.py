@@ -159,12 +159,11 @@ def _day_matches(spec: CronSpec, day: date) -> bool:
         return False
     by_date = day.day in spec.days
     by_weekday = (day.weekday() + 1) % 7 in spec.weekdays
-    if spec.days_any and spec.weekdays_any:
-        return True
-    if spec.days_any:
-        return by_weekday
-    if spec.weekdays_any:
-        return by_date
+    # Cron's rule: when either day field starts with "*" both must match, so
+    # a stepped wildcard such as "*/2" still restricts its field. Only when
+    # both fields are restricted does a match on either one run.
+    if spec.days_any or spec.weekdays_any:
+        return by_date and by_weekday
     return by_date or by_weekday
 
 
