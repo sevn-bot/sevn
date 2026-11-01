@@ -32,6 +32,7 @@ from sevn.store.models import PendingRequest as PendingRow
 from sevn.store.models import Turn as TurnRow
 
 _OPEN = ("running", "waiting", "idle")
+_ENDED_JOBS = frozenset({"done", "failed", "cancelled"})
 _FRESH = frozenset({"new_request", "chit_chat"})
 
 
@@ -197,7 +198,10 @@ async def reroute(
     hub: Hub,
 ) -> tuple[str, str]:
     """Move a message's job, cancelling a running turn first (D7)."""
-    job_id, bot_id, decision_id = await _job_for_message(message_id)
+    job_id, bot_id, decision_id, job_status = await _job_for_message(message_id)
+    if job_status in _ENDED_JOBS:
+        # Moving an ended job would run the message (and its side effects) again.
+        raise DomainError("invalid_params", "message already finished")
     if start_new:
         target = await AgentService().spawn(bot_id, origin_job_id=job_id)
     else:
@@ -471,7 +475,7 @@ async def _attach_user_message(
     return message_id
 
 
-async def _job_for_message(message_id: str) -> tuple[str, str, str | None]:
+async def _job_for_message(message_id: str) -> tuple[str, str, str | None, str]:
     async with open_session() as session:
         message = await session.get(Message, message_id)
         if message is None:
@@ -482,7 +486,7 @@ async def _job_for_message(message_id: str) -> tuple[str, str, str | None]:
         job = await session.get(JobRow, turn.job_ids[0])
         if job is None:
             raise DomainError("not_found", "job not found")
-        return job.id, job.to_bot_id, job.route_decision_id
+        return job.id, job.to_bot_id, job.route_decision_id, job.status
 
 
 async def _running_turn(agent_id: str) -> str | None:
