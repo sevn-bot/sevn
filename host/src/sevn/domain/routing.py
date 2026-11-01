@@ -162,7 +162,7 @@ async def deliver(
         route_decision_id=decision_id,
         status=job_status,
     )
-    message_id = await _attach_user_message(job_id, agent, bot, message.text, decision)
+    message_id, created = await _attach_user_message(job_id, agent, bot, message.text, decision)
     payload: dict[str, object] = {
         "job_id": job_id,
         "agent_id": agent.id,
@@ -173,6 +173,10 @@ async def deliver(
         ahead = await _ahead(bot.id, job_id)
         payload["ahead"] = ahead
         payload["notice"] = f"queued: {ahead} ahead"
+    # The open chat refreshes on message.created. A message that waits for the
+    # user's choice, or behind the bot's cap, starts no turn, so nothing else
+    # would show it (or its choice buttons) until a reload.
+    await hub.emit("message.created", message_id, created)
     await hub.emit(
         "route.decided",
         message_id,
@@ -450,10 +454,12 @@ async def _attach_user_message(
     bot: BotRecord,
     text: str,
     decision: RouteDecision,
-) -> str:
+) -> tuple[str, dict[str, object]]:
+    """Store the user message and its queued turn. Returns the id and its event payload."""
     now = utcnow()
     turn_id = new_id("turn_")
     message_id = new_id("msg_")
+    parts = _message_parts(text, decision, agent.title)
     async with open_session() as session:
         session.add(
             TurnRow(
@@ -478,13 +484,20 @@ async def _attach_user_message(
                 agent_id=agent.id,
                 role="user",
                 author="user",
-                parts=_message_parts(text, decision, agent.title),
+                parts=parts,
                 created_at=now,
             )
         )
         session.add(RouteDecisionRow(id=new_id("rd_"), message_id=message_id, created_at=now))
         await session.commit()
-    return message_id
+    return message_id, {
+        "message_id": message_id,
+        "thread_id": agent.thread_id,
+        "turn_id": turn_id,
+        "agent_id": agent.id,
+        "role": "user",
+        "parts": parts,
+    }
 
 
 async def _job_for_message(message_id: str) -> tuple[str, str, str | None, str]:
