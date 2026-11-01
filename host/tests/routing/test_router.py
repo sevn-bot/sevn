@@ -235,53 +235,59 @@ async def test_steer_enqueues_into_running_pydantic_turn(
         _clear()
 
 
-async def test_answer_resolves_pending_question(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+async def _waiting_question(home: Path, bot_id: str) -> tuple[str, str]:
+    """Spawn an agent whose turn waits on one question. Returns ``(agent_id, pending_id)``."""
     from sevn.domain.agents import AgentService
     from sevn.store.db import async_engine
     from sevn.store.models import PendingRequest
     from sqlalchemy.ext.asyncio import async_sessionmaker
     from support.chat import insert_turn
 
+    agent = await AgentService().spawn(bot_id=bot_id)
+    await AgentService().set_status(agent.id, "waiting")
+    turn_id = await insert_turn(
+        home,
+        agent_id=agent.id,
+        thread_id=agent.thread_id,
+        job_id=mint_id("job_"),
+        status="waiting",
+        model_messages=[],
+    )
+    engine = async_engine(f"sqlite+aiosqlite:///{home / 'sevn.db'}")
+    sessions = async_sessionmaker(engine, expire_on_commit=False)
+    pending_id = mint_id("pend_")
+    try:
+        async with sessions() as session:
+            session.add(
+                PendingRequest(
+                    id=pending_id,
+                    turn_id=turn_id,
+                    agent_id=agent.id,
+                    kind="question",
+                    tool_call_id=None,
+                    payload={"text": "Which day?"},
+                    answer=None,
+                    status="waiting",
+                    created_at=datetime.now(UTC),
+                    resolved_at=None,
+                )
+            )
+            await session.commit()
+    finally:
+        await engine.dispose()
+    return agent.id, pending_id
+
+
+async def test_answer_resolves_pending_question(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sevn.domain.agents import AgentService
+
     load_modules("sevn.api.bots", "sevn.api.messages")
     await _quiet_worker()
     async with connected(tmp_path, monkeypatch) as (_host, client):
         bot = await _create_bot(client)
-        agent = await AgentService().spawn(bot_id=str(bot["id"]))
-        await AgentService().set_status(agent.id, "waiting")
-        job_id = mint_id("job_")
-        turn_id = await insert_turn(
-            tmp_path,
-            agent_id=agent.id,
-            thread_id=agent.thread_id,
-            job_id=job_id,
-            status="waiting",
-            model_messages=[],
-        )
-        asked = datetime.now(UTC)
-        engine = async_engine(f"sqlite+aiosqlite:///{tmp_path / 'sevn.db'}")
-        sessions = async_sessionmaker(engine, expire_on_commit=False)
-        pending_id = mint_id("pend_")
-        try:
-            async with sessions() as session:
-                session.add(
-                    PendingRequest(
-                        id=pending_id,
-                        turn_id=turn_id,
-                        agent_id=agent.id,
-                        kind="question",
-                        tool_call_id=None,
-                        payload={"text": "Which day?"},
-                        answer=None,
-                        status="waiting",
-                        created_at=asked,
-                        resolved_at=None,
-                    )
-                )
-                await session.commit()
-        finally:
-            await engine.dispose()
+        agent_id, pending_id = await _waiting_question(tmp_path, str(bot["id"]))
         await _send(client, bot["id"], "Tuesday")
         rows = fetch_all(
             tmp_path,
@@ -290,7 +296,32 @@ async def test_answer_resolves_pending_question(
         )
         assert rows[0]["status"] == "resolved"
         assert "Tuesday" in str(rows[0]["answer"])
-        revived = await AgentService().get(agent.id)
+        revived = await AgentService().get(agent_id)
+        assert revived.status != "waiting"
+
+
+async def test_send_to_lane_with_question_answers_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A deep-linked send carries ``agent_id``. It must answer, not queue behind the wait."""
+    from sevn.domain.agents import AgentService
+
+    load_modules("sevn.api.bots", "sevn.api.messages")
+    await _quiet_worker()
+    async with connected(tmp_path, monkeypatch) as (_host, client):
+        bot = await _create_bot(client)
+        _other_id, other_pending = await _waiting_question(tmp_path, str(bot["id"]))
+        agent_id, pending_id = await _waiting_question(tmp_path, str(bot["id"]))
+        await _send(client, bot["id"], "Tuesday", agent_id=agent_id)
+        rows = fetch_all(
+            tmp_path,
+            "SELECT id, status, answer FROM pending_requests",
+        )
+        by_id = {row["id"]: row for row in rows}
+        assert by_id[pending_id]["status"] == "resolved"
+        assert "Tuesday" in str(by_id[pending_id]["answer"])
+        assert by_id[other_pending]["status"] == "waiting"
+        revived = await AgentService().get(agent_id)
         assert revived.status != "waiting"
 
 
