@@ -304,7 +304,7 @@ async def _stop(process: asyncio.subprocess.Process) -> None:
     loop = asyncio.get_running_loop()
     deadline = loop.time() + _TERM_GRACE
     # No event exists for "the group is empty": poll it.
-    while _group_alive(group) and loop.time() < deadline:  # noqa: ASYNC110
+    while _group_alive(group) and loop.time() < deadline:  # noqa: ASYNC110 — no event for an empty group
         await asyncio.sleep(_POLL)
     if _group_alive(group):
         _signal_group(group, signal.SIGKILL)
