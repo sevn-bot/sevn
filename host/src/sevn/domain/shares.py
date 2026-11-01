@@ -62,6 +62,17 @@ class SharedBot(BaseModel):
     status: str
 
 
+class SharedReport(BaseModel):
+    """One bot's value for a shared metric, so a conflict shows both numbers."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    bot_name: str
+    value: float | None
+    as_of: datetime
+    source: str
+
+
 class SharedMetric(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -73,6 +84,7 @@ class SharedMetric(BaseModel):
     as_of: datetime
     status: str
     delta_24h: float | None
+    reports: list[SharedReport]
 
 
 class SharedRoutine(BaseModel):
@@ -207,6 +219,16 @@ async def _snapshot(*, label: str, scope: str | None, expires_at: datetime) -> S
             as_of=tile.as_of,
             status=tile.status,
             delta_24h=tile.delta_24h,
+            # Every reporting bot is in scope (checked below), so their values can show.
+            reports=[
+                SharedReport(
+                    bot_name=report.bot_name,
+                    value=report.value,
+                    as_of=report.as_of,
+                    source=report.source,
+                )
+                for report in tile.reports
+            ],
         )
         for tile in board.metrics
         if tile.shareable and all(visible(report.bot_id) for report in tile.reports)
@@ -218,7 +240,7 @@ async def _snapshot(*, label: str, scope: str | None, expires_at: datetime) -> S
         scope_bot_name=None if scope is None else names.get(scope, ""),
         expires_at=expires_at,
         # Spend, tokens and running turns are host-wide; a bot-scoped link omits them.
-        kpis=board.kpis if scope is None else [],
+        kpis=[_public_kpi(kpi) for kpi in board.kpis] if scope is None else [],
         bots=[
             SharedBot(id=bot.id, name=bot.name, status=bot.status)
             for bot in board.bots
@@ -246,6 +268,14 @@ async def _snapshot(*, label: str, scope: str | None, expires_at: datetime) -> S
         waiting=sum(1 for item in board.waiting if visible(item.bot_id)),
         finished_24h=FinishedCounts(done=done, failed=failed),
     )
+
+
+def _public_kpi(kpi: FleetKpi) -> FleetKpi:
+    """A KPI tile without the owner's settings: no spend cap, run limit or level."""
+    note = "; ".join(
+        part for part in kpi.note.split("; ") if not part.startswith(("host budget", "host limit"))
+    )
+    return kpi.model_copy(update={"limit": None, "budget_usd": None, "level": None, "note": note})
 
 
 async def _finished(since: datetime, scope: str | None) -> tuple[int, int]:

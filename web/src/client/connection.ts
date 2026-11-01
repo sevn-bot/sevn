@@ -288,6 +288,12 @@ export type SharedFleet = {
     as_of: string;
     status: MetricStatus;
     delta_24h: number | null;
+    reports: {
+      bot_name: string;
+      value: number | null;
+      as_of: string;
+      source: string;
+    }[];
   }[];
   days: string[];
   activity: FleetDay[];
