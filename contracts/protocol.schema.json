@@ -3115,6 +3115,204 @@
       "title": "SandboxModeResult",
       "type": "object"
     },
+    "ShareRecord": {
+      "additionalProperties": false,
+      "description": "A share link as the owner sees it. The secret is shown once, at create.",
+      "properties": {
+        "bot_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Bot Id"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "expires_at": {
+          "format": "date-time",
+          "title": "Expires At",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "last_opened_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Last Opened At"
+        },
+        "opens": {
+          "title": "Opens",
+          "type": "integer"
+        },
+        "revoked_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Revoked At"
+        },
+        "status": {
+          "$ref": "#/$defs/ShareStatus"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "bot_id",
+        "status",
+        "created_at",
+        "expires_at",
+        "revoked_at",
+        "last_opened_at",
+        "opens"
+      ],
+      "title": "ShareRecord",
+      "type": "object"
+    },
+    "ShareStatus": {
+      "enum": [
+        "active",
+        "expired",
+        "revoked"
+      ],
+      "type": "string"
+    },
+    "SharesCreateParams": {
+      "additionalProperties": false,
+      "description": "A read-only link. The returned ``path`` holds the only copy of its secret.",
+      "properties": {
+        "bot_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bot Id"
+        },
+        "expires_in_hours": {
+          "default": 168,
+          "title": "Expires In Hours",
+          "type": "integer"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "op_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op Id"
+        }
+      },
+      "required": [
+        "label"
+      ],
+      "title": "SharesCreateParams",
+      "type": "object"
+    },
+    "SharesCreateResult": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "share": {
+          "$ref": "#/$defs/ShareRecord"
+        }
+      },
+      "required": [
+        "share",
+        "path"
+      ],
+      "title": "SharesCreateResult",
+      "type": "object"
+    },
+    "SharesListParams": {
+      "additionalProperties": false,
+      "properties": {},
+      "title": "SharesListParams",
+      "type": "object"
+    },
+    "SharesListResult": {
+      "additionalProperties": false,
+      "properties": {
+        "shares": {
+          "items": {
+            "$ref": "#/$defs/ShareRecord"
+          },
+          "title": "Shares",
+          "type": "array"
+        }
+      },
+      "required": [
+        "shares"
+      ],
+      "title": "SharesListResult",
+      "type": "object"
+    },
+    "SharesRevokeParams": {
+      "additionalProperties": false,
+      "properties": {
+        "op_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op Id"
+        },
+        "share_id": {
+          "title": "Share Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "share_id"
+      ],
+      "title": "SharesRevokeParams",
+      "type": "object"
+    },
     "SyncSinceParams": {
       "additionalProperties": false,
       "properties": {
@@ -3595,6 +3793,21 @@
       "mutating": true,
       "params": "RoutinesUpdateParams",
       "result": "RoutineRecord"
+    },
+    "shares.create": {
+      "mutating": true,
+      "params": "SharesCreateParams",
+      "result": "SharesCreateResult"
+    },
+    "shares.list": {
+      "mutating": false,
+      "params": "SharesListParams",
+      "result": "SharesListResult"
+    },
+    "shares.revoke": {
+      "mutating": true,
+      "params": "SharesRevokeParams",
+      "result": "ShareRecord"
     },
     "sync.since": {
       "mutating": false,

@@ -15,6 +15,7 @@ from sevn.domain.fleet import FleetOverview
 from sevn.domain.jobs import MessageRecord
 from sevn.domain.pending import PendingRecord
 from sevn.domain.routines import RoutineRecord
+from sevn.domain.shares import ShareRecord
 from sevn.memory.store import MemoryRecord
 
 
@@ -301,6 +302,41 @@ class TurnsCancelResult(BaseModel):
     status: str
 
 
+class SharesCreateParams(BaseModel):
+    """A read-only link. The returned ``path`` holds the only copy of its secret."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    label: str
+    bot_id: str | None = None
+    expires_in_hours: int = 168
+    op_id: str | None = None
+
+
+class SharesCreateResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    share: ShareRecord
+    path: str
+
+
+class SharesListParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class SharesListResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    shares: list[ShareRecord]
+
+
+class SharesRevokeParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    share_id: str
+    op_id: str | None = None
+
+
 class FleetBriefParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -446,6 +482,9 @@ METHODS: dict[str, MethodSpec] = {
         _spec("memories.pin", MemoriesPinParams, MemoryRecord, mutating=True),
         _spec("fleet.overview", FleetOverviewParams, FleetOverview, mutating=False),
         _spec("fleet.brief", FleetBriefParams, FleetBrief, mutating=False),
+        _spec("shares.create", SharesCreateParams, SharesCreateResult, mutating=True),
+        _spec("shares.list", SharesListParams, SharesListResult, mutating=False),
+        _spec("shares.revoke", SharesRevokeParams, ShareRecord, mutating=True),
         _spec("routines.list", RoutinesListParams, RoutinesListResult, mutating=False),
         _spec("routines.create", RoutinesCreateParams, RoutineRecord, mutating=True),
         _spec("routines.update", RoutinesUpdateParams, RoutineRecord, mutating=True),
