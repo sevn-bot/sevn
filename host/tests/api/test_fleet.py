@@ -61,6 +61,7 @@ async def _turn(
     status: str,
     finished_at: datetime | None,
     reply: str | None = None,
+    usage: dict[str, object] | None = None,
 ) -> str:
     from sevn.domain.session import open_session
     from sevn.store.models import Agent, Message, Turn
@@ -78,7 +79,7 @@ async def _turn(
                 job_ids=[],
                 status=status,
                 model="test",
-                usage={},
+                usage=usage or {},
                 model_messages=None,
                 started_at=started,
                 finished_at=finished_at,
@@ -347,3 +348,85 @@ async def test_overview_is_read_only(tmp_path: Path, monkeypatch: pytest.MonkeyP
         await _overview(client)
         after = await host.outbox.since(0)
     assert len(after) == len(before)
+
+
+def _usage(
+    tokens: int, *, cost: float | None, source: str, estimate: float | None = None
+) -> dict[str, object]:
+    return {
+        "requests": 1,
+        "tool_calls": 0,
+        "input_tokens": tokens,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+        "cost_usd": cost,
+        "cost_source": source,
+        "estimated_usd": estimate,
+    }
+
+
+async def test_kpis_count_spend_tokens_waiting_and_running(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _load()
+    now = datetime.now(UTC)
+    yesterday = now - timedelta(days=1)
+    async with connected(tmp_path, monkeypatch) as (_host, client):
+        bot = await _bot(client, "Atlas")
+        agent = await _agent(bot, "idle", "Scan")
+        await _turn(agent, "done", now, "a", _usage(1000, cost=0.5, source="price_table"))
+        await _turn(agent, "done", now, "b", _usage(200, cost=0.25, source="price_table"))
+        await _turn(agent, "done", now, "c", _usage(300, cost=0.0, source="local"))
+        await _turn(agent, "done", now, "d", _usage(400, cost=None, source="unknown"))
+        await _turn(
+            agent, "done", now, "e", _usage(500, cost=None, source="subscription", estimate=0.9)
+        )
+        await _turn(agent, "failed", now, "f", _usage(50, cost=0.05, source="price_table"))
+        await _turn(agent, "done", yesterday, "g", _usage(9000, cost=4.0, source="price_table"))
+        await _turn(agent, "done", now, "h")
+        running = await _agent(bot, "running", "Busy")
+        await _turn(running, "running", None)
+        asking = await _agent(bot, "waiting", "Ask")
+        waiting_turn = await _turn(asking, "waiting", None)
+        await _pending(asking, waiting_turn, "question", {"text": "ok?"}, now)
+        body = await _overview(client)
+    kpis = {tile["key"]: tile for tile in body["kpis"]}
+    assert list(kpis) == ["spend_today", "tokens_today", "waiting", "running"]
+    spend = kpis["spend_today"]
+    assert spend["value"] == pytest.approx(0.8)
+    assert spend["unit"] == "USD"
+    assert spend["unpriced"] == 1
+    assert spend["subscription"] == 1
+    assert "routing" in spend["note"]
+    assert spend["source"] != ""
+    assert kpis["tokens_today"]["value"] == 1000 + 200 + 300 + 400 + 500 + 50
+    assert kpis["tokens_today"]["unit"] == "tokens"
+    assert kpis["waiting"]["value"] == 1
+    assert kpis["running"]["value"] == 1
+    assert kpis["running"]["limit"] == 3
+    for tile in kpis.values():
+        assert tile["label"] != ""
+        assert tile["source"] != ""
+
+
+async def test_activity_carries_priced_cost_per_day(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _load()
+    now = datetime.now(UTC)
+    earlier = now - timedelta(days=2)
+    today = now.date().isoformat()
+    async with connected(tmp_path, monkeypatch) as (_host, client):
+        bot = await _bot(client, "Atlas")
+        agent = await _agent(bot, "idle", "Scan")
+        await _turn(agent, "done", now, "a", _usage(10, cost=0.5, source="price_table"))
+        await _turn(agent, "done", now, "b", _usage(10, cost=None, source="unknown"))
+        await _turn(agent, "done", earlier, "c", _usage(10, cost=1.25, source="price_table"))
+        body = await _overview(client)
+    rows = {row["day"]: row for row in body["activity"]}
+    assert rows[today]["turns"] == 2
+    assert rows[today]["cost_usd"] == pytest.approx(0.5)
+    assert rows[today]["unpriced"] == 1
+    assert rows[earlier.date().isoformat()]["cost_usd"] == pytest.approx(1.25)
+    assert rows[earlier.date().isoformat()]["unpriced"] == 0
