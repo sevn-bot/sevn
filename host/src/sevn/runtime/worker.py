@@ -17,8 +17,8 @@ from sevn.protocol.hub import Hub
 from sevn.runtime.base import Runtime, ToolDecision
 from sevn.runtime.runtimes.claude import ClaudeRuntime, installed_client
 from sevn.runtime.runtimes.pydantic_ai import PydanticAIRuntime
-from sevn.runtime.turn import (
-    TurnRunner,
+from sevn.runtime.turn import TurnRunner
+from sevn.runtime.turn_end import (
     cancel_persisted_waiting,
     persist_queued_cancel,
     persist_running_cancel,
