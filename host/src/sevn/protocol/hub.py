@@ -123,6 +123,11 @@ class Hub:
             token = _active_op.set((op_id, stored_method))
             try:
                 result = dict(await work())
+            except Exception:
+                # A failed op must not stay "in progress": the caller could
+                # never retry it under the same op_id until retention ends.
+                await self.oplog.forget_pending(op_id)
+                raise
             finally:
                 _active_op.reset(token)
             saved = await self.oplog.lookup(op_id)
