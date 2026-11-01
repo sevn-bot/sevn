@@ -410,3 +410,31 @@ def test_seatbelt_denies_sevn_home_and_workspaces(
     workspace_allow = text.index('(subpath (param "WORKSPACE"))')
     assert home_deny < workspace_allow
     assert workspaces_deny < workspace_allow
+
+
+def _inside_scratch(path: str, workspace: object, agent_id: object) -> bool:
+    scratch = Path(str(workspace)).resolve() / "tasks" / str(agent_id)
+    return Path(path).is_relative_to(scratch)
+
+
+@pytest.mark.skipif(
+    sys.platform not in {"darwin", "linux"},
+    reason="the workspace shell is confined on macOS or Linux",
+)
+async def test_workspace_shell_has_a_writable_tmpdir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The host TMPDIR is outside the sandbox's writable paths (read-only on
+    macOS, hidden by the /tmp tmpfs on Linux), so the shell gets its own."""
+    from sevn.tools.shell import execute
+
+    host_tmp = tmp_path / "host-tmp"
+    host_tmp.mkdir()
+    monkeypatch.setenv("TMPDIR", str(host_tmp))
+    bot, agent = await _pair(tmp_path, monkeypatch)
+    shown = await execute(bot.id, agent.id, 'printf %s "$TMPDIR"')
+    assert shown.returncode == 0, shown.stderr
+    assert _inside_scratch(shown.stdout, bot.workspace_path, agent.id), shown.stdout
+    made = await execute(bot.id, agent.id, 'f=$(mktemp) && printf ok > "$f" && cat "$f"')
+    assert made.returncode == 0, made.stderr
+    assert made.stdout == "ok"

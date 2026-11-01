@@ -183,3 +183,53 @@ async def test_worktree_isolation_ignored_outside_git(
     scratch = Path(str(bot.workspace_path)) / "tasks" / agent.id
     assert scratch.is_dir()
     assert not (Path(str(bot.workspace_path)) / ".sevn" / "worktrees" / agent.id).exists()
+
+
+def _ran_filters(marker: Path) -> list[str]:
+    return [
+        str(path) for path in (marker, Path(f"{marker}-2"), Path(f"{marker}-3")) if path.exists()
+    ]
+
+
+async def test_worktree_checkout_runs_no_bot_filter(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The bot can write .git/config and .git/info/attributes. A smudge or
+    process filter there must not run on the host when the worktree is made."""
+    from sevn.domain.workspace import ensure
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    assert _git(repo, "init", "-b", "main").returncode == 0
+    (repo / "README").write_text("base\n", encoding="utf-8")
+    (repo / "notes.txt").write_text("notes\n", encoding="utf-8")
+    assert _git(repo, "add", "README", "notes.txt").returncode == 0
+    assert _git(repo, "commit", "-m", "init").returncode == 0
+    marker = tmp_path / "filter-ran"
+    with (repo / ".git" / "config").open("a", encoding="utf-8") as config:
+        config.write(
+            f'[filter "evil"]\n\tsmudge = touch {marker} && cat\n\trequired = true\n'
+            f'[filter "a=b.c"]\n\tsmudge = touch {marker}-2 && cat\n'
+            f"\tprocess = touch {marker}-3\n"
+        )
+    (repo / ".git" / "info").mkdir(exist_ok=True)
+    (repo / ".git" / "info" / "attributes").write_text(
+        "README filter=evil\nnotes.txt filter=a=b.c\n", encoding="utf-8"
+    )
+    bot, agent = await _pair(tmp_path, monkeypatch)
+    with sqlite3.connect(tmp_path / "sevn.db") as connection:
+        connection.execute(
+            "UPDATE bots SET workspace_path = ? WHERE id = ?",
+            (str(repo), bot.id),
+        )
+        connection.execute(
+            "UPDATE agents SET isolation = 'worktree' WHERE id = ?",
+            (agent.id,),
+        )
+        connection.commit()
+    note = await ensure(agent.id)
+    assert note == ""
+    assert _ran_filters(marker) == []
+    worktree = repo / ".sevn" / "worktrees" / agent.id
+    assert (worktree / "README").read_text(encoding="utf-8") == "base\n"
+    assert (worktree / "notes.txt").read_text(encoding="utf-8") == "notes\n"
