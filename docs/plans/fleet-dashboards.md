@@ -1,6 +1,6 @@
 # Plan: fleet dashboards
 
-Status: phase 1 in review (PR #11), phase 2 in review (PR #12), phase 3 in review (PR #14), phase 4 in review (PR #15), phase 6 in review. Phase 5 waits on bot-to-bot delegation and A2UI. Integration branch: `wave/fleet-dashboards`, cut from `wave/0020-bot-core` (PR #9). Every PR for this plan targets `wave/fleet-dashboards`, not `test` or `main`.
+Status: phase 1 in review (PR #11), phase 2 in review (PR #12), phase 3 in review (PR #14), phase 4 on hold until plan 0050 merges (PR #15), phase 6 in review (PR #16, stacked on phase 4). Phase 5 waits on bot-to-bot delegation and A2UI. Integration branch: `wave/fleet-dashboards`, cut from `wave/0020-bot-core` (PR #9). Every PR for this plan targets `wave/fleet-dashboards`, not `test` or `main`.
 
 Source: the "Agent Fleet Dashboards" playbook, which restates ideas from Alex Finn's video on running a fleet of about 20 agents. This plan maps those ideas onto sevn.
 
@@ -127,7 +127,7 @@ Done when:
 
 ### What PR #15 built ahead of plan 0050
 
-PR #15 was written before this section named plan 0050 as the owner of the routine tables. It ships a smaller routine model of its own, which has to move onto 0050's tables (or be replaced by them) before this phase is done:
+PR #15 was written before this section named plan 0050 as the owner of the routine tables. It ships a smaller routine model of its own. **Decision: PR #15 waits for plan 0050.** It does not merge with its own `0004_routines` migration; once 0050 lands, it is rebased onto 0050's tables and methods, and the parts below that 0050 already provides are dropped. What PR #15 holds today:
 
 - Migration `0004_routines`: `routines` (bot, name, five-field cron `schedule`, IANA `timezone`, prompt `text`, `status`, `paused_reason`, `next_run`, `last_run`) and `jobs.routine_id` and `jobs.silent`. Last outcome, last useful run and costs are read from jobs and turns, not stored.
 - `domain/cron.py` evaluates the schedule on the routine's wall clock: a time daylight saving skips does not run, a repeated time runs once.
