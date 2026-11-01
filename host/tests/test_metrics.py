@@ -86,6 +86,10 @@ async def test_report_stores_a_point(tmp_path: Path, monkeypatch: pytest.MonkeyP
         ({"as_of": "2099-01-01T00:00:00+00:00"}, "future"),
         ({"freshness_minutes": 0}, "freshness"),
         ({"freshness_minutes": 60 * 24 * 31}, "freshness"),
+        # Infinity or NaN would turn the dashboard frame into invalid JSON.
+        ({"value": float("inf")}, "finite"),
+        ({"value": float("-inf")}, "finite"),
+        ({"value": float("nan")}, "finite"),
     ],
 )
 async def test_bad_reports_are_returned_to_the_model(
@@ -188,3 +192,43 @@ async def test_at_most_eight_tiles_newest_first(
             )
         body = await _overview(client)
     assert [tile["key"] for tile in body["metrics"]] == [f"m{index}" for index in range(9, 1, -1)]
+
+
+async def test_long_history_reads_the_latest_point_and_its_delta(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A month of hourly points: the tile shows the newest and the 24-48h change."""
+    from sevn.domain.session import open_session
+    from sevn.store.models import MetricPoint
+
+    load_modules("sevn.api.bots", "sevn.api.fleet")
+    async with connected(tmp_path, monkeypatch) as (_host, client):
+        bot_id = await _bot(client, "Newsletter")
+        now = datetime.now(UTC)
+        async with open_session() as session:
+            for hour in range(24 * 30, 0, -1):
+                moment = now - timedelta(hours=hour)
+                session.add(
+                    MetricPoint(
+                        id=mint_id("met_"),
+                        bot_id=bot_id,
+                        key="subscribers",
+                        label="subscribers",
+                        value=float(10_000 - hour),
+                        unit="",
+                        source="api",
+                        status="ok",
+                        as_of=moment,
+                        freshness_minutes=1440,
+                        shareable=True,
+                        created_at=moment,
+                    )
+                )
+            await session.commit()
+        body = await _overview(client)
+        indexes = fetch_all(tmp_path, "PRAGMA index_list('metric_points')")
+    tile = next(tile for tile in body["metrics"] if tile["key"] == "subscribers")
+    assert tile["value"] == 9_999
+    # Newest is 1 hour old; the last point at or before 24 hours before it is 25 hours old.
+    assert tile["delta_24h"] == pytest.approx(24)
+    assert any("key" in str(row["name"]) for row in indexes)

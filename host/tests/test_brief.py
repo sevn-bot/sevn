@@ -202,3 +202,35 @@ async def test_a_quiet_night_has_nothing_broken(
     assert brief["finished_done"] == 0
     assert brief["routines_today"] == []
     assert brief["routines_today_usd"] == 0
+
+
+async def test_the_brief_sees_past_the_dashboard_caps(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A stale metric older than the 8 newest, and done turns behind 20 newer failures."""
+    from sevn.domain.agents import AgentService
+    from sevn.domain.metrics import report
+
+    load_modules("sevn.api.bots", "sevn.api.fleet")
+    now = datetime.now(UTC)
+    async with connected(tmp_path, monkeypatch) as (_host, client):
+        atlas = await _bot(client, "Atlas")
+        lane = await AgentService().spawn(atlas, title="Scan")
+        await _turn(lane.id, "done", now - timedelta(hours=3), "the useful one")
+        for index in range(21):
+            await _turn(lane.id, "failed", now - timedelta(minutes=60 - index), "This turn failed.")
+        await report(
+            atlas,
+            key="old-visits",
+            value=900,
+            source="Plausible",
+            as_of=(now - timedelta(hours=5)).isoformat(),
+            freshness_minutes=60,
+        )
+        for index in range(9):
+            await report(atlas, key=f"fresh-{index}", value=index, source="api")
+        frame, _earlier = await request(client, "fleet.brief", {})
+        brief = ok(frame)
+    assert [item["preview"] for item in brief["finished_top"]] == ["the useful one"]
+    texts = " ".join(issue["text"] for issue in brief["broken"])
+    assert "old-visits is stale" in texts
