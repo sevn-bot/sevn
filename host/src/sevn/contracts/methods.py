@@ -253,10 +253,14 @@ class PendingListResult(BaseModel):
 
 
 class PendingAnswerParams(BaseModel):
+    """An approval takes ``answer``. A question takes ``option_id`` or ``text``."""
+
     model_config = ConfigDict(extra="forbid")
 
     pending_id: str
-    answer: Literal["approve", "deny"]
+    answer: Literal["approve", "deny"] | None = None
+    option_id: str | None = None
+    text: str | None = None
     op_id: str | None = None
 
 
@@ -265,6 +269,7 @@ class PendingAnswerResult(BaseModel):
 
     id: str
     status: str
+    job_id: str | None = None
 
 
 class TurnsSnapshotParams(BaseModel):

@@ -306,7 +306,114 @@ async def _cancel_agent(agent_id: str) -> None:
     await AgentService().set_status(agent_id, "done")
 
 
-async def _resolve_answer(agent_id: str, text: str) -> None:
+async def answer_question(
+    pending_id: str,
+    *,
+    option_id: str | None,
+    text: str | None,
+    hub: Hub,
+) -> tuple[str, str, str]:
+    """Answer a ``user.ask`` question from a card, without routing.
+
+    The question closes like a chat answer does, and the answer is queued on
+    the same lane as the user's next message. Returns ``(job_id, agent_id,
+    turn_id)``.
+    """
+    async with open_session() as session:
+        row = await session.get(PendingRow, pending_id)
+        if row is None:
+            raise DomainError("not_found", "pending request not found")
+        if row.kind != "question":
+            raise DomainError("invalid_params", "not a question")
+        if row.status != "waiting":
+            raise DomainError("pending_resolved", "pending request is resolved")
+        agent_id = row.agent_id
+        turn_id = row.turn_id
+        answer_text, answer = _question_answer(row.payload, option_id=option_id, text=text)
+    agent = await AgentService().get(agent_id)
+    bot = await BotService().get(agent.bot_id)
+    await _resolve_answer(agent_id, answer_text, chosen=(pending_id, answer))
+    job_id = new_id("job_")
+    decision = RouteDecision(
+        intent="answer",
+        target_agent_id=agent_id,
+        confidence=1.0,
+        path="card",
+    )
+    await JobService().enqueue(
+        job_id,
+        bot.id,
+        agent_id,
+        answer_text,
+        origin="user",
+        route_decision_id=None,
+        status="queued",
+    )
+    message_id = await _attach_user_message(job_id, agent, bot, answer_text, decision)
+    await hub.emit(
+        "route.decided",
+        message_id,
+        {
+            "message_id": message_id,
+            "job_id": job_id,
+            "agent_id": agent_id,
+            "bot_id": bot.id,
+            "intent": "answer",
+            "path": "card",
+        },
+    )
+    await hub.emit(
+        "job.queued",
+        job_id,
+        {"job_id": job_id, "agent_id": agent_id, "bot_id": bot.id, "status": "queued"},
+    )
+    await _start(agent_id)
+    return job_id, agent_id, turn_id
+
+
+def _question_answer(
+    payload: dict[str, object],
+    *,
+    option_id: str | None,
+    text: str | None,
+) -> tuple[str, dict[str, object]]:
+    """The answer text and the stored answer. Exactly one of the two is given."""
+    if (option_id is None) == (text is None):
+        raise DomainError("invalid_params", "give option_id or text")
+    if text is not None:
+        cleaned = text.strip()
+        if cleaned == "":
+            raise DomainError("invalid_params", "the answer is empty")
+        return cleaned, {"text": cleaned}
+    for option in _question_options(payload):
+        if option.get("id") == option_id:
+            label = option.get("label", "")
+            return label, {"option_id": option_id, "text": label}
+    raise DomainError("invalid_params", "unknown option")
+
+
+def _question_options(payload: dict[str, object]) -> list[dict[str, str]]:
+    raw = payload.get("options")
+    if not isinstance(raw, list):
+        return []
+    found: list[dict[str, str]] = []
+    for item in cast("list[object]", raw):
+        if not isinstance(item, dict):
+            continue
+        body = cast("dict[object, object]", item)
+        option_id = body.get("id")
+        label = body.get("label")
+        if isinstance(option_id, str) and isinstance(label, str):
+            found.append({"id": option_id, "label": label})
+    return found
+
+
+async def _resolve_answer(
+    agent_id: str,
+    text: str,
+    *,
+    chosen: tuple[str, dict[str, object]] | None = None,
+) -> None:
     now = utcnow()
     answer: dict[str, object] = {"text": text}
     async with open_session() as session:
@@ -320,7 +427,7 @@ async def _resolve_answer(agent_id: str, text: str) -> None:
         )
         for row in rows:
             row.status = "resolved"
-            row.answer = answer
+            row.answer = chosen[1] if chosen is not None and row.id == chosen[0] else answer
             row.resolved_at = now
         # Close the paused turn and its job. The answer is delivered as the
         # next user message by ``deliver``; leaving the turn waiting wedges

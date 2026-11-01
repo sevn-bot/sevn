@@ -57,6 +57,14 @@ class PendingService:
             await session.commit()
             return _record(row)
 
+    async def kind_of(self, pending_id: str) -> str:
+        """``approval`` or ``question``. ``not_found`` for an unknown id."""
+        async with open_session() as session:
+            row = await session.get(PendingRequest, pending_id)
+            if row is None:
+                raise DomainError("not_found", "pending request not found")
+            return row.kind
+
     async def has_waiting(self, turn_id: str) -> bool:
         async with open_session() as session:
             found = await session.scalar(
