@@ -2,18 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import KW_ONLY, dataclass, replace
-from typing import TYPE_CHECKING, Any
-
-from pydantic_ai.capabilities.abstract import AbstractCapability
-from pydantic_ai.messages import ModelRequest, UserPromptPart
-
 from sevn.log import logger
 from sevn.memory.store import MemoryRecord, MemoryStore
-
-if TYPE_CHECKING:
-    from pydantic_ai.models import ModelRequestContext
-    from pydantic_ai.tools import RunContext
 
 _FULL = "<sevn_memories>"
 _DIFF = "<sevn_memories_diff>"
@@ -36,41 +26,23 @@ class _Block(str):
         return str.__contains__(self, item)
 
 
-@dataclass
-class MemoryContext(AbstractCapability[Any]):
-    """Inject the memory block into the user turn, not the instructions."""
+async def with_memories(bot_id: str, agent_id: str, text: str, *, prior: bool) -> str:
+    """``text`` with the memory block in front of it, for the turn's user prompt.
 
-    bot_id: str = ""
-    agent_id: str = ""
-    prior: bool = False
+    The block goes into the prompt the run starts with, so it is saved in the
+    turn's model history. Later turns then send only a diff against a block the
+    model still has. Rewriting a request in ``before_model_request`` would show it
+    to one request only, while the diff baseline moved on.
+    """
+    prefix = await _prefix(bot_id, agent_id, prior=prior)
+    if prefix == "":
+        return text
+    return f"{prefix}\n\n{text}"
 
-    _: KW_ONLY
 
-    id: str | None = "memory"
-
-    @classmethod
-    def get_serialization_name(cls) -> str | None:
-        return None
-
-    async def before_model_request(
-        self,
-        ctx: RunContext[Any],
-        request_context: ModelRequestContext,
-    ) -> ModelRequestContext:
-        _ = ctx
-        if self.bot_id == "":
-            return request_context
-        prefix = await _prefix(self.bot_id, self.agent_id, prior=self.prior)
-        if prefix == "":
-            return request_context
-        messages = list(request_context.messages)
-        for index in range(len(messages) - 1, -1, -1):
-            message = messages[index]
-            if isinstance(message, ModelRequest):
-                messages[index] = _prefix_request(message, prefix)
-                request_context.messages = messages
-                return request_context
-        return request_context
+def carries_memories(text: str) -> bool:
+    """True when a user prompt holds a memory block or diff. Compaction keeps it."""
+    return _FULL in text or _DIFF in text
 
 
 async def render_user_block(bot_id: str, *, prior: bool, agent_id: str = "") -> str:
@@ -117,20 +89,6 @@ async def _prefix(bot_id: str, agent_id: str, *, prior: bool) -> str:
         if hint != "":
             parts.append(hint)
     return "\n\n".join(parts)
-
-
-def _prefix_request(message: ModelRequest, prefix: str) -> ModelRequest:
-    parts: list[object] = []
-    attached = False
-    for part in message.parts:
-        if not attached and isinstance(part, UserPromptPart) and isinstance(part.content, str):
-            parts.append(replace(part, content=f"{prefix}\n\n{part.content}"))
-            attached = True
-        else:
-            parts.append(part)
-    if not attached:
-        parts.insert(0, UserPromptPart(prefix))
-    return replace(message, parts=parts)
 
 
 def _full(rows: list[MemoryRecord]) -> str:
