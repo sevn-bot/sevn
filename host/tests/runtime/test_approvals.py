@@ -196,6 +196,59 @@ async def test_waiting_turn_survives_restart(
         )
 
 
+async def test_crash_during_resume_is_resumed_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A resumed turn is ``running`` with its approval checkpoint. Recovery must not drop it."""
+    from sevn.runtime.models import use_model
+    from sevn.runtime.recovery import recover
+    from sevn.runtime.worker import bind
+
+    reset_model_requests()
+    flowing = asyncio.Event()
+    flowing.set()
+    use_model(
+        function_model(
+            [
+                [{"kind": "tool", "name": "shell", "args": {"command": "echo hi"}}],
+                [{"kind": "text", "text": "done"}],
+            ],
+            pause=flowing,
+        )
+    )
+    load_modules("sevn.api.bots", "sevn.api.messages", "sevn.api.pending")
+    try:
+        async with connected(tmp_path, monkeypatch) as (host, client):
+            worker = bind(host.hub)
+            bot = await _bot(client)
+            await request(
+                client,
+                "messages.send",
+                {"bot_id": bot["id"], "text": "run it", "op_id": mint_id("op_")},
+            )
+            item = await _wait_pending(tmp_path, client)
+            flowing.clear()
+            frame, _earlier = await request(
+                client,
+                "pending.answer",
+                {"pending_id": item["id"], "answer": "approve", "op_id": mint_id("op_")},
+            )
+            ok(frame)
+            for _ in range(500):
+                if len(model_request_payloads()) >= 2:
+                    break
+                await asyncio.sleep(0.01)
+            assert len(model_request_payloads()) >= 2
+            assert fetch_all(tmp_path, "SELECT status FROM turns")[0]["status"] == "running"
+            await worker.aclose()
+            recovered = await recover()
+            turn_id = fetch_all(tmp_path, "SELECT id FROM turns")[0]["id"]
+            assert [answered.turn_id for answered in recovered.resume] == [turn_id]
+    finally:
+        flowing.set()
+        use_model(None)
+
+
 async def test_resumed_approval_wakes_a_queued_sibling_lane(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
