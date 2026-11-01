@@ -14,8 +14,15 @@ export type MetricTile = {
   reports?: { bot_name: string; value: number | null }[];
 };
 
+const exact = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
+
+/** Compact from 1,000 up; below that, up to two decimals so 48.2% stays 48.2. */
+export function formatMetric(value: number): string {
+  return Math.abs(value) >= 1000 ? formatCount(value) : exact.format(value);
+}
+
 export function formatDelta(delta: number): string {
-  return `${delta > 0 ? "+" : ""}${formatCount(delta)} in 24h`;
+  return `${delta > 0 ? "+" : ""}${formatMetric(delta)} in 24h`;
 }
 
 const border: Record<MetricStatus, string> = {
@@ -37,14 +44,14 @@ export function MetricTiles({ metrics }: { metrics: MetricTile[] }) {
           key={metric.key}
           data-testid={`metric-${metric.key}`}
           data-status={metric.status}
-          title={`${metric.source} · as of ${metric.as_of}`}
+          title={`${metric.value === null ? "unavailable" : exact.format(metric.value)} ${metric.unit} · ${metric.source} · as of ${metric.as_of}`}
           className={`rounded border px-3 py-2 ${border[metric.status]}`}
         >
           <p className="text-xs text-zinc-400">{metric.label}</p>
           <p
             className={`text-lg font-medium tabular-nums ${metric.value === null ? "text-zinc-500" : ""}`}
           >
-            {metric.value === null ? "unavailable" : formatCount(metric.value)}
+            {metric.value === null ? "unavailable" : formatMetric(metric.value)}
             {metric.value !== null && metric.unit !== "" ? (
               <span className="ml-1 text-xs font-normal text-zinc-400">
                 {metric.unit}
@@ -70,7 +77,7 @@ export function MetricTiles({ metrics }: { metrics: MetricTile[] }) {
               {(metric.reports ?? [])
                 .map(
                   (report) =>
-                    `${report.bot_name} ${report.value === null ? "unavailable" : formatCount(report.value)}`,
+                    `${report.bot_name} ${report.value === null ? "unavailable" : exact.format(report.value)}`,
                 )
                 .join(" · ")}
             </p>
