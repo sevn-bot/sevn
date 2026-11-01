@@ -602,10 +602,16 @@ async def test_failed_claude_turn_keeps_its_usage(
                         await request(
                             client,
                             "bots.create",
-                            {"name": "Claude", "runtime": "claude", "op_id": mint_id("op_")},
+                            {
+                                "name": "Claude",
+                                "runtime": "claude",
+                                "access": "full",
+                                "op_id": mint_id("op_"),
+                            },
                         )
                     )[0]
                 )
+                await _network_on(client, str(created["id"]))
                 await request(
                     client,
                     "messages.send",
