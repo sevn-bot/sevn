@@ -364,6 +364,26 @@ async def test_diff_sent_on_later_turns(tmp_path: Path, monkeypatch: pytest.Monk
     assert "second fact" in diff
 
 
+async def test_diff_names_a_deleted_memory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The lane's history still holds the full block, so the next diff must retract it."""
+    from sevn.memory.context import render_user_block
+    from sevn.memory.store import MemoryStore
+
+    bot_id = await _bot(tmp_path, monkeypatch)
+    store = MemoryStore()
+    first = mint_id("turn_")
+    saved = await store.save(bot_id, "the office is in Lyon", tier="pinned", turn_id=first)
+    await store.commit(first)
+    opening = await render_user_block(bot_id, prior=False, agent_id="agt_a")
+    assert "the office is in Lyon" in opening
+    await store.delete(saved.id)
+    diff = await render_user_block(bot_id, prior=True, agent_id="agt_a")
+    assert "<sevn_memories_diff>" in diff
+    assert "removed" in diff
+    assert "the office is in Lyon" in diff
+    assert await render_user_block(bot_id, prior=True, agent_id="agt_a") == ""
+
+
 async def test_capture_hint_after_high_noul(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -57,9 +57,12 @@ async def render_user_block(bot_id: str, *, prior: bool, agent_id: str = "") -> 
             return ""
         return _Block(_full(rows))
     changed = [row for row in rows if previous.get(row.id) != current[row.id]]
-    if len(changed) == 0:
+    # The model still holds the earlier block, so a deleted memory must be named
+    # as removed. Leaving it out would keep it in the lane's context for good.
+    removed = [shown[0] for key, shown in previous.items() if key not in current]
+    if len(changed) == 0 and len(removed) == 0:
         return ""
-    return _Block(_diff(changed))
+    return _Block(_diff(changed, removed))
 
 
 async def capture_after_turn(agent_id: str, text: str) -> None:
@@ -98,8 +101,9 @@ def _full(rows: list[MemoryRecord]) -> str:
     return "\n".join(lines)
 
 
-def _diff(rows: list[MemoryRecord]) -> str:
+def _diff(rows: list[MemoryRecord], removed: list[str]) -> str:
     lines = [_DIFF]
     lines.extend(f"- {row.text}" for row in rows)
+    lines.extend(f"- removed, no longer holds: {text}" for text in removed)
     lines.append("</sevn_memories_diff>")
     return "\n".join(lines)
