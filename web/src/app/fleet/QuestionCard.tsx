@@ -6,6 +6,7 @@ export function QuestionCard({ item }: { item: FleetWaiting }) {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [answered, setAnswered] = useState(false);
 
   async function send(answer: { option_id: string } | { text: string }) {
     setSending(true);
@@ -13,11 +14,25 @@ export function QuestionCard({ item }: { item: FleetWaiting }) {
     try {
       await call("pending.answer", { pending_id: item.id, ...answer });
       setDraft("");
+      // The card stays until the next refresh; a second answer would only
+      // come back as pending_resolved.
+      setAnswered(true);
     } catch {
       setFailed(true);
     } finally {
       setSending(false);
     }
+  }
+
+  if (answered) {
+    return (
+      <div className="space-y-2">
+        <p>{item.text}</p>
+        <p role="status" className="text-sm text-zinc-400">
+          Answered
+        </p>
+      </div>
+    );
   }
 
   return (

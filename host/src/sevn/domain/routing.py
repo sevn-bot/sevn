@@ -8,9 +8,9 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import cast
+from typing import Any, cast
 
-from sqlalchemy import select
+from sqlalchemy import CursorResult, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sevn.config import Settings
@@ -21,6 +21,7 @@ from sevn.domain.bots import BotRecord, BotService
 from sevn.domain.errors import DomainError
 from sevn.domain.ids import new_id
 from sevn.domain.jobs import JobService, park_job
+from sevn.domain.pending import blocks_turn
 from sevn.domain.session import open_session
 from sevn.log import logger
 from sevn.protocol.hub import Hub
@@ -356,7 +357,10 @@ async def answer_question(
         answer_text, answer = _question_answer(row.payload, option_id=option_id, text=text)
     agent = await AgentService().get(agent_id)
     bot = await BotService().get(agent.bot_id)
-    await _resolve_answer(agent_id, answer_text, chosen=(pending_id, answer))
+    # Only one answer wins a card; a second client gets ``pending_resolved``
+    # and queues nothing.
+    if not await _claim_question(pending_id, agent_id, answer):
+        raise DomainError("pending_resolved", "pending request is resolved")
     job_id = new_id("job_")
     decision = RouteDecision(
         intent="answer",
@@ -433,12 +437,58 @@ def _question_options(payload: dict[str, object]) -> list[dict[str, str]]:
     return found
 
 
-async def _resolve_answer(
-    agent_id: str,
-    text: str,
-    *,
-    chosen: tuple[str, dict[str, object]] | None = None,
-) -> None:
+async def _claim_question(pending_id: str, agent_id: str, answer: dict[str, object]) -> bool:
+    """Resolve one question while it is still waiting. False when another answer won.
+
+    The paused turn closes only once nothing that holds it is left, so the
+    lane's other questions stay on their cards. The answer job is queued
+    either way; the worker runs it once the turn is no longer waiting.
+    """
+    from sevn.runtime.turn_end import close_question_turns
+
+    now = utcnow()
+    async with open_session() as session:
+        claimed = cast(
+            "CursorResult[Any]",
+            await session.execute(
+                update(PendingRow)
+                .where(PendingRow.id == pending_id)
+                .where(PendingRow.status == "waiting")
+                .values(status="resolved", answer=answer, resolved_at=now)
+            ),
+        )
+        if claimed.rowcount != 1:
+            await session.rollback()
+            return False
+        if not await _agent_held(session, agent_id):
+            await close_question_turns(session, agent_id, now)
+            await _release_agent(session, agent_id, now)
+        await session.commit()
+    return True
+
+
+async def _agent_held(session: AsyncSession, agent_id: str) -> bool:
+    """True while the agent has a waiting approval or blocking question."""
+    rows = await session.execute(
+        select(PendingRow.kind, PendingRow.payload)
+        .where(PendingRow.agent_id == agent_id)
+        .where(PendingRow.status == "waiting")
+    )
+    return any(blocks_turn(kind, payload) for kind, payload in rows)
+
+
+async def _release_agent(session: AsyncSession, agent_id: str, now: datetime) -> None:
+    agent = await session.get(AgentRow, agent_id)
+    if agent is None or agent.status != "waiting":
+        return
+    if await _agent_held(session, agent_id):
+        return
+    agent.status = "idle"
+    agent.last_activity_at = now
+    apply_lifecycle(agent, "idle", now)
+
+
+async def _resolve_answer(agent_id: str, text: str) -> None:
     from sevn.runtime.turn_end import close_question_turns
 
     now = utcnow()
@@ -454,25 +504,14 @@ async def _resolve_answer(
         )
         for row in rows:
             row.status = "resolved"
-            row.answer = chosen[1] if chosen is not None and row.id == chosen[0] else answer
+            row.answer = answer
             row.resolved_at = now
         # Close the paused turn and its job. The answer is delivered as the
         # next user message by ``deliver``; leaving the turn waiting wedges
         # the agent because ``Worker._pump`` returns while a turn is waiting.
         await close_question_turns(session, agent_id, now)
         await session.flush()
-        agent = await session.get(AgentRow, agent_id)
-        if agent is not None and agent.status == "waiting":
-            still = await session.scalar(
-                select(PendingRow.id)
-                .where(PendingRow.agent_id == agent_id)
-                .where(PendingRow.status == "waiting")
-                .limit(1)
-            )
-            if still is None:
-                agent.status = "idle"
-                agent.last_activity_at = now
-                apply_lifecycle(agent, "idle", now)
+        await _release_agent(session, agent_id, now)
         await session.commit()
 
 

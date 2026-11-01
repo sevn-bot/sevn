@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sevn.domain.ids import new_id
+from sevn.domain.pending import blocks_turn
 from sevn.domain.session import open_session
 from sevn.domain.workspace import drop_locks
 from sevn.log import logger
@@ -143,13 +144,12 @@ def _failed_usage(exc: BaseException) -> dict[str, object]:
 
 
 async def _has_waiting_pending(session: AsyncSession, turn_id: str) -> bool:
-    found = await session.scalar(
-        select(PendingRow.id)
+    rows = await session.execute(
+        select(PendingRow.kind, PendingRow.payload)
         .where(PendingRow.turn_id == turn_id)
         .where(PendingRow.status == "waiting")
-        .limit(1)
     )
-    return found is not None
+    return any(blocks_turn(kind, payload) for kind, payload in rows)
 
 
 async def _fail_open_turn(

@@ -77,7 +77,8 @@ Done when:
 
 - `user.ask` takes optional `options` (up to six, ids `opt_1` on), `priority` (low, normal, high), `due_by` (ISO 8601 with a timezone) and `blocking` (default true). A bad value goes back to the model as `invalid_params`.
 - `pending.answer` takes `option_id` or `text` for a question. An approval keeps `approve` and `deny`. A mismatch is `invalid_params`.
-- Answering from a card closes the question like a chat answer and queues the answer on the same lane as the user's next message, with an answer chip. It does not go through routing.
+- Answering from a card resolves only that question and queues the answer on the same lane as the user's next message, with an answer chip. It does not go through routing. The paused turn closes once no approval or blocking question is left on the lane; other questions keep their cards. The first answer claims the question; a second one gets `pending_resolved` and queues nothing.
+- A question asked with `blocking` false does not pause the turn. It stays on the dashboard after the turn ends, and its answer runs as the lane's next message.
 - Cards sort by blocking, then priority, then age. An approval is blocking and normal priority.
 - Cards show priority, due time or overdue, and not blocking.
 - Cancelling a turn expires its open questions (`{"expired": true}`).
