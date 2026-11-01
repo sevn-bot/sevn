@@ -249,7 +249,7 @@ async def _activity(session: AsyncSession, first: date) -> list[FleetDay]:
     rows = await session.execute(
         select(AgentRow.bot_id, TurnRow.finished_at)
         .join(AgentRow, TurnRow.agent_id == AgentRow.id)
-        .where(TurnRow.status == "done")
+        .where(TurnRow.status.in_(_ENDED))
         .where(TurnRow.finished_at.is_not(None))
         .where(TurnRow.finished_at >= start)
     )

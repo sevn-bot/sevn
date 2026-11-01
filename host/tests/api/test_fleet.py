@@ -278,27 +278,34 @@ async def test_finished_can_be_filtered_by_bot(
     assert len(body["bots"]) == 2
 
 
-async def test_activity_counts_done_turns_per_bot_and_day(
+async def test_activity_counts_finished_turns_per_bot_and_day(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Every ended turn counts, so a bot whose turns all failed is not shown as idle."""
     _load()
     now = datetime.now(UTC)
     today = now.date().isoformat()
     async with connected(tmp_path, monkeypatch) as (_host, client):
         bot = await _bot(client, "Atlas")
         quiet = await _bot(client, "Nimbus")
+        failing = await _bot(client, "Cirrus")
         agent = await _agent(bot, "idle", "A")
         await _turn(agent, "done", now, "a")
         await _turn(agent, "done", now - timedelta(seconds=30), "b")
         three_days = now - timedelta(days=3)
         await _turn(agent, "done", three_days, "c")
         await _turn(agent, "failed", now, "d")
+        await _turn(agent, "running", None, "still going")
         await _turn(agent, "done", now - timedelta(days=20), "too old")
+        broken = await _agent(failing, "idle", "C")
+        await _turn(broken, "failed", now, "e")
+        await _turn(broken, "cancelled", now, "f")
         body = await _overview(client)
     activity = {(row["bot_id"], row["day"]): row["turns"] for row in body["activity"]}
     assert activity == {
-        (bot, today): 2,
+        (bot, today): 3,
         (bot, three_days.date().isoformat()): 1,
+        (failing, today): 2,
     }
     assert all(row["bot_id"] != quiet for row in body["activity"])
 
