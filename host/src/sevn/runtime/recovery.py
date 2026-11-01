@@ -85,6 +85,7 @@ async def recover() -> Recovery:
                 if any(turn.model_messages is not None for turn in related):
                     continue
                 _close_crashed_turns(session, related, now)
+                await _preserve_retry_message(session, job, related, now)
                 job.status = "queued"
                 job.started_at = None
                 await _idle_crashed_agent(session, turns, job.agent_id, now)
@@ -101,6 +102,40 @@ def _close_crashed_turns(session: AsyncSession, related: list[TurnRow], now: dat
         turn.status = "failed"
         turn.finished_at = now
         session.add(_turn_finished(turn.id, turn.agent_id, now))
+
+
+async def _preserve_retry_message(
+    session: AsyncSession, job: JobRow, related: list[TurnRow], now: datetime
+) -> None:
+    """Move the original message onto the queued retry, retaining its id and time."""
+    failed = [turn for turn in related if turn.status == "failed"]
+    messages = list(
+        await session.scalars(
+            select(Message).where(
+                Message.turn_id.in_([turn.id for turn in failed]), Message.role == "user"
+            )
+        )
+    )
+    if not messages:
+        return
+    source = failed[-1]
+    retry = TurnRow(
+        id=new_id("turn_"),
+        agent_id=source.agent_id,
+        thread_id=source.thread_id,
+        job_ids=[job.id],
+        status="queued",
+        model=source.model,
+        usage={},
+        model_messages=None,
+        started_at=now,
+        finished_at=None,
+    )
+    session.add(retry)
+    await session.flush()
+    for message in messages:
+        message.turn_id = retry.id
+        session.add(_message_event(message, now))
 
 
 async def _idle_crashed_agent(

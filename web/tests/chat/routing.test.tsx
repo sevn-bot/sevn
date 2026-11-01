@@ -11,6 +11,51 @@ const agents = {
   ],
 };
 
+test("structured choices address duplicate titles by id", async () => {
+  const harness = await startHarness({
+    "messages.list": {
+      messages: [
+        message("msg_choice", [
+          {
+            type: "routing_ask",
+            choices: JSON.stringify([
+              { label: "Continue: A|B", agent_id: "agent_first" },
+              { label: "Continue: A|B", agent_id: "agent_second" },
+            ]),
+          },
+        ]),
+      ],
+      next_cursor: null,
+    },
+    "agents.list": {
+      agents: [
+        { id: "agent_first", title: "A|B", status: "idle" },
+        { id: "agent_second", title: "A|B", status: "idle" },
+      ],
+    },
+    "pending.list": { pending: [] },
+    "messages.reroute": {},
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Chat = await loadChat();
+    testing.render(createElement(Chat, { botId }));
+    const buttons = await testing.screen.findAllByRole("button", {
+      name: "Continue: A|B",
+    });
+    buttons[1].click();
+    await testing.waitFor(() => {
+      expect(
+        requestParams(harness.requests, "messages.reroute").at(-1)?.agent_id,
+      ).toBe("agent_second");
+    });
+    expect(requestParams(harness.requests, "messages.send")).toHaveLength(0);
+  } finally {
+    testing.cleanup();
+    harness.stop();
+  }
+});
+
 function message(
   id: string,
   parts: Record<string, string>[],
@@ -271,6 +316,212 @@ test("injection warning chip", async () => {
     const Chat = await loadChat();
     testing.render(createElement(Chat, { botId }));
     await testing.screen.findByText(/injection/i);
+  } finally {
+    testing.cleanup();
+    harness.stop();
+  }
+});
+
+test("question metadata does not duplicate the displayed question", async () => {
+  const harness = await startHarness({
+    "messages.list": {
+      messages: [
+        message("msg_question", [
+          { type: "text", text: "Which day?" },
+          { type: "question", text: "Which day?", pending_id: "pend_question" },
+        ]),
+      ],
+      next_cursor: null,
+    },
+    "agents.list": agents,
+    "pending.list": { pending: [] },
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Chat = await loadChat();
+    testing.render(createElement(Chat, { botId }));
+    expect(await testing.screen.findAllByText("Which day?")).toHaveLength(1);
+  } finally {
+    testing.cleanup();
+    harness.stop();
+  }
+});
+
+test.each(["job.started", "job.done"])(
+  "%s clears the queued notice",
+  async (kind) => {
+    const harness = await startHarness({
+      "messages.list": { messages: [], next_cursor: null },
+      "agents.list": agents,
+      "pending.list": { pending: [] },
+    });
+    const testing = await import("@testing-library/react");
+    try {
+      const Chat = await loadChat();
+      testing.render(createElement(Chat, { botId }));
+      await testing.screen.findByText("Lisbon");
+      harness.event("job.queued", {
+        job_id: "job_trip",
+        agent_id: "agent_trip",
+        ahead: 2,
+      });
+      await testing.screen.findByText("queued: 2 ahead");
+      harness.event(kind, { job_id: "job_trip", agent_id: "agent_trip" });
+      await testing.waitFor(() => {
+        expect(testing.screen.queryByText("queued: 2 ahead")).toBeNull();
+      });
+    } finally {
+      testing.cleanup();
+      harness.stop();
+    }
+  },
+);
+
+test("rerouting clears only the moved job's queue notice", async () => {
+  const harness = await startHarness({
+    "messages.list": { messages: [], next_cursor: null },
+    "agents.list": agents,
+    "pending.list": { pending: [] },
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Chat = await loadChat();
+    testing.render(createElement(Chat, { botId }));
+    await testing.screen.findByText("Lisbon");
+    harness.event("job.queued", {
+      job_id: "job_kept",
+      agent_id: "agent_trip",
+      ahead: 1,
+    });
+    harness.event("job.queued", {
+      job_id: "job_moved",
+      agent_id: "agent_trip",
+      ahead: 2,
+    });
+    await testing.screen.findByText("queued: 2 ahead");
+    harness.event("route.corrected", {
+      job_id: "job_moved",
+      agent_id: "agent_invoice",
+    });
+    await testing.screen.findByText("queued: 1 ahead");
+    expect(testing.screen.queryByText("queued: 2 ahead")).toBeNull();
+    harness.event("job.started", {
+      job_id: "job_kept",
+      agent_id: "agent_trip",
+    });
+    await testing.waitFor(() =>
+      expect(testing.screen.queryByText("queued: 1 ahead")).toBeNull(),
+    );
+  } finally {
+    testing.cleanup();
+    harness.stop();
+  }
+});
+
+test("route.corrected replaces the routing choice without a new turn", async () => {
+  let corrected = false;
+  const harness = await startHarness({
+    "messages.list": () => ({
+      messages: [
+        message(
+          "msg_choice",
+          corrected
+            ? [
+                { type: "text", text: "move me" },
+                { type: "routing", intent: "follow_up", title: "Invoice fix" },
+              ]
+            : [
+                {
+                  type: "routing_ask",
+                  choices: "New task|Continue: Invoice fix",
+                },
+              ],
+        ),
+      ],
+      next_cursor: null,
+    }),
+    "agents.list": agents,
+    "pending.list": { pending: [] },
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Chat = await loadChat();
+    testing.render(createElement(Chat, { botId }));
+    await testing.screen.findByRole("button", {
+      name: "Continue: Invoice fix",
+    });
+    corrected = true;
+    harness.event("route.corrected", {
+      message_id: "msg_choice",
+      agent_id: "agent_invoice",
+    });
+    await testing.screen.findByText("→ continues: Invoice fix");
+    expect(
+      testing.screen.queryByRole("button", { name: "Continue: Invoice fix" }),
+    ).toBeNull();
+  } finally {
+    testing.cleanup();
+    harness.stop();
+  }
+});
+
+test("sandbox mode audit refreshes the mounted warning in both directions", async () => {
+  let allowed = false;
+  const harness = await startHarness({
+    "messages.list": { messages: [], next_cursor: null },
+    "agents.list": agents,
+    "pending.list": { pending: [] },
+    "system.info": () => ({ caps: { allow_all: allowed } }),
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Chat = await loadChat();
+    testing.render(createElement(Chat, { botId }));
+    await testing.screen.findByText("Lisbon");
+    expect(testing.screen.queryByText(/allow all/i)).toBeNull();
+    allowed = true;
+    harness.event("audit", { setting: "sandbox.mode", mode: "allow_all" });
+    await testing.screen.findByText(/allow all/i);
+    allowed = false;
+    harness.event("audit", { setting: "sandbox.mode", mode: "enforced" });
+    await testing.waitFor(() =>
+      expect(testing.screen.queryByText(/allow all/i)).toBeNull(),
+    );
+  } finally {
+    testing.cleanup();
+    harness.stop();
+  }
+});
+
+test("rejected sandbox changes keep the confirmed level and network", async () => {
+  const harness = await startHarness({
+    "messages.list": { messages: [], next_cursor: null },
+    "agents.list": agents,
+    "pending.list": { pending: [] },
+    "bots.get": { access: "full", network: "on" },
+    "bots.update": {
+      __error: { code: "forbidden", message: "fixture rejection" },
+    },
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Chat = await loadChat();
+    testing.render(createElement(Chat, { botId }));
+    testing.fireEvent.click(await testing.screen.findByText("Settings"));
+    const level =
+      await testing.screen.findByLabelText<HTMLSelectElement>("Level");
+    const network =
+      await testing.screen.findByLabelText<HTMLSelectElement>("Network");
+    testing.fireEvent.change(level, { target: { value: "workspace" } });
+    await testing.screen.findByRole("alert");
+    expect(level.value).toBe("full");
+    await testing.waitFor(() => expect(network.disabled).toBe(false));
+    testing.fireEvent.change(network, { target: { value: "off" } });
+    await testing.waitFor(() =>
+      expect(requestParams(harness.requests, "bots.update")).toHaveLength(2),
+    );
+    await testing.screen.findByRole("alert");
+    expect(network.value).toBe("on");
   } finally {
     testing.cleanup();
     harness.stop();

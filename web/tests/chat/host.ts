@@ -29,6 +29,11 @@ export function rpcError(
   return { [errorKey]: { code, message } };
 }
 
+const noReplyKey = "__no_reply";
+
+/** A reply the harness never answers, like a request still in flight. */
+export const noReply: Record<string, unknown> = { [noReplyKey]: true };
+
 export type Harness = {
   requests: Frame[];
   tick: (kind: string, data: Record<string, unknown>) => void;
@@ -81,6 +86,9 @@ export async function startHarness(
       const reply = replies[method];
       const body =
         typeof reply === "function" ? reply(params, nth) : (reply ?? {});
+      if (body[noReplyKey] === true) {
+        return;
+      }
       const failure = body[errorKey];
       socket.send(
         JSON.stringify(

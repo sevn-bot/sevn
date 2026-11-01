@@ -6,8 +6,6 @@ import hashlib
 from contextvars import ContextVar
 from datetime import datetime, timedelta
 
-from sqlalchemy import select
-
 from sevn.decisions.base import Attempt, stored_state
 from sevn.domain.ids import new_id
 from sevn.domain.session import open_session
@@ -33,14 +31,10 @@ def last_decision_id() -> str | None:
 
 async def mark_corrected(decision_id: str | None, agent_id: str) -> None:
     """Record where the user moved a routed message (D7)."""
+    if decision_id is None:
+        return
     async with open_session() as session:
-        row: DecisionLog | None = None
-        if decision_id is not None:
-            row = await session.get(DecisionLog, decision_id)
-        if row is None:
-            row = await session.scalar(
-                select(DecisionLog).order_by(DecisionLog.created_at.desc()).limit(1)
-            )
+        row = await session.get(DecisionLog, decision_id)
         if row is None:
             return
         row.corrected_to = agent_id

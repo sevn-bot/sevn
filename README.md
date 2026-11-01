@@ -23,7 +23,7 @@ Each agent owns one thread. Statuses are `running`, `waiting`, `idle`, `done`, a
 
 Every agent gets its own `tasks/<agent_id>/` folder inside the bot workspace. The folder stays when the agent is archived. A write outside that folder takes an advisory lock for ten minutes, refreshed on each write. A second agent that writes the same path gets `path_locked`, with the holder's id and title. Locks are released when the turn finishes and when the agent is done. Writes inside the agent's own scratch folder are not locked.
 
-New agents start with isolation `shared`, so file tools and the shell use the bot workspace. When an agent's isolation is `worktree` and that workspace is a git repository, those tools use a git worktree at `.sevn/worktrees/<agent_id>` on branch `sevn/<agent_id>`. A workspace that is not a git repository stays on the scratch folder.
+New agents start with isolation `shared`, so file tools and the shell use the bot workspace. When an agent's isolation is `worktree` and that workspace is a git repository, those tools use a git worktree at `<sevn-home>/worktrees/<agent_id>` on branch `sevn/<agent_id>`. Its parent is host-managed, outside bot-writable workspaces, so a sibling cannot replace the checkout root. A workspace that is not a git repository stays on the scratch folder.
 
 ## Routing
 
@@ -55,6 +55,8 @@ The host does not save a memory on its own. After a successful turn, a jev score
 ## Sandbox
 
 The bot access level defaults to `workspace`. Bot settings can switch the level and the network flag.
+
+Claude Code's native tools currently run without sevn's OS confinement. Claude bots therefore require explicitly selected `access=full` and `network=on`; other combinations fail before the CLI session opens. Tool approvals remain required. Use Pydantic AI for workspace confinement, isolated execution, or network-off tools.
 
 `workspace` file tools resolve paths and refuse anything outside the bot workspace and the `Shared` directory next to the workspaces folder (`path_outside_workspace`). The shell runs under Seatbelt on macOS, using `host/src/sevn/sandbox/profiles/sevn-workspace.sb`, or under bubblewrap on Linux. The workspace and `Shared` are writable. The rest of the system is read-only, and your home directory is not readable at all except for git's config (`~/.gitconfig`, `~/.config/git`) and the usual toolchain installs (`~/.local/bin`, `~/.local/share/uv`, `~/.cargo/bin`, `~/.rustup/toolchains`, `~/.nvm/versions`, `~/.pyenv`, `~/.bun/bin`, `~/.deno/bin`, `~/go/bin`, pnpm). Reads and writes are also denied for `.ssh`, `.aws`, `Library/Keychains`, the CLI credential directories, and the sevn database, secrets, keys, run token and logs wherever `SEVN_HOME` puts them. On macOS the command can reach only the Mach services it needs for name lookup, logging, preferences, DNS and TLS trust, so the keychain, the pasteboard, `open` and Apple Events are out of reach. On Linux it runs in new namespaces (`--unshare-all`, `--new-session`), so it cannot see or signal host processes. Network follows the bot flag, which defaults to off. Other platforms do not run that confined command. Running the host itself inside Docker needs `--security-opt seccomp=unconfined --security-opt apparmor=unconfined --security-opt systempaths=unconfined` for bubblewrap to start.
 
