@@ -164,12 +164,20 @@ def _raw_destructive(command: str) -> bool:
 
 
 def _parse(command: str) -> list[_Command] | None:
-    """Split a line into simple commands. ``None`` when shlex cannot read it."""
+    """Split a line into simple commands. ``None`` when shlex cannot read it.
+
+    Newlines become ``;`` so each line is scored as its own command, as ``sh``
+    runs it. shlex's ``#`` comment handling stays off: after that join a ``#``
+    would hide every later line from the scorer, while ``sh`` ends a comment at
+    the newline and runs the next line. A ``#`` word is then an unknown program,
+    so a commented line is at least ``medium``.
+    """
     lexer = shlex.shlex(
         command.replace("\r", "\n").replace("\n", " ; "),
         posix=True,
         punctuation_chars=True,
     )
+    lexer.commenters = ""
     lexer.whitespace_split = True
     try:
         tokens = list(lexer)
