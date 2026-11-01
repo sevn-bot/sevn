@@ -116,7 +116,7 @@ def test_bubblewrap_masks_host_socket_directories(
         )
 
 
-async def test_worktree_shell_cannot_write_its_parent(
+async def test_worktree_shell_cannot_change_host_parent(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     import shutil
@@ -140,9 +140,12 @@ async def test_worktree_shell_cannot_write_its_parent(
         assert row is not None
         row.isolation = "worktree"
         await session.commit()
-    denied = await execute(bot.id, agent.id, "printf changed > ../marker")
-    assert denied.returncode != 0
-    assert not (root.parent / "marker").exists()
+    marker = root.parent / "marker"
+    marker.write_text("preserve host parent", encoding="utf-8")
+    await execute(bot.id, agent.id, "printf changed > ../marker")
+    # Seatbelt refuses this write; bubblewrap may write to its private tmpfs.
+    # Neither may change the real parent that controls the checkout root.
+    assert marker.read_text(encoding="utf-8") == "preserve host parent"
     allowed = await execute(bot.id, agent.id, "printf ok > note.txt")
     assert allowed.returncode == 0, allowed.stderr
     assert (root / "note.txt").read_text(encoding="utf-8") == "ok"
