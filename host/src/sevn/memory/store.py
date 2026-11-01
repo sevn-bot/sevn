@@ -242,7 +242,9 @@ class MemoryStore:
             if len(kept) != len(batch.inserts):
                 batch.inserts = kept
                 return
-            await self._require(memory_id)
+            current = await self._require(memory_id)
+            if current.bot_id != bot_id:
+                raise DomainError("not_found", "memory not found")
             batch.deletes.append(memory_id)
 
     async def stage_tier(
@@ -253,10 +255,17 @@ class MemoryStore:
         actor: str,
         revision: int,
         turn_id: str,
+        caller_bot_id: str | None = None,
     ) -> MemoryRecord:
-        """Stage a tier change. A user-origin row rejects a bot actor immediately."""
+        """Stage a tier change. A user-origin row rejects a bot actor immediately.
+
+        ``caller_bot_id`` scopes the change to that bot: another bot's memory
+        is ``not_found``.
+        """
         wanted = _tier(tier)
         bot_id = await self._bot_for(memory_id, turn_id)
+        if caller_bot_id is not None and bot_id != caller_bot_id:
+            raise DomainError("not_found", "memory not found")
         async with bot_write_lock(bot_id):
             batch = _pending.get(turn_id)
             if batch is not None:

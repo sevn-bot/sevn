@@ -12,7 +12,7 @@ from pathlib import Path
 from sevn.domain.errors import DomainError
 from sevn.domain.ids import new_id
 from sevn.domain.session import open_session
-from sevn.domain.workspace import open_place
+from sevn.domain.workspace import open_place, scratch_dir
 from sevn.sandbox.env import child_env
 from sevn.sandbox.policy import (
     allow_all_enabled,
@@ -96,11 +96,12 @@ async def execute(
         target,
         host_allow_all=host_allow_all,
     )
-    ran = await _run(
-        argv,
-        target.root.resolve(),
-        child_env(docker=target.access == "isolated" and not host_allow_all),
-    )
+    env = child_env(docker=target.access == "isolated" and not host_allow_all)
+    if target.access == "workspace" and not host_allow_all:
+        tmp = await _scratch_tmp(target.root.resolve(), agent_id)
+        for name in ("TMPDIR", "TMP", "TEMP"):
+            env[name] = str(tmp)
+    ran = await _run(argv, target.root.resolve(), env)
     return ShellResult(
         executed=True,
         risk=risk,
@@ -162,6 +163,17 @@ async def _load(bot_id: str, agent_id: str) -> _Target:
             network_on=row.network == "on",
             root=place.root,
         )
+
+
+async def _scratch_tmp(root: Path, agent_id: str) -> Path:
+    """A writable temp folder for the confined shell.
+
+    The host ``TMPDIR`` is read-only under Seatbelt and hidden by the ``/tmp``
+    tmpfs under bubblewrap. The agent's scratch folder is writable on both.
+    """
+    tmp = scratch_dir(root, agent_id) / ".tmp"
+    await asyncio.to_thread(tmp.mkdir, parents=True, exist_ok=True)
+    return tmp
 
 
 def _argv(command: str, target: _Target, *, host_allow_all: bool) -> list[str]:

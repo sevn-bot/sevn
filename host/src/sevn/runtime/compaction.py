@@ -74,8 +74,9 @@ async def compact_messages(
     """Keep the last six messages and capability pairs; summarize the rest."""
     if not _over_threshold(estimated_tokens, model_window) or len(messages) <= _KEEP:
         return list(messages)
-    older = messages[:-_KEEP]
-    recent = list(messages[-_KEEP:])
+    split = _split_point(messages, len(messages) - _KEEP)
+    older = messages[:split]
+    recent = list(messages[split:])
     dropped = [message for message in older if not _keeps_capability(message)]
     if len(dropped) == 0:
         return list(messages)
@@ -93,6 +94,44 @@ async def compact_messages(
             inserted = True
     compacted.extend(recent)
     return compacted
+
+
+def _split_point(messages: Sequence[ModelMessage], start: int) -> int:
+    """Move ``start`` back until every tool return kept verbatim has its call.
+
+    A return whose call was summarized away is an unknown ``tool_call_id`` to
+    the provider, and the next request fails. Capability pairs in the older
+    span are kept, so their calls count as present.
+    """
+    split = start
+    while split > 0:
+        kept = list(messages[split:])
+        kept.extend(message for message in messages[:split] if _keeps_capability(message))
+        called = {
+            call_id
+            for message in kept
+            if isinstance(message, ModelResponse)
+            for call_id in _call_ids(message)
+        }
+        returned = {
+            call_id
+            for message in messages[split:]
+            if isinstance(message, ModelRequest)
+            for call_id in _call_ids(message)
+        }
+        if returned <= called:
+            return split
+        split -= 1
+    return split
+
+
+def _call_ids(message: ModelMessage) -> list[str]:
+    found: list[str] = []
+    for part in message.parts:
+        call_id = getattr(part, "tool_call_id", None)
+        if isinstance(call_id, str) and call_id != "":
+            found.append(call_id)
+    return found
 
 
 def _over_threshold(estimated_tokens: int, model_window: int) -> bool:

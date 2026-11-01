@@ -49,6 +49,15 @@ class OpLog:
             found.result = dict(result)
             await session.commit()
 
+    async def forget_pending(self, op_id: str) -> None:
+        """Drop the in-progress marker for ``op_id``. A finished result stays."""
+        async with self._sessions() as session:
+            found = await session.get(OpLogEntry, op_id)
+            if found is None or found.result.get("_pending") is not True:
+                return
+            await session.delete(found)
+            await session.commit()
+
     async def prune(self) -> None:
         cutoff = utcnow() - _RETENTION
         async with self._sessions() as session, session.begin():

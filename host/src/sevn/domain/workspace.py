@@ -209,14 +209,25 @@ async def _git(cwd: Path, *args: str) -> int:
         raise DomainError("invalid_params", "git is not available")
     env = child_env()
     env["GIT_TERMINAL_PROMPT"] = "0"
-    # The bot can write the workspace's .git, so its hooks and fsmonitor would
-    # run here on the host, outside the sandbox.
+    # The bot can write the workspace's .git, so its hooks, fsmonitor, checkout
+    # filters and submodule recursion would run here on the host, outside the
+    # sandbox. Filters are blanked through GIT_CONFIG_* rather than ``-c``:
+    # a driver name may contain ``=``, which ``-c`` cannot express.
+    overrides = [
+        ("core.hooksPath", "/dev/null"),
+        ("core.fsmonitor", "false"),
+        ("submodule.recurse", "false"),
+    ]
+    for name in await _filter_drivers(git, cwd, env):
+        for key in ("smudge", "clean", "process"):
+            overrides.append((f"filter.{name}.{key}", ""))
+        overrides.append((f"filter.{name}.required", "false"))
+    env["GIT_CONFIG_COUNT"] = str(len(overrides))
+    for index, (key, value) in enumerate(overrides):
+        env[f"GIT_CONFIG_KEY_{index}"] = key
+        env[f"GIT_CONFIG_VALUE_{index}"] = value
     process = await asyncio.create_subprocess_exec(
         git,
-        "-c",
-        "core.hooksPath=/dev/null",
-        "-c",
-        "core.fsmonitor=false",
         *args,
         cwd=cwd,
         env=env,
@@ -227,6 +238,36 @@ async def _git(cwd: Path, *args: str) -> int:
     if process.returncode is None:
         return 1
     return process.returncode
+
+
+async def _filter_drivers(git: str, cwd: Path, env: dict[str, str]) -> set[str]:
+    """Every ``filter.<name>`` driver git sees from ``cwd``, in any config file.
+
+    Reading config runs no command. A failed read refuses the git call, since
+    the drivers it would have found could not be blanked.
+    """
+    process = await asyncio.create_subprocess_exec(
+        git,
+        "config",
+        "--null",
+        "--get-regexp",
+        r"^filter\.",
+        cwd=cwd,
+        env=env,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, _stderr = await process.communicate()
+    # ``git config --get-regexp`` exits 1 when nothing matches.
+    if process.returncode not in (0, 1):
+        raise DomainError("invalid_params", "git config could not be read")
+    names: set[str] = set()
+    for entry in stdout.decode("utf-8", "surrogateescape").split("\0"):
+        key = entry.split("\n", 1)[0]
+        if not key.startswith("filter.") or key.count(".") < 2:
+            continue
+        names.add(key[len("filter.") : key.rindex(".")])
+    return names
 
 
 async def _load(agent_id: str) -> tuple[str, str, Path]:
