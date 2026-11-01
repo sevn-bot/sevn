@@ -11,6 +11,7 @@ from sevn.domain.ids import new_id
 from sevn.domain.session import open_session
 from sevn.domain.workspace import drop_locks
 from sevn.log import logger
+from sevn.memory.store import MemoryStore
 from sevn.protocol.hub import Hub
 from sevn.runtime.errors import ModelError, TurnError
 from sevn.runtime.turn_store import (
@@ -257,6 +258,28 @@ async def persist_queued_cancel(hub: Hub, turn_id: str) -> bool:
     return True
 
 
+async def close_question_turns(session: AsyncSession, agent_id: str, now: datetime) -> None:
+    """Close the agent's turns paused on a question once the user has answered.
+
+    The answer runs as the next turn, so a paused turn's staged memory writes
+    commit here, in the caller's session, or they are lost. The caller commits.
+    """
+    turns = list(
+        await session.scalars(
+            select(TurnRow).where(TurnRow.agent_id == agent_id).where(TurnRow.status == "waiting")
+        )
+    )
+    for turn in turns:
+        turn.status = "done"
+        turn.finished_at = now
+        await MemoryStore().write(session, turn.id)
+        for job_id in turn.job_ids or ():
+            job = await session.get(JobRow, job_id)
+            if job is not None and job.status in ("queued", "started"):
+                job.status = "done"
+                job.finished_at = now
+
+
 async def cancel_persisted_waiting(hub: Hub, turn_id: str) -> bool:
     """Cancel a turn already stored as waiting.
 
@@ -269,6 +292,9 @@ async def cancel_persisted_waiting(hub: Hub, turn_id: str) -> bool:
         turn = await session.get(TurnRow, turn_id)
         if turn is None or turn.status != "waiting":
             return False
+        # A cancelled turn keeps none of its memory writes, and staged pinned
+        # rows would keep counting against the bot's pinned budget.
+        await MemoryStore().rollback(turn_id)
         turn.status = "cancelled"
         turn.finished_at = finished_at
         turn.usage = {}

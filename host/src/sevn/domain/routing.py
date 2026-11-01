@@ -215,13 +215,33 @@ async def reroute(
             raise DomainError("invalid_params", "agent_id or new is required")
         target = await _agent_on_bot(bot_id, agent_id)
     await _requeue(job_id, target.id)
-    await _start(target.id)
+    # Requeueing cancelled any turn the job had, so its slot is free again. The
+    # moved job then takes a slot like a new lane or a follow-up would in deliver.
+    target = await AgentService().get(target.id)
+    held = await _over_cap(bot_id, "new_request" if start_new else "follow_up", target)
+    if not held:
+        await _start(target.id)
     await mark_corrected(decision_id, target.id)
     await hub.emit(
         "route.corrected",
         message_id,
         {"message_id": message_id, "job_id": job_id, "agent_id": target.id},
     )
+    if held:
+        # Left queued: the worker starts it when a slot frees (Worker._open_slots).
+        ahead = await _ahead(bot_id, job_id)
+        await hub.emit(
+            "job.queued",
+            job_id,
+            {
+                "job_id": job_id,
+                "agent_id": target.id,
+                "bot_id": bot_id,
+                "status": "queued",
+                "ahead": ahead,
+                "notice": f"queued: {ahead} ahead",
+            },
+        )
     return job_id, target.id
 
 
@@ -311,6 +331,8 @@ async def _cancel_agent(agent_id: str) -> None:
 
 
 async def _resolve_answer(agent_id: str, text: str) -> None:
+    from sevn.runtime.turn_end import close_question_turns
+
     now = utcnow()
     answer: dict[str, object] = {"text": text}
     async with open_session() as session:
@@ -329,21 +351,7 @@ async def _resolve_answer(agent_id: str, text: str) -> None:
         # Close the paused turn and its job. The answer is delivered as the
         # next user message by ``deliver``; leaving the turn waiting wedges
         # the agent because ``Worker._pump`` returns while a turn is waiting.
-        waiting_turns = list(
-            await session.scalars(
-                select(TurnRow)
-                .where(TurnRow.agent_id == agent_id)
-                .where(TurnRow.status == "waiting")
-            )
-        )
-        for turn in waiting_turns:
-            turn.status = "done"
-            turn.finished_at = now
-            for job_id in turn.job_ids or ():
-                job = await session.get(JobRow, job_id)
-                if job is not None and job.status in ("queued", "started"):
-                    job.status = "done"
-                    job.finished_at = now
+        await close_question_turns(session, agent_id, now)
         await session.flush()
         agent = await session.get(AgentRow, agent_id)
         if agent is not None and agent.status == "waiting":
