@@ -1,4 +1,8 @@
-"""Bot-reported metrics and read-only share links (plan fleet-dashboards, phase 6)."""
+"""Bot-reported metrics, read-only share links, and a budget override (phase 6).
+
+``routines.budget_resumed_at`` records an owner resuming a routine the budget
+paused, so the budget sweep does not pause it again the same day.
+"""
 
 from __future__ import annotations
 
@@ -12,6 +16,10 @@ depends_on = None
 
 
 def upgrade() -> None:
+    op.add_column(
+        "routines",
+        sa.Column("budget_resumed_at", sa.DateTime(timezone=True), nullable=True),
+    )
     op.create_table(
         "metric_points",
         sa.Column("id", sa.String(), nullable=False),
@@ -51,3 +59,4 @@ def downgrade() -> None:
     op.drop_table("share_links")
     op.drop_index("ix_metric_points_key_bot_as_of", table_name="metric_points")
     op.drop_table("metric_points")
+    op.drop_column("routines", "budget_resumed_at")

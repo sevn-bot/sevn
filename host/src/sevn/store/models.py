@@ -255,6 +255,9 @@ class Routine(Base):
     paused_reason: Mapped[str | None] = mapped_column(String, nullable=True)
     next_run: Mapped[datetime | None] = mapped_column(_IsoDateTime, nullable=True)
     last_run: Mapped[datetime | None] = mapped_column(_IsoDateTime, nullable=True)
+    # When the owner resumed a routine the budget had paused. The budget sweep
+    # leaves it running for the rest of that day.
+    budget_resumed_at: Mapped[datetime | None] = mapped_column(_IsoDateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(_IsoDateTime, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(_IsoDateTime, nullable=False)
 
