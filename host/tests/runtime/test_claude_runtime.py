@@ -58,10 +58,16 @@ async def _claude_agent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tupl
                 await request(
                     client,
                     "bots.create",
-                    {"name": "Claude", "runtime": "claude", "op_id": mint_id("op_")},
+                    {
+                        "name": "Claude",
+                        "runtime": "claude",
+                        "access": "full",
+                        "op_id": mint_id("op_"),
+                    },
                 )
             )[0]
         )
+        await _network_on(client, str(created["id"]))
         agent = await AgentService().spawn(bot_id=str(created["id"]))
     except Exception:
         await context.__aexit__(None, None, None)
@@ -164,10 +170,16 @@ async def test_can_use_tool_creates_pending_and_blocks_until_answer(
                 await request(
                     client,
                     "bots.create",
-                    {"name": "Claude", "runtime": "claude", "op_id": mint_id("op_")},
+                    {
+                        "name": "Claude",
+                        "runtime": "claude",
+                        "access": "full",
+                        "op_id": mint_id("op_"),
+                    },
                 )
             )[0]
         )
+        await _network_on(client, str(created["id"]))
         await request(
             client,
             "messages.send",
@@ -221,10 +233,16 @@ async def test_restart_marks_waiting_claude_turn_interrupted(
                 await request(
                     client,
                     "bots.create",
-                    {"name": "Claude", "runtime": "claude", "op_id": mint_id("op_")},
+                    {
+                        "name": "Claude",
+                        "runtime": "claude",
+                        "access": "full",
+                        "op_id": mint_id("op_"),
+                    },
                 )
             )[0]
         )
+        await _network_on(client, str(created["id"]))
         await request(
             client,
             "messages.send",
@@ -391,11 +409,13 @@ async def test_cancelled_claude_abort_ends_cancelled(
                             {
                                 "name": "Claude",
                                 "runtime": "claude",
+                                "access": "full",
                                 "op_id": mint_id("op_"),
                             },
                         )
                     )[0]
                 )
+                await _network_on(client, str(created["id"]))
                 await request(
                     client,
                     "messages.send",
@@ -494,11 +514,13 @@ async def test_runtime_error_keeps_streamed_text_and_hides_provider_text(
                             {
                                 "name": "Claude",
                                 "runtime": "claude",
+                                "access": "full",
                                 "op_id": mint_id("op_"),
                             },
                         )
                     )[0]
                 )
+                await _network_on(client, str(created["id"]))
                 await request(
                     client,
                     "messages.send",
@@ -573,11 +595,13 @@ async def test_cancelled_claude_turn_closes_open_permission(
                             {
                                 "name": "Claude",
                                 "runtime": "claude",
+                                "access": "full",
                                 "op_id": mint_id("op_"),
                             },
                         )
                     )[0]
                 )
+                await _network_on(client, str(created["id"]))
                 await request(
                     client,
                     "messages.send",
@@ -723,11 +747,13 @@ async def test_pending_list_returns_claude_permission_name_and_args(
                             {
                                 "name": "Claude",
                                 "runtime": "claude",
+                                "access": "full",
                                 "op_id": mint_id("op_"),
                             },
                         )
                     )[0]
                 )
+                await _network_on(client, str(created["id"]))
                 await request(
                     client,
                     "messages.send",
@@ -791,11 +817,13 @@ async def test_claude_turn_presents_bot_instructions(
                                 "scope": "Rocky shore",
                                 "instructions": instructions,
                                 "runtime": "claude",
+                                "access": "full",
                                 "op_id": mint_id("op_"),
                             },
                         )
                     )[0]
                 )
+                await _network_on(client, str(created["id"]))
                 await request(
                     client,
                     "messages.send",
@@ -820,16 +848,12 @@ async def test_claude_turn_presents_bot_instructions(
 
 
 @pytest.mark.parametrize("policy", ["auto", "allow_all"])
-async def test_claude_non_ask_policy_finishes_without_a_permission_wait(
+async def test_claude_non_ask_policy_waits_for_permission(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     policy: str,
 ) -> None:
-    """Bot policies auto and allow_all allow the tool without the can_use_tool wait.
-
-    ApprovalPolicy is ask, auto, or allow_all. ask still waits in
-    test_can_use_tool_creates_pending_and_blocks_until_answer.
-    """
+    """Bot policies auto and allow_all wait for a tool answer, the same as ask."""
     from sevn.runtime.runtimes.claude import use_client
     from sevn.runtime.worker import bind
 
@@ -861,12 +885,14 @@ async def test_claude_non_ask_policy_finishes_without_a_permission_wait(
                             {
                                 "name": "Claude",
                                 "runtime": "claude",
+                                "access": "full",
                                 "approval_policy": policy,
                                 "op_id": mint_id("op_"),
                             },
                         )
                     )[0]
                 )
+                await _network_on(client, str(created["id"]))
                 await request(
                     client,
                     "messages.send",
@@ -884,17 +910,78 @@ async def test_claude_non_ask_policy_finishes_without_a_permission_wait(
                     ]
                     status = str(jobs[0]["status"]) if jobs else ""
                     results = list(fake.permission_results)
-                    if status == "done" and waiting == [] and results == ["approve"]:
+                    if waiting and results == []:
                         break
                     await asyncio.sleep(0.02)
             finally:
                 await worker.aclose()
     finally:
         use_client(None)
-    assert status == "done" and waiting == [] and results == ["approve"], (
+    assert waiting and results == [] and status != "done", (
         policy,
         status,
         waiting,
         results,
         fake.permission_started.is_set(),
+    )
+
+
+def test_blanked_env_keeps_path_and_blanks_secrets(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PATH", "/usr/bin")
+    monkeypatch.setenv("HOME", "/Users/sevn")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-secretvalue")
+    monkeypatch.setenv("SEVN_SECRET_TOKEN", "supersecretvalue")
+    from sevn.runtime.runtimes.claude import blanked_env
+
+    env = blanked_env()
+    assert env["PATH"] == "/usr/bin"
+    assert env["HOME"] == "/Users/sevn"
+    assert env["ANTHROPIC_API_KEY"] == ""
+    assert env["SEVN_SECRET_TOKEN"] == ""
+    assert "sk-ant-secretvalue" not in env.values()
+    assert "supersecretvalue" not in env.values()
+
+
+@pytest.mark.parametrize(
+    ("access", "network"),
+    [("workspace", "off"), ("workspace", "on"), ("isolated", "on"), ("full", "off")],
+)
+async def test_claude_refuses_unsupported_confinement_before_connect(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, access: str, network: str
+) -> None:
+    from sevn.domain.bots import BotService
+    from sevn.runtime.errors import TurnError
+    from sevn.runtime.runtimes.claude import ClaudeRuntime
+
+    _host, _client, created = await _claude_agent(tmp_path, monkeypatch)
+    try:
+        await BotService().update(
+            created["id"], access=access, network=network, fields={"access", "network"}
+        )
+        fake = FakeClaudeClient(script=_HI)
+        with pytest.raises(TurnError, match="Claude requires full access and network on"):
+            await ClaudeRuntime(client=fake).open(created["agent"])
+        assert fake.connects == []
+        assert fake.queries == []
+    finally:
+        await _close(created)
+
+
+def test_claude_env_blanks_host_agent_socket_and_xdg_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+    from sevn.runtime.runtimes.claude import blanked_env
+
+    keys = ("SSH_AUTH_SOCK", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME")
+    for key in keys:
+        monkeypatch.setenv(key, "fixture-value")
+    env = blanked_env()
+    assert all(env[key] == "" for key in keys)
+
+
+async def _network_on(client: object, bot_id: str) -> None:
+    ok(
+        (
+            await request(
+                client, "bots.update", {"bot_id": bot_id, "network": "on", "op_id": mint_id("op_")}
+            )
+        )[0]
     )

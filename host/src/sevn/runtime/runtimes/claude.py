@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import json
+import os
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from typing import Protocol, cast
@@ -28,9 +29,14 @@ from claude_agent_sdk import (
     ToolUseBlock,
     UserMessage,
 )
-from claude_agent_sdk.types import ContentBlock, ConversationResetMessage, RateLimitEvent
+from claude_agent_sdk.types import (
+    ContentBlock,
+    ConversationResetMessage,
+    RateLimitEvent,
+    SystemPromptPreset,
+)
 
-from sevn.domain.agents import AgentRecord
+from sevn.domain.agents import AgentRecord, sibling_block
 from sevn.domain.bots import BotService
 from sevn.domain.ids import new_id
 from sevn.domain.session import open_session
@@ -92,13 +98,17 @@ class SdkClaudeClient:
         self._tool_names = {}
         self._saw_session = False
         system_prompt = options.get("system_prompt")
+        model = options.get("model")
+        env = options.get("env")
         sdk_options = ClaudeAgentOptions(
             cwd=cwd,
             resume=resume if isinstance(resume, str) and resume != "" else None,
             permission_mode="default",
             can_use_tool=_sdk_hook(can_use_tool),
             include_partial_messages=True,
-            system_prompt=system_prompt if isinstance(system_prompt, str) else None,
+            system_prompt=_preset_prompt(system_prompt),
+            model=model if isinstance(model, str) and model != "" else None,
+            env=_env_map(env),
         )
         self._sdk = ClaudeSDKClient(sdk_options)
         await self._sdk.connect()
@@ -206,16 +216,24 @@ class ClaudeRuntime:
 
     async def open(self, agent: AgentRecord) -> SessionRef:
         bot = await BotService().get(agent.bot_id)
+        if bot.access != "full" or bot.network != "on":
+            raise TurnError(
+                "Claude requires full access and network on; "
+                "use Pydantic AI for workspace, isolated, or network-off execution"
+            )
         client = self._client_for(agent.id)
 
         async def _can_use_tool(tool: str, args: object, request_id: object) -> str:
             return await self._ask(agent.id, tool, args, request_id)
 
+        siblings = await sibling_block(agent.bot_id, agent.id)
         await client.connect(
             cwd=bot.workspace_path,
             resume=agent.runtime_session_ref,
             can_use_tool=_can_use_tool,
-            system_prompt=build_instructions(bot),
+            system_prompt=build_instructions(bot, siblings=siblings),
+            model=_claude_model(bot.model),
+            env=blanked_env(),
         )
         return SessionRef(agent_id=agent.id, session_ref=agent.runtime_session_ref)
 
@@ -314,12 +332,79 @@ class ClaudeRuntime:
         return "deny"
 
 
+_KEEP_ENV = frozenset(
+    {
+        "PATH",
+        "HOME",
+        "USER",
+        "LOGNAME",
+        "SHELL",
+        "TMPDIR",
+        "TMP",
+        "TEMP",
+        "TERM",
+        "CLAUDE_CONFIG_DIR",
+    }
+)
+
+
+def blanked_env() -> dict[str, str]:
+    """Overlay that blanks every parent env var the Claude CLI must not inherit.
+
+    The SDK merges this dict over ``os.environ``. A missing key is still inherited,
+    so every other key is set to an empty string.
+    """
+    overlay: dict[str, str] = {}
+    for key, value in os.environ.items():
+        overlay[key] = value if _keep_env(key) else ""
+    return overlay
+
+
+def _keep_env(key: str) -> bool:
+    if key in _KEEP_ENV or key.startswith("LC_"):
+        return True
+    if key.startswith("CLAUDE_") and "API_KEY" not in key and "SECRET" not in key:
+        return True
+    return False
+
+
+def _claude_model(model: str) -> str | None:
+    prefix = "anthropic:"
+    if not model.startswith(prefix):
+        return None
+    name = model[len(prefix) :]
+    if name == "":
+        return None
+    return name
+
+
+def _preset_prompt(value: object) -> SystemPromptPreset | None:
+    if isinstance(value, str) and value != "":
+        return SystemPromptPreset(type="preset", preset="claude_code", append=value)
+    if isinstance(value, dict):
+        body = cast("dict[object, object]", value)
+        if body.get("type") == "preset":
+            return cast("SystemPromptPreset", value)
+    return None
+
+
+def _env_map(value: object) -> dict[str, str]:
+    if not isinstance(value, dict):
+        return blanked_env()
+    mapped: dict[str, str] = {}
+    items = cast("dict[object, object]", value)
+    for key, item in items.items():
+        if isinstance(key, str) and isinstance(item, str):
+            mapped[key] = item
+    if mapped:
+        return mapped
+    return blanked_env()
+
+
 def _policy_allows(turn: TurnContext | None) -> bool:
-    """``auto`` and ``allow_all`` approve a tool without waiting. ``ask`` does not."""
-    if turn is None or turn.bot is None:
-        return False
-    policy = turn.bot.approval_policy
-    return policy == "auto" or policy == "allow_all"
+    """Per-bot auto and allow_all still wait. Host-wide allow_all is not a bot field."""
+    _ = turn
+    return False
 
 
 def map_claude_event(native: Mapping[str, object]) -> RuntimeEvent:

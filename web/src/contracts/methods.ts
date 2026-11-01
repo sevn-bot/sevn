@@ -36,10 +36,40 @@ export const methods = {
     params: "BotsUpdateParams",
     result: "BotRecord",
   },
+  "host.set_sandbox_mode": {
+    mutating: true,
+    params: "SandboxModeParams",
+    result: "SandboxModeResult",
+  },
+  "memories.delete": {
+    mutating: true,
+    params: "MemoriesDeleteParams",
+    result: "MemoriesDeleteResult",
+  },
+  "memories.list": {
+    mutating: false,
+    params: "MemoriesListParams",
+    result: "MemoriesListResult",
+  },
+  "memories.pin": {
+    mutating: true,
+    params: "MemoriesPinParams",
+    result: "MemoryRecord",
+  },
+  "memories.update": {
+    mutating: true,
+    params: "MemoriesUpdateParams",
+    result: "MemoryRecord",
+  },
   "messages.list": {
     mutating: false,
     params: "MessagesListParams",
     result: "MessagesListResult",
+  },
+  "messages.reroute": {
+    mutating: true,
+    params: "MessagesRerouteParams",
+    result: "MessagesRerouteResult",
   },
   "messages.send": {
     mutating: true,

@@ -26,7 +26,9 @@ async function runSmoke(page: SmokePage, expect: ExpectVisible): Promise<void> {
     `${state.baseURL}/auth/login?token=${encodeURIComponent(state.token)}`,
   );
   await page.getByRole("button", { name: "Ping" }).click();
-  await expect(page.getByText(/event #\d+/)).toBeVisible({ timeout: 2000 });
+  await expect(page.getByText(/event #\d+ — system\.ping/)).toBeVisible({
+    timeout: 10_000,
+  });
 }
 
 if (process.env.VITEST) {

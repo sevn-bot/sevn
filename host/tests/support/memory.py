@@ -94,6 +94,7 @@ async def memory_host(
     try:
         yield host
     finally:
+        await _close_worker(hub)
         for client in host.clients:
             close = getattr(client, "close", None)
             if close is None:
@@ -107,6 +108,22 @@ async def memory_host(
         for task in host.tasks:
             with suppress(asyncio.CancelledError):
                 await task
+
+
+async def _close_worker(hub: Any) -> None:
+    """Stop the worker a test bound to ``hub``.
+
+    A pump left running outlives the test's event loop. Garbage collection later
+    destroys it inside another test, which breaks that test's database greenlet.
+    """
+    import sys
+
+    worker_module = sys.modules.get("sevn.runtime.worker")
+    if worker_module is None:
+        return
+    worker = worker_module.current()
+    if worker is not None and worker.hub is hub:
+        await worker.aclose()
 
 
 def hello_frame(*, proto: list[int] | None = None, last_seq: int = 0) -> dict[str, Any]:

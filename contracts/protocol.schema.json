@@ -258,6 +258,9 @@
           "title": "Name",
           "type": "string"
         },
+        "network": {
+          "$ref": "#/$defs/NetworkFlag"
+        },
         "paused": {
           "title": "Paused",
           "type": "boolean"
@@ -295,6 +298,7 @@
         "effort",
         "access",
         "approval_policy",
+        "network",
         "workspace_path",
         "folder_id",
         "paused",
@@ -644,6 +648,17 @@
           "default": null,
           "title": "Name"
         },
+        "network": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NetworkFlag"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "op_id": {
           "anyOf": [
             {
@@ -881,6 +896,212 @@
         }
       ]
     },
+    "MemoriesDeleteParams": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "op_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op Id"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "MemoriesDeleteParams",
+      "type": "object"
+    },
+    "MemoriesDeleteResult": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "MemoriesDeleteResult",
+      "type": "object"
+    },
+    "MemoriesListParams": {
+      "additionalProperties": false,
+      "properties": {
+        "bot_id": {
+          "title": "Bot Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "bot_id"
+      ],
+      "title": "MemoriesListParams",
+      "type": "object"
+    },
+    "MemoriesListResult": {
+      "additionalProperties": false,
+      "properties": {
+        "memories": {
+          "items": {
+            "$ref": "#/$defs/MemoryRecord"
+          },
+          "title": "Memories",
+          "type": "array"
+        }
+      },
+      "required": [
+        "memories"
+      ],
+      "title": "MemoriesListResult",
+      "type": "object"
+    },
+    "MemoriesPinParams": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "op_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op Id"
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Revision"
+        },
+        "tier": {
+          "anyOf": [
+            {
+              "enum": [
+                "pinned",
+                "recall"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tier"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "MemoriesPinParams",
+      "type": "object"
+    },
+    "MemoriesUpdateParams": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "op_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op Id"
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Revision"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "text"
+      ],
+      "title": "MemoriesUpdateParams",
+      "type": "object"
+    },
+    "MemoryRecord": {
+      "additionalProperties": false,
+      "description": "One committed or staged memory.",
+      "properties": {
+        "bot_id": {
+          "title": "Bot Id",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "origin": {
+          "$ref": "#/$defs/Origin"
+        },
+        "revision": {
+          "title": "Revision",
+          "type": "integer"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "tier": {
+          "$ref": "#/$defs/Tier"
+        }
+      },
+      "required": [
+        "id",
+        "bot_id",
+        "text",
+        "tier",
+        "origin",
+        "revision"
+      ],
+      "title": "MemoryRecord",
+      "type": "object"
+    },
     "MessageRecord": {
       "additionalProperties": false,
       "description": "One UI message returned by ``messages.list``.",
@@ -991,6 +1212,68 @@
         "next_cursor"
       ],
       "title": "MessagesListResult",
+      "type": "object"
+    },
+    "MessagesRerouteParams": {
+      "additionalProperties": false,
+      "properties": {
+        "agent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Agent Id"
+        },
+        "message_id": {
+          "title": "Message Id",
+          "type": "string"
+        },
+        "new": {
+          "default": false,
+          "title": "New",
+          "type": "boolean"
+        },
+        "op_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op Id"
+        }
+      },
+      "required": [
+        "message_id"
+      ],
+      "title": "MessagesRerouteParams",
+      "type": "object"
+    },
+    "MessagesRerouteResult": {
+      "additionalProperties": false,
+      "properties": {
+        "agent_id": {
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "job_id": {
+          "title": "Job Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "job_id",
+        "agent_id"
+      ],
+      "title": "MessagesRerouteResult",
       "type": "object"
     },
     "MessagesSendParams": {
@@ -1106,6 +1389,20 @@
       ],
       "title": "ModelsListResult",
       "type": "object"
+    },
+    "NetworkFlag": {
+      "enum": [
+        "on",
+        "off"
+      ],
+      "type": "string"
+    },
+    "Origin": {
+      "enum": [
+        "user",
+        "bot"
+      ],
+      "type": "string"
     },
     "PendingAnswerParams": {
       "additionalProperties": false,
@@ -1318,10 +1615,73 @@
       ],
       "type": "string"
     },
+    "SandboxModeParams": {
+      "additionalProperties": false,
+      "description": "Owner confirm phrase for ``host.set_sandbox_mode`` (D14).",
+      "properties": {
+        "confirm": {
+          "title": "Confirm",
+          "type": "string"
+        },
+        "mode": {
+          "enum": [
+            "allow_all",
+            "enforced"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "op_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op Id"
+        }
+      },
+      "required": [
+        "mode",
+        "confirm"
+      ],
+      "title": "SandboxModeParams",
+      "type": "object"
+    },
+    "SandboxModeResult": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": [
+            "allow_all",
+            "enforced"
+          ],
+          "title": "Mode",
+          "type": "string"
+        }
+      },
+      "required": [
+        "mode"
+      ],
+      "title": "SandboxModeResult",
+      "type": "object"
+    },
     "SyncSinceParams": {
       "additionalProperties": false,
       "properties": {
+        "limit": {
+          "default": 200,
+          "maximum": 500,
+          "minimum": 1,
+          "title": "Limit",
+          "type": "integer"
+        },
         "seq": {
+          "maximum": 9223372036854775807,
+          "minimum": 0,
           "title": "Seq",
           "type": "integer"
         }
@@ -1334,17 +1694,42 @@
     },
     "SyncSinceResult": {
       "additionalProperties": false,
-      "description": "Cursor after durable events have been replayed as `evt` frames.",
+      "description": "Head of the log, plus the cursor for the next page of `evt` frames.",
       "properties": {
         "host_seq": {
           "title": "Host Seq",
           "type": "integer"
+        },
+        "more": {
+          "title": "More",
+          "type": "boolean"
+        },
+        "next_seq": {
+          "title": "Next Seq",
+          "type": "integer"
         }
       },
       "required": [
-        "host_seq"
+        "host_seq",
+        "next_seq",
+        "more"
       ],
       "title": "SyncSinceResult",
+      "type": "object"
+    },
+    "SystemCaps": {
+      "additionalProperties": false,
+      "description": "Capabilities ``system.info`` reports to every client (D14).",
+      "properties": {
+        "allow_all": {
+          "title": "Allow All",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "allow_all"
+      ],
+      "title": "SystemCaps",
       "type": "object"
     },
     "SystemInfoParams": {
@@ -1357,11 +1742,7 @@
       "additionalProperties": false,
       "properties": {
         "caps": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Caps",
-          "type": "array"
+          "$ref": "#/$defs/SystemCaps"
         },
         "host_id": {
           "title": "Host Id",
@@ -1453,6 +1834,13 @@
       ],
       "title": "Tick",
       "type": "object"
+    },
+    "Tier": {
+      "enum": [
+        "pinned",
+        "recall"
+      ],
+      "type": "string"
     },
     "TurnsCancelParams": {
       "additionalProperties": false,
@@ -1597,6 +1985,12 @@
     "pending.resolved": {
       "durable": true
     },
+    "route.corrected": {
+      "durable": true
+    },
+    "route.decided": {
+      "durable": true
+    },
     "routine.run": {
       "durable": true
     },
@@ -1658,10 +2052,40 @@
       "params": "BotsUpdateParams",
       "result": "BotRecord"
     },
+    "host.set_sandbox_mode": {
+      "mutating": true,
+      "params": "SandboxModeParams",
+      "result": "SandboxModeResult"
+    },
+    "memories.delete": {
+      "mutating": true,
+      "params": "MemoriesDeleteParams",
+      "result": "MemoriesDeleteResult"
+    },
+    "memories.list": {
+      "mutating": false,
+      "params": "MemoriesListParams",
+      "result": "MemoriesListResult"
+    },
+    "memories.pin": {
+      "mutating": true,
+      "params": "MemoriesPinParams",
+      "result": "MemoryRecord"
+    },
+    "memories.update": {
+      "mutating": true,
+      "params": "MemoriesUpdateParams",
+      "result": "MemoryRecord"
+    },
     "messages.list": {
       "mutating": false,
       "params": "MessagesListParams",
       "result": "MessagesListResult"
+    },
+    "messages.reroute": {
+      "mutating": true,
+      "params": "MessagesRerouteParams",
+      "result": "MessagesRerouteResult"
     },
     "messages.send": {
       "mutating": true,

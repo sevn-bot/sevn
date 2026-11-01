@@ -16,6 +16,8 @@ _DURABLE = (
     "turn.waiting",
     "turn.finished",
     "message.created",
+    "route.decided",
+    "route.corrected",
     "pending.created",
     "pending.resolved",
     "memory.changed",

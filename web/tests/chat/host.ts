@@ -22,6 +22,7 @@ type MockServer = {
 export type Harness = {
   requests: Frame[];
   tick: (kind: string, data: Record<string, unknown>) => void;
+  event: (kind: string, data: Record<string, unknown>) => void;
   stop: () => void;
 };
 
@@ -38,6 +39,7 @@ export async function startHarness(
   const requests: Frame[] = [];
   const counts = new Map<string, number>();
   let current: MockSocket | null = null;
+  let seq = 1;
   server.on("connection", (socket) => {
     current = socket;
     let welcomed = false;
@@ -69,7 +71,13 @@ export async function startHarness(
       const reply = replies[method];
       const body =
         typeof reply === "function" ? reply(params, nth) : (reply ?? {});
-      socket.send(JSON.stringify({ t: "res", id: frame.id, r: body }));
+      socket.send(
+        JSON.stringify({
+          t: "res",
+          id: frame.id,
+          ...(body.__error ? { e: body.__error } : { r: body }),
+        }),
+      );
     });
   });
   const clientName = "../../src/client/index.ts";
@@ -87,6 +95,10 @@ export async function startHarness(
     requests,
     tick(kind, data) {
       current?.send(JSON.stringify({ t: "tick", k: kind, d: data }));
+    },
+    event(kind, data) {
+      current?.send(JSON.stringify({ t: "evt", s: seq, k: kind, d: data }));
+      seq += 1;
     },
     stop() {
       connection.close();
@@ -119,6 +131,11 @@ export async function loadBotList(): Promise<Component> {
 export async function loadChat(): Promise<Component> {
   const modules = import.meta.glob("../../src/app/chat/Chat.tsx");
   return named(modules, "Chat");
+}
+
+export async function loadMemoriesPanel(): Promise<Component> {
+  const modules = import.meta.glob("../../src/app/bots/MemoriesPanel.tsx");
+  return named(modules, "MemoriesPanel");
 }
 
 async function named(

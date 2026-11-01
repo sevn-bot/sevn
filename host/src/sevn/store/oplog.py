@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -36,8 +36,29 @@ class OpLog:
             found = await session.get(OpLogEntry, op_id)
             if found is None:
                 return None
+            if _aware(found.created_at) < utcnow() - _RETENTION:
+                await session.delete(found)
+                await session.commit()
+                return None
             session.expunge(found)
             return found
+
+    async def replace_result(self, op_id: str, result: Mapping[str, object]) -> None:
+        async with self._sessions() as session:
+            found = await session.get(OpLogEntry, op_id)
+            if found is None:
+                return
+            found.result = dict(result)
+            await session.commit()
+
+    async def forget_pending(self, op_id: str) -> None:
+        """Drop the in-progress marker for ``op_id``. A finished result stays."""
+        async with self._sessions() as session:
+            found = await session.get(OpLogEntry, op_id)
+            if found is None or found.result.get("_pending") is not True:
+                return
+            await session.delete(found)
+            await session.commit()
 
     async def prune(self) -> None:
         cutoff = utcnow() - _RETENTION
@@ -46,3 +67,9 @@ class OpLog:
 
     async def aclose(self) -> None:
         await self._engine.dispose()
+
+
+def _aware(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value

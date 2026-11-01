@@ -44,8 +44,9 @@ async def recover() -> Recovery:
     """Requeue ``started`` jobs whose turn has no committed result.
 
     A ``waiting`` turn that still has an open approval stays waiting, and so
-    does its job. A ``waiting`` turn whose approvals are already saved is
-    returned in ``resume``; the caller continues it. Leaving that job
+    does its job. A ``waiting`` turn whose approvals are already saved, or a
+    ``running`` turn that was resuming from them, is returned in ``resume``;
+    the caller continues it. Leaving that job
     ``started`` would wedge the agent. A committed ``model_messages`` value
     is a result, including an empty list. A Claude turn that was blocked on
     ``can_use_tool`` only holds that wait in memory, so a restart marks the
@@ -84,6 +85,7 @@ async def recover() -> Recovery:
                 if any(turn.model_messages is not None for turn in related):
                     continue
                 _close_crashed_turns(session, related, now)
+                await _preserve_retry_message(session, job, related, now)
                 job.status = "queued"
                 job.started_at = None
                 await _idle_crashed_agent(session, turns, job.agent_id, now)
@@ -100,6 +102,40 @@ def _close_crashed_turns(session: AsyncSession, related: list[TurnRow], now: dat
         turn.status = "failed"
         turn.finished_at = now
         session.add(_turn_finished(turn.id, turn.agent_id, now))
+
+
+async def _preserve_retry_message(
+    session: AsyncSession, job: JobRow, related: list[TurnRow], now: datetime
+) -> None:
+    """Move the original message onto the queued retry, retaining its id and time."""
+    failed = [turn for turn in related if turn.status == "failed"]
+    messages = list(
+        await session.scalars(
+            select(Message).where(
+                Message.turn_id.in_([turn.id for turn in failed]), Message.role == "user"
+            )
+        )
+    )
+    if not messages:
+        return
+    source = failed[-1]
+    retry = TurnRow(
+        id=new_id("turn_"),
+        agent_id=source.agent_id,
+        thread_id=source.thread_id,
+        job_ids=[job.id],
+        status="queued",
+        model=source.model,
+        usage={},
+        model_messages=None,
+        started_at=now,
+        finished_at=None,
+    )
+    session.add(retry)
+    await session.flush()
+    for message in messages:
+        message.turn_id = retry.id
+        session.add(_message_event(message, now))
 
 
 async def _idle_crashed_agent(
@@ -135,12 +171,18 @@ def _agent_updated(agent_id: str, now: datetime) -> Event:
 
 
 def _answered_turns(related: list[TurnRow], pendings: list[PendingRow]) -> list[AnsweredTurn]:
-    """Waiting turns with every approval already saved, and none still open."""
+    """Turns with every approval already saved, and none still open.
+
+    A ``waiting`` turn whose answers landed before the stop, and a ``running``
+    turn the stop hit while it resumed. Resuming marks the turn ``running`` but
+    keeps its approval checkpoint in ``model_messages``. That checkpoint is not
+    a committed result, so the turn is resumed again from it.
+    """
     if any(turn.status == "waiting" and _open_pending(turn.id, pendings) for turn in related):
         return []
     ready: list[AnsweredTurn] = []
     for turn in related:
-        if turn.status != "waiting":
+        if turn.status not in {"waiting", "running"} or turn.model_messages is None:
             continue
         decisions = _saved_decisions(turn.id, pendings, turn.model_messages)
         if len(decisions) == 0:
@@ -196,7 +238,9 @@ async def _interrupt_claude(
     agent = await session.get(AgentRow, agent_id)
     if agent is None or agent.runtime != "claude":
         return False
-    stalled = [turn for turn in related if turn.status == "waiting" or turn.id in waiting_ids]
+    stalled = [
+        turn for turn in related if turn.status in {"waiting", "running"} or turn.id in waiting_ids
+    ]
     if len(stalled) == 0:
         return False
     now = utcnow()
@@ -206,14 +250,43 @@ async def _interrupt_claude(
         message = _resend_message(turn, job.to_bot_id, now)
         session.add(message)
         session.add(_message_event(message, now))
+        session.add(
+            _status_event(
+                "turn.finished",
+                turn.id,
+                {"turn_id": turn.id, "agent_id": agent_id, "status": "interrupted"},
+                now,
+            )
+        )
         for pending in pendings:
             if pending.turn_id != turn.id or pending.status != "waiting":
                 continue
             pending.status = "resolved"
             pending.answer = {"decision": "interrupted"}
             pending.resolved_at = now
+            session.add(
+                _status_event(
+                    "pending.resolved",
+                    pending.id,
+                    {
+                        "pending_id": pending.id,
+                        "turn_id": pending.turn_id,
+                        "agent_id": pending.agent_id,
+                        "status": "resolved",
+                    },
+                    now,
+                )
+            )
     job.status = "cancelled"
     job.finished_at = now
+    session.add(
+        _status_event(
+            "job.done",
+            job.id,
+            {"job_id": job.id, "agent_id": agent_id, "status": "cancelled"},
+            now,
+        )
+    )
     agent.status = "idle"
     agent.last_activity_at = now
     return True
@@ -231,6 +304,15 @@ def _resend_message(turn: TurnRow, bot_id: str, now: datetime) -> Message:
         parts=parts,
         created_at=now,
     )
+
+
+def _status_event(
+    event_type: str,
+    entity: str,
+    payload: dict[str, object],
+    now: datetime,
+) -> Event:
+    return Event(type=event_type, entity=entity, payload=payload, created_at=now)
 
 
 def _message_event(message: Message, now: datetime) -> Event:

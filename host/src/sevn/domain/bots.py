@@ -11,14 +11,16 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import delete, select
 
 from sevn.config import Settings
-from sevn.contracts.kinds import AccessName, ApprovalPolicy, RuntimeName
+from sevn.contracts.kinds import AccessName, ApprovalPolicy, NetworkFlag, RuntimeName
 from sevn.domain.errors import DomainError
 from sevn.domain.ids import new_id
 from sevn.domain.session import open_session
+from sevn.domain.workspace import purge_worktrees
 from sevn.paths import Paths
 from sevn.secrets.backends import open_backend
 from sevn.secrets.errors import SecretNotFound
 from sevn.store.db import utcnow
+from sevn.store.models import Agent as AgentRow
 from sevn.store.models import Bot as BotRow
 
 _PROVIDERS = ("anthropic", "openai", "google", "openrouter")
@@ -40,6 +42,7 @@ class BotRecord(BaseModel):
     effort: str | None
     access: AccessName
     approval_policy: ApprovalPolicy
+    network: NetworkFlag
     workspace_path: str
     folder_id: str | None
     paused: bool
@@ -93,6 +96,7 @@ class BotService:
             created_by=created_by,
             created_at=now,
             updated_at=now,
+            network="off",
         )
         await asyncio.to_thread(_make_workspace, workspace)
         try:
@@ -133,6 +137,7 @@ class BotService:
         folder_id: str | None = None,
         paused: bool | None = None,
         can_create_bots: bool | None = None,
+        network: NetworkFlag | None = None,
         fields: set[str],
     ) -> tuple[BotRecord, dict[str, object]]:
         async with open_session() as session:
@@ -155,6 +160,7 @@ class BotService:
                 folder_id=folder_id,
                 paused=paused,
                 can_create_bots=can_create_bots,
+                network=network,
             )
             if applied:
                 row.updated_at = utcnow()
@@ -167,9 +173,15 @@ class BotService:
             if row is None:
                 raise DomainError("not_found", "bot not found")
             workspace = Path(row.workspace_path)
+            agent_ids: list[str] = []
+            if purge:
+                agent_ids = list(
+                    await session.scalars(select(AgentRow.id).where(AgentRow.bot_id == bot_id))
+                )
             await session.execute(delete(BotRow).where(BotRow.id == bot_id))
             await session.commit()
         if purge:
+            await asyncio.to_thread(purge_worktrees, agent_ids, bot_id)
             await asyncio.to_thread(_remove_workspace, workspace)
         return bot_id
 
@@ -191,6 +203,7 @@ def _apply(
     folder_id: str | None,
     paused: bool | None,
     can_create_bots: bool | None,
+    network: NetworkFlag | None,
 ) -> dict[str, object]:
     applied: dict[str, object] = {}
     if "name" in fields and name is not None:
@@ -232,6 +245,9 @@ def _apply(
     if "can_create_bots" in fields and can_create_bots is not None:
         row.can_create_bots = can_create_bots
         applied["can_create_bots"] = can_create_bots
+    if "network" in fields and network is not None:
+        row.network = network
+        applied["network"] = network
     return applied
 
 
@@ -248,6 +264,7 @@ def _record(row: BotRow) -> BotRecord:
         effort=row.effort,
         access=_access(row.access),
         approval_policy=_policy(row.approval_policy),
+        network=_network(row.network),
         workspace_path=row.workspace_path,
         folder_id=row.folder_id,
         paused=row.paused,
@@ -274,6 +291,12 @@ def _policy(value: str) -> ApprovalPolicy:
     if value == "ask" or value == "auto" or value == "allow_all":
         return value
     raise DomainError("invalid_params", "unknown approval policy")
+
+
+def _network(value: str) -> NetworkFlag:
+    if value == "on" or value == "off":
+        return value
+    raise DomainError("invalid_params", "unknown network")
 
 
 def _workspace(bot_id: str) -> Path:

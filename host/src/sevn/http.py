@@ -10,6 +10,7 @@ import webbrowser
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
+from datetime import timedelta
 from pathlib import Path
 from typing import cast
 
@@ -23,12 +24,15 @@ from starlette.websockets import WebSocket
 
 import sevn.api.agents as agent_api
 import sevn.api.bots as bot_api
+import sevn.api.memories as memory_api
 import sevn.api.messages as message_api
 import sevn.api.models as model_api
 import sevn.api.pending as pending_api
+import sevn.sandbox.policy as sandbox_policy
 import sevn.system as system
 from sevn import __version__
 from sevn.config import Settings
+from sevn.domain.agents import expire_agents
 from sevn.log import logger
 from sevn.paths import Paths
 from sevn.protocol.hub import Hub
@@ -46,6 +50,7 @@ _REGISTERED = (
     system.system_info,
     system.system_ping,
     system.sync_since,
+    sandbox_policy.set_sandbox_mode,
     bot_api.bots_create,
     bot_api.bots_list,
     bot_api.bots_get,
@@ -55,11 +60,16 @@ _REGISTERED = (
     agent_api.agents_get,
     model_api.models_list,
     message_api.messages_send,
+    message_api.messages_reroute,
     message_api.messages_list,
     message_api.turns_snapshot,
     message_api.turns_cancel,
     pending_api.pending_list,
     pending_api.pending_answer,
+    memory_api.memories_list,
+    memory_api.memories_update,
+    memory_api.memories_delete,
+    memory_api.memories_pin,
 )
 
 CSP = (
@@ -156,23 +166,38 @@ def create_app(settings: Settings) -> ASGIApp:
     return app
 
 
+async def _expire_loop() -> None:
+    """Apply the idle and archive clocks while the host runs."""
+    while True:
+        try:
+            await expire_agents()
+        except Exception:  # noqa: BLE001 — one failed sweep must not stop the loop
+            logger.exception("agent expiry failed")
+        await asyncio.sleep(600)
+
+
 @asynccontextmanager
 async def _lifespan(app: ASGIApp) -> AsyncGenerator[None]:
     state = _state(app)
     paths = Paths.from_env()
+    await asyncio.to_thread(_ensure_home, paths.home)
     url = f"sqlite+aiosqlite:///{paths.db}"
     await upgrade(url)
     outbox = Outbox(url)
     oplog = OpLog(url)
     state.outbox = outbox
     state.oplog = oplog
+    await _retain(outbox, oplog)
     browser: asyncio.Task[None] | None = None
+    expiry: asyncio.Task[None] | None = None
     worker: Worker | None = None
     resumes: list[asyncio.Task[None]] = []
+    retention = asyncio.create_task(_retain_loop(outbox, oplog))
     try:
         state.hub = Hub(outbox, oplog)
         recovered = await recover()
         worker = bind(state.hub)
+        expiry = asyncio.create_task(_expire_loop())
         for item in recovered.resume:
             logger.info("resuming answered turn {turn_id}", turn_id=item.turn_id)
             resumes.append(
@@ -192,6 +217,9 @@ async def _lifespan(app: ASGIApp) -> AsyncGenerator[None]:
             browser = asyncio.create_task(_open_browser(state))
         yield
     finally:
+        retention.cancel()
+        with suppress(asyncio.CancelledError):
+            await retention
         for task in resumes:
             if not task.done():
                 task.cancel()
@@ -202,6 +230,10 @@ async def _lifespan(app: ASGIApp) -> AsyncGenerator[None]:
             browser.cancel()
             with suppress(asyncio.CancelledError):
                 await browser
+        if expiry is not None:
+            expiry.cancel()
+            with suppress(asyncio.CancelledError):
+                await expiry
         if worker is not None:
             await worker.aclose()
         await outbox.aclose()
@@ -275,7 +307,8 @@ def refusal(headers: Headers, port: int, *, server: object = None) -> str | None
     if origin is None or origin.strip() == "":
         return None
     origin = origin.strip()
-    allowed = {f"http://{item}" for item in _allowed_hosts(port)}
+    names = _allowed_hosts(port)
+    allowed = {f"http://{item}" for item in names} | {f"https://{item}" for item in names}
     if os.environ.get("SEVN_DEV") == "1":
         allowed.add(_DEV_ORIGIN)
     if origin not in allowed:
@@ -318,6 +351,29 @@ def _testclient_socket(host: str, server: object) -> bool:
 
 def _guarded(path: str) -> bool:
     return path == "/ws" or path == "/auth" or path.startswith("/auth/")
+
+
+_OUTBOX_AGE = timedelta(days=7)
+_OUTBOX_ROWS = 100_000
+_RETAIN_EVERY_S = 3600
+
+
+def _ensure_home(home: Path) -> None:
+    home.mkdir(parents=True, exist_ok=True, mode=0o700)
+
+
+async def _retain(outbox: Outbox, oplog: OpLog) -> None:
+    await outbox.prune(_OUTBOX_AGE, _OUTBOX_ROWS)
+    await oplog.prune()
+
+
+async def _retain_loop(outbox: Outbox, oplog: OpLog) -> None:
+    while True:
+        await asyncio.sleep(_RETAIN_EVERY_S)
+        try:
+            await _retain(outbox, oplog)
+        except Exception:  # noqa: BLE001 — retention must not kill the host
+            logger.exception("retention failed")
 
 
 def _require_hub(state: AppState) -> Hub:

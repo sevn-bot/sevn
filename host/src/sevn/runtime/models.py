@@ -27,6 +27,12 @@ from sevn.secrets.backends import open_backend
 from sevn.secrets.errors import SecretNotFound
 
 ECHO_ID = "echo"
+# The lane e2e starts its clock before both sends. Both replies must be painted
+# before 2500 ms, and the run must last at least 1500 ms. Overlapping turns
+# share this pause, leaving time for the chat log to paint. Twice the pause
+# is past that window, so a serial pair cannot finish inside it. A real sleep:
+# freezing the clock and then awaiting this hangs.
+_ECHO_TURN_DELAY_S = 1.4
 
 _SECRET_NAMES = {
     "anthropic": "provider/anthropic",
@@ -67,11 +73,22 @@ def echo_enabled() -> bool:
     return os.environ.get("SEVN_DEV") == "1" and os.environ.get("SEVN_TEST_MODEL") == "echo"
 
 
+_OLLAMA_PREFIX = "ollama:"
+
+
 def model_allowed(model_id: str) -> bool:
-    """Reject the echo id unless the dev flags are on. Other ids stay selectable."""
+    """Catalog ids and ``ollama:<name>`` are selectable.
+
+    ``models.list`` adds local Ollama models under that prefix when the
+    server answers, so the picker can send them. Echo is selectable only
+    behind the dev flags.
+    """
     if model_id == ECHO_ID:
         return echo_enabled()
-    return True
+    if model_id.startswith(_OLLAMA_PREFIX):
+        name = model_id[len(_OLLAMA_PREFIX) :]
+        return name != "" and not any(char.isspace() for char in name)
+    return any(item.id == model_id for item in _CATALOG)
 
 
 _override: Model | None = None
@@ -127,6 +144,28 @@ async def list_models() -> list[CatalogModel]:
     if echo_enabled():
         found.append(CatalogModel(id=ECHO_ID, provider="echo", name="Echo"))
     return found
+
+
+_CHEAPEST: tuple[tuple[str, str], ...] = (
+    ("anthropic", "anthropic:claude-haiku-4-5"),
+    ("openai", "openai:gpt-5-mini"),
+    ("google", "google:gemini-2.5-flash"),
+    ("openrouter", "openrouter:anthropic/claude-sonnet-4.5"),
+)
+
+
+def model_override_active() -> bool:
+    """True when tests have installed a model with ``use_model``."""
+    return _override is not None
+
+
+def cheapest_configured_model() -> str | None:
+    """The cheapest catalog id among providers that have a key, or none."""
+    configured = _configured_providers()
+    for provider, model_id in _CHEAPEST:
+        if provider in configured:
+            return model_id
+    return None
 
 
 def _configured_providers() -> set[str]:
@@ -225,10 +264,14 @@ def _object_list(value: object) -> list[object] | None:
 
 
 def _echo_model() -> FunctionModel:
+    """Echo the user text after a wall-clock pause of ``_ECHO_TURN_DELAY_S``."""
+
     async def respond(messages: list[ModelMessage], _info: AgentInfo) -> ModelResponse:
+        await asyncio.sleep(_ECHO_TURN_DELAY_S)
         return ModelResponse(parts=[TextPart(content=_echo_text(messages))])
 
     async def stream(messages: list[ModelMessage], _info: AgentInfo) -> AsyncIterator[str]:
+        await asyncio.sleep(_ECHO_TURN_DELAY_S)
         yield _echo_text(messages)
 
     return FunctionModel(respond, stream_function=stream, model_name=ECHO_ID)

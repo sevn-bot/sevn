@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -37,6 +38,20 @@ async def test_repeat_op_id_returns_original(
             await asyncio.wait_for(client.recv_text(), 0.2)
 
 
+async def test_reused_op_id_with_different_params_is_rejected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async with memory_host(tmp_path, monkeypatch) as host:
+        client, _session = host.open()
+        await handshake(client, host.token)
+        before = await count_events(host.outbox)
+        await _ping(client, "op-same", "hi")
+        await send_req(client, "again", "system.ping", {"op_id": "op-same", "note": "other"})
+        rejected = await recv_frame(client)
+        assert rejected["e"]["code"] == "op_mismatch"
+        assert await count_events(host.outbox) == before + 1
+
+
 async def test_mutating_without_op_id(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     async with memory_host(tmp_path, monkeypatch) as host:
         client, _session = host.open()
@@ -54,3 +69,31 @@ async def test_response_carries_caused_seq(tmp_path: Path, monkeypatch: pytest.M
         assert response["r"]["seq"] == event["s"]
         assert event["k"] == "system.ping"
         assert event["d"]["note"] == "hi"
+
+
+@pytest.mark.parametrize("pending", [False, True])
+async def test_expired_op_can_run_and_cache_a_fresh_result(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, pending: bool
+) -> None:
+    from sevn.domain.session import open_session
+    from sevn.store.db import utcnow
+    from sevn.store.models import OpLogEntry
+
+    async with memory_host(tmp_path, monkeypatch) as host:
+        await host.hub.oplog.record("op-expired", "old-method", {"_pending": pending})
+        async with open_session() as session:
+            row = await session.get(OpLogEntry, "op-expired")
+            assert row is not None
+            row.created_at = utcnow() - timedelta(hours=25)
+            await session.commit()
+        calls = 0
+
+        async def work():
+            nonlocal calls
+            calls += 1
+            return {"calls": calls}
+
+        first = await host.hub.claim_op("op-expired", "new-method", "hash", work)
+        again = await host.hub.claim_op("op-expired", "new-method", "hash", work)
+        assert first == again == {"calls": 1}
+        assert calls == 1

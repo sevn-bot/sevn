@@ -55,10 +55,7 @@ def test_sevn_home_env_overrides(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     assert paths.run == tmp_path / "run"
     assert paths.secrets_file == tmp_path / "secrets.age"
     assert paths.keys == tmp_path / "keys"
-    if sys.platform == "linux":
-        assert paths.logs == tmp_path / "logs"
-    elif sys.platform == "darwin":
-        assert paths.logs == Path.home() / "Library" / "Logs" / "sevn"
+    assert paths.logs == tmp_path / "logs"
 
 
 def test_workspaces_env_overrides(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

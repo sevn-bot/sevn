@@ -32,11 +32,11 @@ async function runChat(page: ChatPage, expect: ExpectVisible): Promise<void> {
     `${state.baseURL}/auth/login?token=${encodeURIComponent(state.token)}`,
   );
   await page.getByRole("button", { name: "Create bot" }).click();
-  await page.getByRole("textbox", { name: "Name" }).fill("Echo");
+  await page.getByRole("textbox", { name: "Name" }).fill("Echo chat");
   await page.getByRole("button", { name: "Create" }).click();
   const message = page.getByRole("textbox", { name: "Message" });
   if (!(await message.isVisible())) {
-    await page.getByText("Echo").click();
+    await page.getByText("Echo chat").click();
   }
   await message.fill("hi");
   await page.getByRole("button", { name: "Send" }).click();

@@ -38,6 +38,7 @@ class PendingService:
                 await session.scalars(
                     select(PendingRequest)
                     .where(PendingRequest.status == "waiting")
+                    .where(PendingRequest.kind == "approval")
                     .order_by(PendingRequest.created_at)
                 )
             )

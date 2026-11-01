@@ -44,26 +44,40 @@ async def events_since(seq: int) -> list[JsonObject]:
     """Replay durable events after ``seq`` and return them as JSON objects."""
 
     async def work(ws: _Socket) -> list[JsonObject]:
-        await ws.send(dump(Req(t="req", id="1", m="sync.since", p={"seq": seq})))
+        cursor = seq
         found: list[JsonObject] = []
-        host_seq = seq
-        saw_res = False
-        while True:
-            frame = parse(await _recv(ws))
-            if isinstance(frame, Evt):
-                found.append(cast(JsonObject, frame.model_dump(mode="json")))
-                if saw_res and frame.s == host_seq:
-                    return found
-                continue
-            if isinstance(frame, Res):
-                if frame.e is not None:
-                    raise ProbeError(frame.e.message)
-                host_seq = _host_seq(frame.r)
-                saw_res = True
-                if host_seq <= seq or any(_seq_of(item) == host_seq for item in found):
-                    return found
-                continue
-            raise ProbeError("unexpected frame")
+        for page in range(1, 1001):
+            await ws.send(dump(Req(t="req", id=str(page), m="sync.since", p={"seq": cursor})))
+            host_seq = cursor
+            next_seq = cursor
+            more = False
+            saw_res = False
+            while True:
+                frame = parse(await _recv(ws))
+                if isinstance(frame, Evt):
+                    found.append(cast(JsonObject, frame.model_dump(mode="json")))
+                    target = next_seq if more else host_seq
+                    if saw_res and frame.s == target:
+                        if not more:
+                            return found
+                        cursor = next_seq
+                        break
+                    continue
+                if isinstance(frame, Res):
+                    if frame.e is not None:
+                        raise ProbeError(frame.e.message)
+                    host_seq = _host_seq(frame.r)
+                    next_seq, more = _page(frame.r, host_seq)
+                    saw_res = True
+                    target = next_seq if more else host_seq
+                    if target <= cursor or any(_seq_of(item) == target for item in found):
+                        if not more:
+                            return found
+                        cursor = next_seq
+                        break
+                    continue
+                raise ProbeError("unexpected frame")
+        raise ProbeError("sync.since did not finish")
 
     return await _session(work)
 
@@ -192,6 +206,16 @@ def _ws_url(host: str, port: int) -> str:
     if ":" in dial and not dial.startswith("["):
         dial = f"[{dial}]"
     return f"ws://{dial}:{port}/ws"
+
+
+def _page(result: JsonObject | None, host_seq: int) -> tuple[int, bool]:
+    if result is None:
+        return host_seq, False
+    raw_next = result.get("next_seq")
+    next_seq = (
+        raw_next if isinstance(raw_next, int) and not isinstance(raw_next, bool) else host_seq
+    )
+    return next_seq, result.get("more") is True
 
 
 def _host_seq(result: JsonObject | None) -> int:
