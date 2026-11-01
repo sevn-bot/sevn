@@ -655,6 +655,14 @@ async def test_idle_ttl_to_done_then_archived(
                 bind(host.hub)
                 bot = await _create_bot(client)
                 sent = await _send(client, bot["id"], "one note")
+                # A newly spawned agent is already idle before its pump starts.
+                # Wait for this job to finish before advancing its idle clock.
+                await poll_rows(
+                    tmp_path,
+                    "SELECT status FROM jobs WHERE id = ?",
+                    (sent["job_id"],),
+                    lambda rows: bool(rows) and rows[0]["status"] == "done",
+                )
                 await poll_agent(tmp_path, str(sent["agent_id"]), "idle")
                 # idle_since is stamped after the turn ends, on a ticking clock, so
                 # leave a wide margin past each deadline instead of one second.
