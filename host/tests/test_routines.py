@@ -416,9 +416,16 @@ async def test_a_claude_run_says_silent_with_its_reply(
                 frame, _earlier = await request(
                     client,
                     "bots.create",
-                    {"name": "Claude", "runtime": "claude", "op_id": mint_id("op_")},
+                    {
+                        "name": "Claude",
+                        "runtime": "claude",
+                        "access": "full",
+                        "op_id": mint_id("op_"),
+                    },
                 )
                 bot_id = ok(frame)["id"]
+                # Bot core runs Claude only with full access and network on.
+                ok(await _call(client, "bots.update", bot_id=bot_id, network="on"))
                 routine = await _create(client, bot_id)
                 now = datetime.now(UTC)
                 await _make_due(tmp_path, routine["id"], now - timedelta(minutes=1))

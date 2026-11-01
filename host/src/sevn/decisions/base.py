@@ -22,6 +22,7 @@ class RouteDecision:
     path: str
     ask_user: bool = False
     choices: tuple[str, ...] = ()
+    choice_targets: tuple[str | None, ...] = ()
     busy_policy: str | None = None
 
 

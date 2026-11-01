@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
 import os
+import shlex
 import sqlite3
 import subprocess
 from datetime import UTC, datetime, timedelta
@@ -157,7 +160,7 @@ async def test_worktree_isolation_in_git_repo(
     assert note == ""
     await write_file(bot.id, agent.id, "f.txt", "from-agent")
     assert not (repo / "f.txt").exists()
-    worktree = repo / ".sevn" / "worktrees" / agent.id / "f.txt"
+    worktree = tmp_path / "worktrees" / agent.id / "f.txt"
     assert worktree.read_text(encoding="utf-8") == "from-agent"
     branch = _git(repo, "rev-parse", "--verify", f"sevn/{agent.id}")
     assert branch.returncode == 0, branch.stderr
@@ -182,7 +185,7 @@ async def test_worktree_isolation_ignored_outside_git(
     assert note == "worktree ignored: workspace is not a git repo"
     scratch = Path(str(bot.workspace_path)) / "tasks" / agent.id
     assert scratch.is_dir()
-    assert not (Path(str(bot.workspace_path)) / ".sevn" / "worktrees" / agent.id).exists()
+    assert not (tmp_path / "worktrees" / agent.id).exists()
 
 
 def _ran_filters(marker: Path) -> list[str]:
@@ -230,6 +233,180 @@ async def test_worktree_checkout_runs_no_bot_filter(
     note = await ensure(agent.id)
     assert note == ""
     assert _ran_filters(marker) == []
-    worktree = repo / ".sevn" / "worktrees" / agent.id
+    worktree = tmp_path / "worktrees" / agent.id
     assert (worktree / "README").read_text(encoding="utf-8") == "base\n"
     assert (worktree / "notes.txt").read_text(encoding="utf-8") == "notes\n"
+
+
+@pytest.mark.parametrize("purge", [False, True])
+async def test_bot_delete_cleans_only_its_worktrees_when_purged(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, purge: bool
+) -> None:
+    from sevn.domain.agents import AgentService
+    from sevn.domain.bots import BotService
+    from sevn.domain.workspace import ensure
+
+    bot, agent = await _pair(tmp_path, monkeypatch)
+    repo = Path(str(bot.workspace_path))
+    assert _git(repo, "init", "-b", "main").returncode == 0
+    (repo / "README").write_text("base", encoding="utf-8")
+    assert _git(repo, "add", "README").returncode == 0
+    assert _git(repo, "commit", "-m", "init").returncode == 0
+    with sqlite3.connect(tmp_path / "sevn.db") as connection:
+        connection.execute("UPDATE agents SET isolation='worktree' WHERE id=?", (agent.id,))
+    assert await ensure(agent.id) == ""
+    checkout = tmp_path / "worktrees" / agent.id
+    (checkout / "uncommitted.txt").write_text("bot data", encoding="utf-8")
+    other_bot = await BotService().create("Other")
+    other_agent = await AgentService().spawn(other_bot.id)
+    other_checkout = tmp_path / "worktrees" / other_agent.id
+    other_checkout.mkdir()
+    (other_checkout / "keep.txt").write_text("other bot data", encoding="utf-8")
+    await BotService().delete(bot.id, purge=purge)
+    assert await asyncio.to_thread(checkout.exists) is not purge
+    assert await asyncio.to_thread(repo.exists) is not purge
+    assert (tmp_path / "git" / bot.id).exists() is not purge
+    assert (other_checkout / "keep.txt").read_text(encoding="utf-8") == "other bot data"
+    if not purge:
+        assert (checkout / "uncommitted.txt").read_text(encoding="utf-8") == "bot data"
+
+
+async def test_new_filter_after_config_read_is_confined(tmp_path: Path, monkeypatch) -> None:
+    from sevn.domain import workspace
+
+    bot, agent = await _pair(tmp_path, monkeypatch)
+    repo = Path(bot.workspace_path)
+    assert _git(repo, "init", "-b", "main").returncode == 0
+    (repo / "notes.txt").write_text("notes\n")
+    (repo / ".gitattributes").write_text("notes.txt filter=late\n")
+    assert _git(repo, "add", ".").returncode == 0
+    assert _git(repo, "commit", "-m", "init").returncode == 0
+    marker = tmp_path / "outside-checkout"
+    original = workspace._filter_drivers
+
+    async def change_config(git, cwd, env):
+        names = await original(git, cwd, env)
+        config_path = Path(_git(repo, "rev-parse", "--absolute-git-dir").stdout.strip()) / "config"
+        with config_path.open("a") as config:
+            command = f"touch {shlex.quote(str(marker))}; cat"
+            config.write(f'[filter "late"]\n\tsmudge = {json.dumps(command)}\n')
+        return names
+
+    monkeypatch.setattr(workspace, "_filter_drivers", change_config)
+    with sqlite3.connect(tmp_path / "sevn.db") as connection:
+        connection.execute("UPDATE agents SET isolation='worktree' WHERE id=?", (agent.id,))
+    assert await workspace.ensure(agent.id) == ""
+    assert not marker.exists()
+    assert (tmp_path / "worktrees" / agent.id / "notes.txt").read_text() == "notes\n"
+
+
+@pytest.mark.parametrize(
+    "relative,cross_device,core_relative",
+    [(False, False, False), (True, False, False), (False, True, False), (False, False, True)],
+)
+async def test_public_shell_git_works_after_existing_worktree_migration(
+    tmp_path, monkeypatch, relative, cross_device, core_relative
+):
+    from sevn.domain.workspace import ensure
+    from sevn.tools.shell import execute
+
+    bot, agent = await _pair(tmp_path, monkeypatch)
+    repo = Path(bot.workspace_path)
+    assert _git(repo, "init", "-b", "main").returncode == 0
+    (repo / "README").write_text("base\n")
+    assert _git(repo, "add", "README").returncode == 0
+    assert _git(repo, "commit", "-m", "init").returncode == 0
+    if relative:
+        assert _git(repo, "config", "worktree.useRelativePaths", "true").returncode == 0
+    if core_relative:
+        assert _git(repo, "config", "core.worktree", "..").returncode == 0
+    checkout = tmp_path / "worktrees" / agent.id
+    checkout.parent.mkdir(exist_ok=True)
+    assert _git(repo, "worktree", "add", "-b", f"sevn/{agent.id}", str(checkout)).returncode == 0
+    (checkout / "README").write_text("staged\n")
+    assert _git(checkout, "add", "README").returncode == 0
+    (checkout / "untracked").write_text("keep\n")
+    with sqlite3.connect(tmp_path / "sevn.db") as connection:
+        connection.execute("UPDATE agents SET isolation='worktree' WHERE id=?", (agent.id,))
+    if cross_device:
+        import errno
+
+        original_rename = os.rename
+
+        def different_device(src, dst, **kwargs):
+            if src == ".git" and dst == "repo":
+                raise OSError(errno.EXDEV, "fixture different volume")
+            return original_rename(src, dst, **kwargs)
+
+        monkeypatch.setattr(os, "rename", different_device)
+        from sevn.domain import workspace as workspace_module
+
+        original_copy = workspace_module._copy_metadata
+
+        def copy_then_commit(source, destination):
+            original_copy(source, destination)
+            assert _git(repo, "commit", "--allow-empty", "-m", "during migration").returncode != 0
+
+        monkeypatch.setattr(workspace_module, "_copy_metadata", copy_then_commit)
+    assert await ensure(agent.id) == ""
+    if cross_device:
+        assert (repo / ".sevn-git-backup" / "HEAD").exists()
+        assert (
+            ".sevn-git-backup"
+            not in _git(repo, "status", "--porcelain", "--untracked-files=all").stdout
+        )
+        assert _git(repo, "add", ".").returncode == 0
+        assert ".sevn-git-backup" not in _git(repo, "diff", "--cached", "--name-only").stdout
+    assert _git(repo, "rev-parse", "--show-toplevel").stdout.strip() == str(repo)
+    for command in (
+        "git status --porcelain",
+        "git add untracked",
+        "git -c user.name=Test -c user.email=test@example.com commit -m fixture",
+        "git rev-parse --abbrev-ref HEAD",
+    ):
+        result = await execute(bot.id, agent.id, command)
+        assert result.returncode == 0, result.stderr
+        if command == "git status --porcelain":
+            assert "M  README" in result.stdout
+            assert "?? untracked" in result.stdout
+    assert f"sevn/{agent.id}" in result.stdout
+    assert _git(repo, "show", f"sevn/{agent.id}:README").stdout == "staged\n"
+    denied = await execute(bot.id, agent.id, f"cat {shlex.quote(str(tmp_path / 'sevn.db'))}")
+    assert denied.returncode != 0
+
+
+async def test_failed_cross_volume_copy_restores_original_gitdir(tmp_path, monkeypatch):
+    import errno
+
+    from sevn.domain import workspace
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    assert _git(repo, "init").returncode == 0
+    metadata = tmp_path / "metadata"
+    rename = os.rename
+
+    def cross_volume(src, dst, **kwargs):
+        if src == ".git" and dst == "repo":
+            raise OSError(errno.EXDEV, "fixture volume boundary")
+        return rename(src, dst, **kwargs)
+
+    monkeypatch.setattr(os, "rename", cross_volume)
+    original_copy = workspace._copy_metadata
+
+    def no_space(_source, _target):
+        raise OSError(errno.ENOSPC, "fixture full volume")
+
+    monkeypatch.setattr(workspace, "_copy_metadata", no_space)
+    from sevn.domain.errors import DomainError
+
+    with pytest.raises(DomainError, match="path is outside the workspace") as caught:
+        await workspace._prepare_metadata(repo, metadata)
+    assert caught.value.code == "path_outside_workspace"
+    assert isinstance(caught.value.__cause__, OSError)
+    assert caught.value.__cause__.errno == errno.ENOSPC
+    assert (repo / ".git").is_dir()
+    assert _git(repo, "status", "--porcelain").returncode == 0
+    monkeypatch.setattr(workspace, "_copy_metadata", original_copy)
+    await workspace._prepare_metadata(repo, metadata)
+    assert _git(repo, "status", "--porcelain").returncode == 0

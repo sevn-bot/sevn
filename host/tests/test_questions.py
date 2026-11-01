@@ -550,3 +550,75 @@ async def test_concurrent_answers_claim_the_question_once(
         assert len(answers) == 1
         stored = _pending(tmp_path, day)["answer"]
         assert stored["text"] == answers[0]
+
+
+async def test_a_card_answer_resumes_a_turn_that_also_asked_for_approval(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Approval answered first, then the question from its card: the turn resumes and ends."""
+    from sevn.runtime.models import use_model
+    from sevn.runtime.worker import bind
+
+    question = {"kind": "tool", "name": "user.ask", "args": {"question": "Which day?"}}
+    approval_call = {"kind": "tool", "name": "shell", "args": {"command": "echo hi"}}
+    use_model(function_model([[question, approval_call], [{"kind": "text", "text": "ok"}]]))
+    load_modules("sevn.api.bots", "sevn.api.messages", "sevn.api.pending")
+    try:
+        async with connected(tmp_path, monkeypatch) as (host, client):
+            bind(host.hub)
+            frame, _earlier = await request(
+                client,
+                "bots.create",
+                {"name": "Proof", "access": "full", "op_id": mint_id("op_")},
+            )
+            bot = ok(frame)
+            await request(
+                client,
+                "messages.send",
+                {"bot_id": bot["id"], "text": "book it", "op_id": mint_id("op_")},
+            )
+            rows = await poll_rows(
+                tmp_path,
+                "SELECT id, turn_id, kind FROM pending_requests WHERE status = 'waiting'",
+                (),
+                lambda found: len(found) == 2,
+            )
+            approval = next(row for row in rows if row["kind"] == "approval")
+            asked = next(row for row in rows if row["kind"] == "question")
+            ok(
+                (
+                    await request(
+                        client,
+                        "pending.answer",
+                        {"pending_id": approval["id"], "answer": "deny", "op_id": mint_id("op_")},
+                    )
+                )[0]
+            )
+            assert _turn_status(tmp_path, str(approval["turn_id"])) == "waiting"
+            answered = ok(
+                (
+                    await request(
+                        client,
+                        "pending.answer",
+                        {"pending_id": asked["id"], "text": "Tuesday", "op_id": mint_id("op_")},
+                    )
+                )[0]
+            )
+            await poll_rows(
+                tmp_path,
+                "SELECT status FROM jobs WHERE id = ?",
+                (answered["job_id"],),
+                lambda found: bool(found) and found[0]["status"] == "done",
+            )
+            await poll_rows(
+                tmp_path,
+                "SELECT status FROM turns WHERE id = ?",
+                (approval["turn_id"],),
+                lambda found: bool(found) and found[0]["status"] == "done",
+            )
+            assert (
+                fetch_all(tmp_path, "SELECT id FROM pending_requests WHERE status = 'waiting'")
+                == []
+            )
+    finally:
+        use_model(None)

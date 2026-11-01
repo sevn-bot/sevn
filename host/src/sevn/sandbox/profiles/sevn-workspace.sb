@@ -44,6 +44,7 @@
 (allow file-read*
     (subpath (param "WORKSPACE"))
     (subpath (param "SHARED"))
+    (subpath (param "GIT_METADATA"))
     (literal (string-append (param "HOME") "/.gitconfig"))
     (subpath (string-append (param "HOME") "/.config/git"))
     (subpath (string-append (param "HOME") "/.local/bin"))
@@ -81,6 +82,7 @@
 (allow file-write*
     (subpath (param "WORKSPACE"))
     (subpath (param "SHARED"))
+    (subpath (param "GIT_METADATA"))
     (subpath "/dev"))
 (deny file-write* (regex #"/\.ssh(/|$)"))
 (deny file-write* (regex #"/\.aws(/|$)"))

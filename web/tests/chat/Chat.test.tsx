@@ -1,6 +1,6 @@
 import { createElement } from "react";
 import { expect, test } from "vitest";
-import { loadChat, requestParams, startHarness } from "./host.ts";
+import { loadChat, noReply, requestParams, startHarness } from "./host.ts";
 
 const botId = "bot_nimbus";
 
@@ -414,9 +414,9 @@ test("an agent link focuses that lane and sends to it", async () => {
 test("an agent link sends to that lane before the lane list loads", async () => {
   const harness = await startHarness({
     "messages.list": { messages: [], next_cursor: null },
-    "agents.list": () => {
-      throw new Error("agents.list never answers in this test");
-    },
+    // Still loading: a throw here would escape the socket handler as an
+    // uncaught error and fail the run.
+    "agents.list": noReply,
     "pending.list": { pending: [] },
     "messages.send": { job_id: "job_1", agent_id: "agent_9" },
   });

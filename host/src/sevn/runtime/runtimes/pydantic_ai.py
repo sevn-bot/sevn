@@ -41,6 +41,7 @@ from sevn.domain.agents import AgentRecord, sibling_block
 from sevn.domain.bots import BotRecord
 from sevn.log import logger
 from sevn.memory import with_memories
+from sevn.memory.context import memory_snapshot, retain_snapshot
 from sevn.runtime.base import PendingAnswer, SessionRef, ToolDecision, TurnContext
 from sevn.runtime.compaction import Compaction
 from sevn.runtime.errors import TurnError
@@ -115,10 +116,17 @@ class PydanticAIRuntime:
         deferred = _deferred(turn.approvals)
         # A resumed approval sends no new prompt: its block is already in history.
         prompt = (
-            await with_memories(bot.id, turn.agent.id, turn.text, prior=bool(turn.message_history))
+            await with_memories(
+                bot.id,
+                turn.agent.id,
+                turn.text,
+                prior=bool(turn.message_history),
+                history=turn.message_history or [],
+            )
             if deferred is None
             else turn.text
         )
+        snapshot = memory_snapshot(bot.id, turn.agent.id)
         task = asyncio.current_task()
         if task is not None:
             self._tasks[turn.agent.id] = task
@@ -130,11 +138,13 @@ class PydanticAIRuntime:
                 text = output if isinstance(output, str) else None
                 if text:
                     yield RuntimeEvent(kind="text_delta", text=text)
+                messages = _dump_messages(result.all_messages())
+                retain_snapshot(messages, snapshot)
                 yield RuntimeEvent(
                     kind="turn_finished",
                     text=text,
                     usage=_usage(result.usage, result.new_messages()),
-                    model_messages=_dump_messages(result.all_messages()),
+                    model_messages=messages,
                     approvals=_approval_calls(output),
                 )
                 return
@@ -152,6 +162,8 @@ class PydanticAIRuntime:
                     async for event in events:
                         mapped = _map(event)
                         if mapped is not None:
+                            if deferred is None and mapped.model_messages is not None:
+                                retain_snapshot(mapped.model_messages, snapshot)
                             yield mapped
                 finally:
                     _live_runs.pop(turn.agent.id, None)

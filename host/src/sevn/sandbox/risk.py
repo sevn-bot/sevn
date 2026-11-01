@@ -138,7 +138,7 @@ _SYSTEM_BINS = (
 )
 _SEPARATORS = frozenset({"|", "||", "&&", ";", "&", "(", ")", ";;", "|&"})
 _OUT_REDIRECTS = frozenset({">", ">>", ">|", "&>", "&>>", ">&", "<>"})
-_QUIET_TARGETS = frozenset({"/dev/null", "1", "2", "&1", "&2", "-"})
+_QUIET_TARGETS = frozenset({"/dev/null"})
 
 _SUDO = re.compile(r"(?:^|[\s;&|(])(?:sudo|doas)(?:\s|$)")
 _PIPE_SHELL = re.compile(r"\b(?:curl|wget)\b[^|]*\|\s*(?:\S*/)?(?:sh|bash|zsh|dash|ksh)\b")
@@ -198,17 +198,18 @@ def _parse(command: str) -> list[_Command] | None:
         return None
     commands: list[_Command] = []
     current = _Command()
-    pending_write = False
+    pending_write: str | None = None
     for token in tokens:
         if pending_write:
-            current.writes.append(token)
-            pending_write = False
+            if pending_write != ">&" or token not in {"1", "2"}:
+                current.writes.append(token)
+            pending_write = None
         elif token in _SEPARATORS:
             if current.words or current.writes:
                 commands.append(current)
             current = _Command(piped_in=token in {"|", "|&"})
         elif token in _OUT_REDIRECTS:
-            pending_write = True
+            pending_write = token
         elif token in {"<", "<<", "<<<"}:
             continue
         else:
@@ -248,6 +249,13 @@ def _writes_by_argument(program: str, args: list[str]) -> bool:
     for arg in args:
         flag = arg.split("=", 1)[0]
         if flag in blocked or flag.startswith("--output"):
+            return True
+        # getopt-style long options may accept any unambiguous prefix.
+        if (
+            flag.startswith("--")
+            and len(flag) > 2
+            and any(option.startswith(flag) for option in blocked if option.startswith("--"))
+        ):
             return True
         if arg.startswith("-") and not arg.startswith("--") and short & set(arg[1:]):
             return True

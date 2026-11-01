@@ -33,4 +33,5 @@ class DefaultDecider:
             path="user",
             ask_user=True,
             choices=choices,
+            choice_targets=(None, *(agent.id for agent in agents)),
         )
