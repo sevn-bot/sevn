@@ -228,6 +228,33 @@ class Job(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     started_at: Mapped[datetime | None] = mapped_column(_IsoDateTime, nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(_IsoDateTime, nullable=True)
+    # Set on a run of a routine. ``silent`` is set when the run said it had
+    # nothing to report (``routine.silent``).
+    routine_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    silent: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+
+
+class Routine(Base):
+    """A prompt a bot runs on a cron schedule (plan fleet-dashboards, phase 4)."""
+
+    __tablename__ = "routines"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    bot_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("bots.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    schedule: Mapped[str] = mapped_column(String, nullable=False)
+    timezone: Mapped[str] = mapped_column(String, nullable=False)
+    text: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    paused_reason: Mapped[str | None] = mapped_column(String, nullable=True)
+    next_run: Mapped[datetime | None] = mapped_column(_IsoDateTime, nullable=True)
+    last_run: Mapped[datetime | None] = mapped_column(_IsoDateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(_IsoDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(_IsoDateTime, nullable=False)
 
 
 class PendingRequest(Base):
