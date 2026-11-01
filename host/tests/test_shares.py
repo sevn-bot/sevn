@@ -281,3 +281,30 @@ async def test_the_op_log_keeps_no_share_secret(
         assert again["share"]["id"] == first["share"]["id"]
         assert secret not in json.dumps(again)
         assert again["path"] == ""
+
+
+def test_a_share_shows_disagreeing_values_but_not_the_owner_limits(
+    host_app: tuple[object, str, object], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A conflict tile needs both values; the spend cap and run limit are the owner's."""
+    from sevn.domain.metrics import report
+
+    _app, _token, client = host_app
+    monkeypatch.setenv("SEVN_BUDGETS__DAILY_USD_HOST", "5")
+    bots = asyncio.run(_seed(tmp_path))
+    asyncio.run(report(bots["nimbus"], key="subscribers", value=3300, source="scrape"))
+    _record, path = _create(label="For the editor", bot_id=None, expires_in_hours=1)
+    body = _web(client).get(f"{path}/data").json()
+    tile = next(item for item in body["metrics"] if item["key"] == "subscribers")
+    assert tile["status"] == "conflict"
+    assert sorted((item["bot_name"], item["value"]) for item in tile["reports"]) == [
+        ("Atlas", 3210),
+        ("Nimbus", 3300),
+    ]
+    assert body["kpis"]
+    for kpi in body["kpis"]:
+        assert kpi.get("budget_usd") is None
+        assert kpi.get("limit") is None
+        assert kpi.get("level") is None
+        assert "budget" not in kpi["note"]
+        assert "limit" not in kpi["note"]

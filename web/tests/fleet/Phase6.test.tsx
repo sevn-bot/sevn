@@ -460,6 +460,31 @@ const shared = {
       as_of: iso(60_000),
       status: "ok",
       delta_24h: 12,
+      reports: [],
+    },
+    {
+      key: "followers",
+      label: "Followers",
+      value: 12400,
+      unit: "",
+      source: "X API",
+      as_of: iso(60_000),
+      status: "conflict",
+      delta_24h: null,
+      reports: [
+        {
+          bot_name: "Social",
+          value: 12400,
+          as_of: iso(60_000),
+          source: "X API",
+        },
+        {
+          bot_name: "Research",
+          value: 980,
+          as_of: iso(60_000),
+          source: "scrape",
+        },
+      ],
     },
   ],
   days: days(),
@@ -505,6 +530,10 @@ test("a share page fetches its snapshot and never opens the socket", async () =>
   await testing.screen.findByText("5 finished in 24 hours");
   const tile = await testing.screen.findByTestId("metric-subscribers");
   expect(tile.textContent).toContain("+12 in 24h");
+  const conflict = await testing.screen.findByTestId("metric-followers");
+  expect(conflict.textContent).toContain(
+    "bots disagree: Social 12,400 · Research 980",
+  );
   expect(fetched).toHaveBeenCalledWith("/share/shr_1/s3cret/data", {
     cache: "no-store",
     credentials: "omit",
