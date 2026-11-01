@@ -61,6 +61,13 @@ const full = overview({
       text: "Which subject line?",
       name: "user.ask",
       args: { question: "Which subject line?" },
+      options: [
+        { id: "opt_1", label: "Is your fleet out of control?" },
+        { id: "opt_2", label: "Three dashboards" },
+      ],
+      priority: "high",
+      due_by: new Date(now.getTime() + 3 * hour).toISOString(),
+      blocking: true,
       bot_id: "bot_nimbus",
       bot_name: "Nimbus",
       agent_id: "agent_news",
@@ -74,6 +81,10 @@ const full = overview({
       text: "shell.run",
       name: "shell.run",
       args: { command: "make test" },
+      options: [],
+      priority: "normal",
+      due_by: null,
+      blocking: true,
       bot_id: "bot_nimbus",
       bot_name: "Nimbus",
       agent_id: "agent_build",
@@ -367,6 +378,130 @@ test("activity grid switches to cost", async () => {
     );
     expect(cell.getAttribute("data-cost")).toBe("0.5");
     expect(cost.getAttribute("aria-pressed")).toBe("true");
+  } finally {
+    harness.stop();
+  }
+});
+
+function question(extra: Record<string, unknown>) {
+  return {
+    id: "pend_q",
+    kind: "question",
+    text: "Which day?",
+    name: "user.ask",
+    args: {},
+    options: [],
+    priority: "normal",
+    due_by: null,
+    blocking: true,
+    bot_id: "bot_nimbus",
+    bot_name: "Nimbus",
+    agent_id: "agent_news",
+    agent_title: "Newsletter",
+    turn_id: "turn_news",
+    created_at: iso(60_000),
+    ...extra,
+  };
+}
+
+test("a question card answers with one click on an option", async () => {
+  const harness = await startHarness({
+    "fleet.overview": full,
+    "pending.answer": { id: "pend_old", status: "resolved", job_id: "job_1" },
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Dashboard = await loadDashboard();
+    testing.render(createElement(Dashboard));
+    const option = await testing.screen.findByRole("button", {
+      name: "Three dashboards",
+    });
+    option.click();
+    await testing.waitFor(() => {
+      expect(requestParams(harness.requests, "pending.answer").length).toBe(1);
+    });
+    const sent = requestParams(harness.requests, "pending.answer")[0];
+    expect(sent?.pending_id).toBe("pend_old");
+    expect(sent?.option_id).toBe("opt_2");
+    expect(sent?.answer).toBeUndefined();
+    expect(sent?.text).toBeUndefined();
+  } finally {
+    harness.stop();
+  }
+});
+
+test("a question card answers with typed text", async () => {
+  const harness = await startHarness({
+    "fleet.overview": overview({ waiting: [question({})] }),
+    "pending.answer": { id: "pend_q", status: "resolved", job_id: "job_1" },
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Dashboard = await loadDashboard();
+    testing.render(createElement(Dashboard));
+    const field = await testing.screen.findByRole("textbox", {
+      name: "Answer Which day?",
+    });
+    testing.fireEvent.change(field, { target: { value: "Tuesday at 10" } });
+    (
+      await testing.screen.findByRole("button", { name: "Send answer" })
+    ).click();
+    await testing.waitFor(() => {
+      expect(requestParams(harness.requests, "pending.answer").length).toBe(1);
+    });
+    const sent = requestParams(harness.requests, "pending.answer")[0];
+    expect(sent?.pending_id).toBe("pend_q");
+    expect(sent?.text).toBe("Tuesday at 10");
+    expect(sent?.option_id).toBeUndefined();
+  } finally {
+    harness.stop();
+  }
+});
+
+test("question cards show priority, due time and non-blocking", async () => {
+  const harness = await startHarness({
+    "fleet.overview": overview({
+      waiting: [
+        question({
+          id: "pend_due",
+          text: "Due soon",
+          priority: "high",
+          due_by: new Date(now.getTime() + 3 * hour + 60_000).toISOString(),
+        }),
+        question({
+          id: "pend_late",
+          text: "Overdue",
+          due_by: new Date(now.getTime() - 2 * hour - 60_000).toISOString(),
+        }),
+        question({
+          id: "pend_fyi",
+          text: "Just checking",
+          priority: "low",
+          blocking: false,
+        }),
+      ],
+    }),
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Dashboard = await loadDashboard();
+    testing.render(createElement(Dashboard));
+    const due = (await testing.screen.findByText("Due soon")).closest("li");
+    expect(due?.textContent).toContain("high");
+    expect(due?.textContent).toContain("due in 3h");
+    expect(due?.getAttribute("data-priority")).toBe("high");
+    const late = (await testing.screen.findByText("Overdue")).closest("li");
+    expect(late?.textContent).toContain("overdue 2h");
+    expect(late?.getAttribute("data-overdue")).toBe("true");
+    const fyi = (await testing.screen.findByText("Just checking")).closest(
+      "li",
+    );
+    expect(fyi?.textContent).toContain("not blocking");
+    expect(fyi?.textContent).toContain("low");
+    const order = [...document.querySelectorAll("li[data-pending]")].map(
+      (node) => node.getAttribute("data-pending"),
+    );
+    expect(order).toEqual(["pend_due", "pend_late", "pend_fyi"]);
   } finally {
     harness.stop();
   }
