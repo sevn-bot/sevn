@@ -74,7 +74,7 @@ class Worker:
         self._tasks: dict[str, asyncio.Task[None]] = {}
         self._resumes: set[asyncio.Task[None]] = set()
         self._again: set[str] = set()
-        self._interrupted: set[str] = set()
+        self._interrupted: set[asyncio.Task[None]] = set()
         self._board = _Board()
         self._closed = False
 
@@ -147,6 +147,7 @@ class Worker:
                 await task
         self._tasks.clear()
         self._resumes.clear()
+        self._interrupted.clear()
 
     async def resume(
         self,
@@ -186,8 +187,11 @@ class Worker:
             return await _turn_status(turn_id)
         await persist_running_cancel(self.hub, turn_id)
         runtime = await self._choose(live)
-        self._interrupted.add(live)
         await runtime.interrupt(live)
+        pump = self._tasks.get(live)
+        if pump is not None and pump.cancelling():
+            # The interrupt cancelled this pump itself (the turn ran in it).
+            self._interrupted.add(pump)
         self.kick(live)
         return "cancelled"
 
@@ -231,10 +235,10 @@ class Worker:
         Release the agent from here instead, or jobs queued on it and lanes queued
         behind the bot's cap stay queued until the next message or a restart.
         """
-        interrupted = agent_id in self._interrupted
-        self._interrupted.discard(agent_id)
-        # Only a cancel() interrupt counts: loop shutdown cancels pumps too, and
-        # a new pump on a closing loop would outlive it.
+        interrupted = task in self._interrupted
+        self._interrupted.discard(task)
+        # Only the pump cancel() interrupted counts: loop shutdown cancels pumps
+        # too, and a task started while the loop closes is never run or reaped.
         if not task.cancelled() or not interrupted or self._closed:
             return
         released = asyncio.create_task(self._release(agent_id))
