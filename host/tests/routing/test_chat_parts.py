@@ -15,7 +15,7 @@ import pytest
 from fakes.fake_jev import FakeJev
 from fakes.models import function_model
 from support.botcore import arm_configured, upgrade_home
-from support.chat import connected, insert_job, load_modules, mint_id, ok, request
+from support.chat import connected, fetch_all, insert_job, load_modules, mint_id, ok, request
 
 
 def _install(script: list[dict[str, object]]) -> FakeJev:
@@ -157,6 +157,11 @@ async def test_ask_user_stores_routing_ask_part(
         assert isinstance(choices, str)
         assert "New task" in choices
         assert choices.count("Continue:") >= 2
+    # No turn starts while the message waits for a choice, so message.created is
+    # what makes an already-open chat show it and its buttons.
+    created = fetch_all(tmp_path, "SELECT payload FROM events WHERE type = 'message.created'", ())
+    assert any("which lane?" in str(row["payload"]) for row in created)
+    assert any("routing_ask" in str(row["payload"]) for row in created)
 
 
 async def test_path_locked_is_stored_as_a_message_part(

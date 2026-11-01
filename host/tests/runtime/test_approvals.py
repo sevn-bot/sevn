@@ -196,6 +196,101 @@ async def test_waiting_turn_survives_restart(
         )
 
 
+async def test_crash_during_resume_is_resumed_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A resumed turn is ``running`` with its approval checkpoint. Recovery must not drop it."""
+    from sevn.runtime.models import use_model
+    from sevn.runtime.recovery import recover
+    from sevn.runtime.worker import bind
+
+    reset_model_requests()
+    flowing = asyncio.Event()
+    flowing.set()
+    use_model(
+        function_model(
+            [
+                [{"kind": "tool", "name": "shell", "args": {"command": "echo hi"}}],
+                [{"kind": "text", "text": "done"}],
+            ],
+            pause=flowing,
+        )
+    )
+    load_modules("sevn.api.bots", "sevn.api.messages", "sevn.api.pending")
+    try:
+        async with connected(tmp_path, monkeypatch) as (host, client):
+            worker = bind(host.hub)
+            bot = await _bot(client)
+            await request(
+                client,
+                "messages.send",
+                {"bot_id": bot["id"], "text": "run it", "op_id": mint_id("op_")},
+            )
+            item = await _wait_pending(tmp_path, client)
+            flowing.clear()
+            frame, _earlier = await request(
+                client,
+                "pending.answer",
+                {"pending_id": item["id"], "answer": "approve", "op_id": mint_id("op_")},
+            )
+            ok(frame)
+            for _ in range(500):
+                if len(model_request_payloads()) >= 2:
+                    break
+                await asyncio.sleep(0.01)
+            assert len(model_request_payloads()) >= 2
+            assert fetch_all(tmp_path, "SELECT status FROM turns")[0]["status"] == "running"
+            await worker.aclose()
+            recovered = await recover()
+            turn_id = fetch_all(tmp_path, "SELECT id FROM turns")[0]["id"]
+            assert [answered.turn_id for answered in recovered.resume] == [turn_id]
+    finally:
+        flowing.set()
+        use_model(None)
+
+
+async def test_resumed_approval_wakes_a_queued_sibling_lane(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With a cap of one, finishing a resumed turn must start the lane queued behind it."""
+    monkeypatch.setenv("SEVN_BOTS__MAX_PARALLEL_AGENTS", "1")
+    load_modules("sevn.api.bots", "sevn.api.messages", "sevn.api.pending")
+    async with connected(tmp_path, monkeypatch) as (host, client):
+        await _arm(host)
+        bot = await _bot(client)
+        await request(
+            client,
+            "messages.send",
+            {"bot_id": bot["id"], "text": "run it", "op_id": mint_id("op_")},
+        )
+        item = await _wait_pending(tmp_path, client)
+        frame, _earlier = await request(
+            client,
+            "messages.send",
+            {"bot_id": bot["id"], "text": "/new second task", "op_id": mint_id("op_")},
+        )
+        queued = ok(frame)
+        assert queued["agent_id"] != item["agent_id"]
+        assert (
+            fetch_all(tmp_path, "SELECT status FROM jobs WHERE id = ?", (queued["job_id"],))[0][
+                "status"
+            ]
+            == "queued"
+        )
+        frame, _earlier = await request(
+            client,
+            "pending.answer",
+            {"pending_id": item["id"], "answer": "deny", "op_id": mint_id("op_")},
+        )
+        ok(frame)
+        await poll_rows(
+            tmp_path,
+            "SELECT status FROM jobs WHERE id = ?",
+            (queued["job_id"],),
+            lambda rows: bool(rows) and rows[0]["status"] == "done",
+        )
+
+
 async def test_answer_twice_rejected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     load_modules("sevn.api.bots", "sevn.api.messages", "sevn.api.pending")
     async with connected(tmp_path, monkeypatch) as (host, client):
@@ -468,3 +563,36 @@ async def test_pending_list_returns_deferred_tool_name_and_args(
         listed = {"name": item.get("name"), "args": item.get("args")}
         stored = {"name": payload.get("name"), "args": payload.get("args")}
         assert listed == stored == {"name": "shell", "args": {"command": "echo hi"}}, item
+
+
+async def test_cancel_persisted_waiting_keeps_the_run_usage(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The run that asked for approval finished, so cancelling keeps what it used."""
+    load_modules("sevn.api.bots", "sevn.api.messages", "sevn.api.pending")
+    async with connected(tmp_path, monkeypatch) as (host, client):
+        await _arm(host)
+        bot = await _bot(client)
+        await request(
+            client,
+            "messages.send",
+            {"bot_id": bot["id"], "text": "run it", "op_id": mint_id("op_")},
+        )
+        await _wait_pending(tmp_path, client)
+        waiting = fetch_all(tmp_path, "SELECT id, usage FROM turns")
+        before = _stored_object(waiting[0]["usage"])
+        assert before["requests"] == 1
+        turn_id = str(waiting[0]["id"])
+        frame, _earlier = await request(
+            client,
+            "turns.cancel",
+            {"turn_id": turn_id, "op_id": mint_id("op_")},
+        )
+        ok(frame)
+        rows = await poll_rows(
+            tmp_path,
+            "SELECT status, usage FROM turns WHERE id = ?",
+            (turn_id,),
+            lambda found: bool(found) and found[0]["status"] == "cancelled",
+        )
+        assert _stored_object(rows[0]["usage"]) == before

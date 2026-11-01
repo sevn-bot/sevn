@@ -154,7 +154,7 @@ async def test_direct_cancel_drops_path_locks(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, status: str
 ) -> None:
     from sevn.domain.agents import AgentService
-    from sevn.runtime.turn import cancel_persisted_waiting, persist_running_cancel
+    from sevn.runtime.turn_end import cancel_persisted_waiting, persist_running_cancel
 
     load_modules("sevn.api.bots")
     async with connected(tmp_path, monkeypatch) as (host, client):

@@ -390,6 +390,10 @@ export function connect(options: ConnectOptions): Promise<Connection> {
   let lastSeq = options.lastSeq ?? 0;
   let nextSeq = lastSeq + 1;
   let knownHostSeq = lastSeq;
+  // Only the first welcome may skip ahead to the host's seq. After a
+  // reconnect, a zero cursor still means "replay from the start": events can
+  // land while we are offline, before we ever saw one.
+  let welcomed = false;
   let backoff = INITIAL_BACKOFF_MS;
   let status: Status = "connecting";
   let socket: WebSocket | null = null;
@@ -592,10 +596,11 @@ export function connect(options: ConnectOptions): Promise<Connection> {
         lastSeq = 0;
         nextSeq = 1;
         buffered.clear();
-      } else if (lastSeq === 0 && hostSeq > 0) {
+      } else if (!welcomed && lastSeq === 0 && hostSeq > 0) {
         lastSeq = hostSeq;
         nextSeq = hostSeq + 1;
       }
+      welcomed = true;
       void catchUp(lastSeq).catch(() => undefined);
       return;
     }

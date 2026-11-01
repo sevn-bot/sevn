@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from contextvars import ContextVar
 from typing import Literal
 
 type CostSource = Literal["price_table", "local", "subscription", "unknown"]
@@ -20,6 +21,29 @@ type CostSource = Literal["price_table", "local", "subscription", "unknown"]
 TOKEN_KEYS = ("input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens")
 _COUNT_KEYS = ("requests", "tool_calls", *TOKEN_KEYS)
 _LOCAL_PROVIDERS = frozenset({"ollama"})
+
+# Model responses a run makes outside the agent's own messages, such as a
+# compaction summary. They are billed like any other request.
+_SIDE: ContextVar[list[object] | None] = ContextVar("sevn_side_responses", default=None)
+
+
+def begin_side_responses() -> list[object]:
+    """Start collecting side responses for the run in this context."""
+    responses: list[object] = []
+    _SIDE.set(responses)
+    return responses
+
+
+def record_side_response(response: object) -> None:
+    """Keep a side response for the current run. Outside a run it is dropped."""
+    responses = _SIDE.get()
+    if responses is not None:
+        responses.append(response)
+
+
+def side_responses() -> list[object]:
+    """The side responses recorded since ``begin_side_responses``."""
+    return list(_SIDE.get() or [])
 
 
 def usage_record(
@@ -65,6 +89,14 @@ def price_responses(responses: Iterable[object]) -> tuple[float | None, CostSour
     if not priced:
         return 0.0, "local"
     return round(total, 6), "price_table"
+
+
+def interrupted_usage() -> dict[str, object]:
+    """A run that stopped before the runtime reported its usage.
+
+    It may have made paid requests, so its cost is unknown, never 0.
+    """
+    return usage_record({}, cost_usd=None, cost_source="unknown")
 
 
 def combine(old: Mapping[str, object], new: Mapping[str, object]) -> dict[str, object]:

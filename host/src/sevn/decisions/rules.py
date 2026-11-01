@@ -44,6 +44,12 @@ def _builtin(
     if message.reply_to_agent_id:
         return _follow(message.reply_to_agent_id)
     if message.agent_id:
+        # A user message to a lane that waits on a question is its answer. As a
+        # follow-up it would queue behind the waiting turn and never run.
+        if message.author == "user" and any(
+            question.agent_id == message.agent_id for question in context.pending_questions
+        ):
+            return _answer(message.agent_id)
         return _follow(message.agent_id)
     if message.new_agent or _slash_new(message.text):
         return _new()
@@ -54,13 +60,17 @@ def _builtin(
         return _new()
     answered = _pending_target(message, context.pending_questions)
     if answered is not None:
-        return RouteDecision(
-            intent="answer",
-            target_agent_id=answered,
-            confidence=1.0,
-            path="rule",
-        )
+        return _answer(answered)
     return None
+
+
+def _answer(agent_id: str) -> RouteDecision:
+    return RouteDecision(
+        intent="answer",
+        target_agent_id=agent_id,
+        confidence=1.0,
+        path="rule",
+    )
 
 
 def _follow(agent_id: str) -> RouteDecision:

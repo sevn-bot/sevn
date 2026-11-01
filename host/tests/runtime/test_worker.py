@@ -285,6 +285,51 @@ async def test_turns_cancel_stops_turn(tmp_path: Path, monkeypatch: pytest.Monke
         pause.set()
 
 
+async def test_cancelling_a_running_turn_wakes_the_lane_queued_behind_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With a cap of one, interrupting the running lane must start the lane queued behind it."""
+    from sevn.runtime.models import use_model
+    from sevn.runtime.worker import bind
+
+    monkeypatch.setenv("SEVN_BOTS__MAX_PARALLEL_AGENTS", "1")
+    pause = asyncio.Event()
+    use_model(function_model([{"kind": "text", "text": "partial"}], pause=pause))
+    load_modules("sevn.api.bots", "sevn.api.messages")
+    try:
+        async with connected(tmp_path, monkeypatch) as (host, client):
+            bind(host.hub)
+            bot = await _create_bot(client)
+            first = await _send(client, bot["id"], "first task")
+            turns = await poll_rows(
+                tmp_path,
+                "SELECT id FROM turns WHERE status = 'running'",
+                (),
+                lambda rows: bool(rows),
+            )
+            second = await _send(client, bot["id"], "/new second task")
+            assert second["agent_id"] != first["agent_id"]
+            held = fetch_all(tmp_path, "SELECT status FROM jobs WHERE id = ?", (second["job_id"],))
+            assert held[0]["status"] == "queued"
+            frame, _earlier = await request(
+                client,
+                "turns.cancel",
+                {"turn_id": turns[0]["id"], "op_id": mint_id("op_")},
+            )
+            ok(frame)
+            # Let the second lane's model call finish once something starts it.
+            pause.set()
+            await poll_rows(
+                tmp_path,
+                "SELECT status FROM jobs WHERE id = ?",
+                (second["job_id"],),
+                lambda rows: bool(rows) and rows[0]["status"] == "done",
+            )
+    finally:
+        pause.set()
+        use_model(None)
+
+
 async def test_cancel_queued_turn_never_runs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -605,3 +650,19 @@ async def test_provider_error_after_start_fails_turn_without_storing_it(
             assert _PROVIDER_CANARY not in json.dumps(body)
     finally:
         use_model(None)
+
+
+async def test_cancel_running_turn_marks_its_cost_unknown(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The open run never reported usage, so its cost is unknown, not 0."""
+    async with _cancelled_running_turn(tmp_path, monkeypatch, "cancel-and-count") as (
+        _host,
+        _client,
+        _bot,
+        _job_id,
+    ):
+        rows = fetch_all(tmp_path, "SELECT usage FROM turns")
+        usage = json.loads(str(rows[0]["usage"]))
+        assert usage["cost_source"] == "unknown"
+        assert usage["cost_usd"] is None
