@@ -215,7 +215,8 @@ async def test_steer_enqueues_into_running_pydantic_turn(
                     }
                 ]
             )
-            await _send(client, bot["id"], "steer-marker add a date")
+            consumed = await _send(client, bot["id"], "steer-marker add a date")
+            await _assert_consumed_turn_done(tmp_path, client, consumed["job_id"])
             pause.set()
             await poll_rows(
                 tmp_path,
@@ -479,7 +480,8 @@ async def test_cancel_stops_agent(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
                     }
                 ]
             )
-            await _send(client, bot["id"], "stop")
+            consumed = await _send(client, bot["id"], "stop")
+            await _assert_consumed_turn_done(tmp_path, client, consumed["job_id"])
             agent = await poll_agent(tmp_path, str(first["agent_id"]), "done")
             assert agent == "done"
             stopped = await AgentService().get(str(first["agent_id"]))
@@ -1029,3 +1031,17 @@ async def test_user_ask_question_is_in_the_thread(
             )
     finally:
         _clear()
+
+
+async def _assert_consumed_turn_done(home: Path, client: object, job_id: object) -> None:
+    turns = fetch_all(home, "SELECT id, job_ids, status, finished_at FROM turns")
+    turn = next(row for row in turns if job_id in json.loads(row["job_ids"]))
+    assert turn["status"] == "done"
+    assert turn["finished_at"] is not None
+    snapshot = ok((await request(client, "turns.snapshot", {"turn_id": turn["id"]}))[0])
+    assert snapshot["status"] == "done"
+    cancelled = ok(
+        (await request(client, "turns.cancel", {"turn_id": turn["id"], "op_id": mint_id("op_")}))[0]
+    )
+    assert cancelled["status"] == "done"
+    assert fetch_all(home, "SELECT status FROM jobs WHERE id=?", (job_id,))[0]["status"] == "done"

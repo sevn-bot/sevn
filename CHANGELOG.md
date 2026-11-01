@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Claim jobs atomically on their selected lane, serialize reroutes with turn startup, retain pinned-memory reservations until commit or rollback, and stop live question streams before releasing locks. Claude requires explicit full access and networking; consumed routing messages finish their turns, and numeric output filenames require approval.
+
 - Replace expired operation records before retries, wake idle queued lanes ahead of already-active lanes, release locks after answered question turns, and preserve the original user message when rerouting a started job.
 
 - Preserve worker wake-ups during capacity checks, purge host-managed worktrees with their bot, and retain Linux DNS configuration while hiding service sockets. Avoid double-counting reserved memory promotions and clear moved jobs from their former lane’s queue notice.

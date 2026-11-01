@@ -9,9 +9,10 @@ from dataclasses import dataclass, field
 from typing import Literal, cast
 
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import select, text
+from sqlalchemy import event, select, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session, SessionTransaction
 
 from sevn.config import Settings
 from sevn.domain.errors import DomainError
@@ -47,6 +48,7 @@ class _Batch:
 
 _locks: dict[str, asyncio.Lock] = {}
 _pending: dict[str, _Batch] = {}
+_writing: dict[str, _Batch] = {}
 
 
 @asynccontextmanager
@@ -125,11 +127,7 @@ class MemoryStore:
         _pending.pop(turn_id, None)
 
     async def write(self, session: AsyncSession, turn_id: str) -> None:
-        """Insert the staged batch into ``session`` and remove it from the stage.
-
-        The caller commits ``session``. A failed commit has already dropped the
-        batch, so a failed turn keeps none of its memory writes.
-        """
+        """Write staged rows, retaining their reservation until the transaction ends."""
         batch = _pending.get(turn_id)
         if batch is None:
             return
@@ -137,6 +135,13 @@ class MemoryStore:
             current = _pending.pop(turn_id, None)
             if current is None:
                 return
+            _writing[turn_id] = current
+
+            def release(_session: Session, transaction: SessionTransaction) -> None:
+                if transaction.parent is None and _writing.get(turn_id) is current:
+                    _writing.pop(turn_id, None)
+
+            event.listen(session.sync_session, "after_transaction_end", release)
             await _apply(session, current)
 
     async def set_tier(
@@ -372,11 +377,14 @@ async def _reject_over_budget(bot_id: str, extra: int, *, replacing: str | None 
 
 
 async def _pinned_bytes(bot_id: str, *, excluding: str | None = None) -> int:
+    # Snapshot before yielding: a commit may release a reservation while this
+    # read still sees the preceding database snapshot.
+    batches = (*_pending.values(), *_writing.values())
     async with open_session() as session:
         rows = list(await session.scalars(select(MemoryRow).where(MemoryRow.bot_id == bot_id)))
     pinned = {row.id: row.text for row in rows if row.tier == "pinned"}
     texts = {row.id: row.text for row in rows}
-    for batch in _pending.values():
+    for batch in batches:
         if batch.bot_id != bot_id:
             continue
         for record in batch.inserts:

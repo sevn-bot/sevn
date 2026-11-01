@@ -163,7 +163,9 @@ async def deliver(
         route_decision_id=decision_id,
         status=job_status,
     )
-    message_id, created = await _attach_user_message(job_id, agent, bot, message.text, decision)
+    message_id, created = await _attach_user_message(
+        job_id, agent, bot, message.text, decision, consumed=consumed
+    )
     payload: dict[str, object] = {
         "job_id": job_id,
         "agent_id": agent.id,
@@ -481,6 +483,8 @@ async def _attach_user_message(
     bot: BotRecord,
     text: str,
     decision: RouteDecision,
+    *,
+    consumed: bool = False,
 ) -> tuple[str, dict[str, object]]:
     """Store the user message and its queued turn. Returns the id and its event payload."""
     now = utcnow()
@@ -494,12 +498,12 @@ async def _attach_user_message(
                 agent_id=agent.id,
                 thread_id=agent.thread_id,
                 job_ids=[job_id],
-                status="queued",
+                status="done" if consumed else "queued",
                 model=bot.model,
                 usage={},
                 model_messages=None,
                 started_at=now,
-                finished_at=None,
+                finished_at=now if consumed else None,
             )
         )
         await session.flush()

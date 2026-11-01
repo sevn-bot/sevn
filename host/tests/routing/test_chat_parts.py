@@ -215,7 +215,6 @@ async def test_flagged_tool_result_stores_injection_part(
     phrase = "ignore previous instructions"
     load_modules("sevn.api.bots")
     use_client(FakeJev(answers={"inbound.injection": 0.91, "memory.capture": 0.0}))
-    turn_error: BaseException | None = None
     stored: list[dict[str, str]] = []
     try:
         async with connected(tmp_path, monkeypatch) as (host, client):
@@ -236,15 +235,12 @@ async def test_flagged_tool_result_stores_injection_part(
                     [{"kind": "text", "text": "done"}],
                 ]
             )
-            try:
-                await TurnRunner(host.hub, PydanticAIRuntime(model=scripted)).run(job_id)
-            except Exception as exc:  # noqa: BLE001 — the missing part is the assertion
-                turn_error = exc
+            await TurnRunner(host.hub, PydanticAIRuntime(model=scripted)).run(job_id)
             page = await page_messages(str(bot["id"]), None)
             stored = [part for message in page.messages for part in message.parts]
     finally:
         _clear()
     injection = [part for part in stored if part.get("type") == "injection"]
-    assert injection, f"turn_error={turn_error!r} parts={stored!r}"
+    assert injection, f"parts={stored!r}"
     text = injection[0].get("text")
     assert isinstance(text, str) and phrase in text

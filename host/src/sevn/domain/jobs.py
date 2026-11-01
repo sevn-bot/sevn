@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 from typing import cast
+from weakref import WeakValueDictionary
 
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import and_, or_, select
@@ -20,6 +22,12 @@ from sevn.store.models import Thread as ThreadRow
 from sevn.store.models import Turn as TurnRow
 
 _PAGE = 50
+_job_locks: WeakValueDictionary[str, asyncio.Lock] = WeakValueDictionary()
+
+
+def job_lock(job_id: str) -> asyncio.Lock:
+    """Serialize claiming a job with moving it to another lane."""
+    return _job_locks.setdefault(job_id, asyncio.Lock())
 
 
 class JobRecord(BaseModel):
@@ -139,6 +147,8 @@ async def park_job(job_id: str, agent_id: str) -> None:
         job = await session.get(JobRow, job_id)
         if job is None:
             raise DomainError("not_found", "job not found")
+        if job.status in {"done", "failed", "interrupted"}:
+            raise DomainError("invalid_params", "message already finished")
         agent = await session.get(AgentRow, agent_id)
         if agent is None:
             raise DomainError("not_found", "agent not found")

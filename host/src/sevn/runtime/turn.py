@@ -7,13 +7,14 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sevn.decisions.registry import begin_inbound, end_inbound, inbound_hits
 from sevn.domain.agents import AgentRecord, AgentService
 from sevn.domain.bots import BotRecord, BotService
 from sevn.domain.ids import new_id
+from sevn.domain.jobs import job_lock
 from sevn.domain.pending import PendingService
 from sevn.domain.session import open_session
 from sevn.domain.workspace import drop_locks
@@ -98,36 +99,37 @@ class TurnRunner:
         self._runtime = runtime
         self._watch = watch
 
-    async def run(self, job_id: str) -> None:
-        job = await _mark_started(job_id)
-        if job is None:
-            logger.info("job cancelled before it started")
-            return
-        await self._hub.emit(
-            "job.started",
-            job.id,
-            {"job_id": job.id, "agent_id": job.agent_id, "status": "started"},
-        )
-        agent = await AgentService().get(job.agent_id)
-        bot = await BotService().get(job.bot_id)
-        history = await _previous_messages(agent.id)
-        started = utcnow()
-        stored = False
-        existing = await _queued_turn_id(job.id)
-        # Register the turn before its row is visible, so a cancel that reads the
-        # row also finds the live turn and interrupts it.
-        if existing is not None:
-            turn_id = existing
-            if self._watch is not None:
-                self._watch.open_turn(turn_id, agent.id)
-                await _promote_turn(turn_id, started, agent, bot)
-                stored = True
-        else:
-            turn_id = new_id("turn_")
-            if self._watch is not None:
-                self._watch.open_turn(turn_id, agent.id)
-                await _insert_open_turn(turn_id, started, job, agent, bot)
-                stored = True
+    async def run(self, job_id: str, *, agent_id: str | None = None) -> None:
+        async with job_lock(job_id):
+            job = await _mark_started(job_id, agent_id=agent_id)
+            if job is None:
+                logger.info("job cancelled before it started")
+                return
+            await self._hub.emit(
+                "job.started",
+                job.id,
+                {"job_id": job.id, "agent_id": job.agent_id, "status": "started"},
+            )
+            agent = await AgentService().get(job.agent_id)
+            bot = await BotService().get(job.bot_id)
+            history = await _previous_messages(agent.id)
+            started = utcnow()
+            stored = False
+            existing = await _queued_turn_id(job.id)
+            # Register the turn before its row is visible, so a cancel that reads the
+            # row also finds the live turn and interrupts it.
+            if existing is not None:
+                turn_id = existing
+                if self._watch is not None:
+                    self._watch.open_turn(turn_id, agent.id)
+                    await _promote_turn(turn_id, started, agent, bot)
+                    stored = True
+            else:
+                turn_id = new_id("turn_")
+                if self._watch is not None:
+                    self._watch.open_turn(turn_id, agent.id)
+                    await _insert_open_turn(turn_id, started, job, agent, bot)
+                    stored = True
         await self._hub.emit(
             "turn.started",
             turn_id,
@@ -457,25 +459,24 @@ def _user_message(turn_id: str, started: datetime, job: _Job, agent: AgentRecord
     )
 
 
-async def _mark_started(job_id: str) -> _Job | None:
-    """Mark the job started. ``None`` when it was cancelled while it waited for a slot."""
+async def _mark_started(job_id: str, *, agent_id: str | None = None) -> _Job | None:
+    """Atomically claim queued work, only for the lane that selected it."""
     async with open_session() as session:
-        row = await session.get(JobRow, job_id)
+        stmt = update(JobRow).where(JobRow.id == job_id, JobRow.status == "queued")
+        if agent_id is not None:
+            stmt = stmt.where(JobRow.agent_id == agent_id)
+        row = await session.scalar(
+            stmt.values(status="started", started_at=utcnow()).returning(JobRow)
+        )
         if row is None:
-            raise TurnError("job not found")
-        if row.status == "cancelled":
             return None
-        agent_id = row.agent_id
-        if agent_id is None:
+        if row.agent_id is None:
             raise TurnError("job has no agent")
-        row.status = "started"
-        if row.started_at is None:
-            row.started_at = utcnow()
         await session.commit()
         return _Job(
             id=row.id,
             bot_id=row.to_bot_id,
-            agent_id=agent_id,
+            agent_id=row.agent_id,
             text=row.text,
             origin=row.origin,
         )
