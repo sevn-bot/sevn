@@ -144,7 +144,7 @@ function FleetHeader({ bots }: { bots: FleetBot[] }) {
   return (
     <div className="flex items-start gap-3">
       {hidden ? null : (
-        <ul className="flex max-h-24 flex-1 flex-wrap gap-2 overflow-hidden">
+        <ul className="flex max-h-24 flex-1 flex-wrap gap-2 overflow-y-auto">
           {bots.map((bot) => (
             <li key={bot.id}>
               <button

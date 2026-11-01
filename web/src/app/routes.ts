@@ -18,10 +18,6 @@ export function routeFromPath(path: string): Route {
   };
 }
 
-export function botIdFromPath(path: string): string | null {
-  return routeFromPath(path).botId;
-}
-
 export function agentPath(botId: string, agentId: string): string {
   return `/bots/${encodeURIComponent(botId)}/agents/${encodeURIComponent(agentId)}`;
 }
