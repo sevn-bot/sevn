@@ -105,6 +105,13 @@ test("metric tiles show value, change, time, source and their state", async () =
       metrics: [
         metric({}),
         metric({
+          key: "open-rate",
+          label: "Open rate",
+          value: 48.25,
+          unit: "%",
+          delta_24h: 0.5,
+        }),
+        metric({
           key: "visits",
           label: "Visits",
           value: 1100,
@@ -158,6 +165,9 @@ test("metric tiles show value, change, time, source and their state", async () =
     expect(subscribers.textContent).toMatch(/as of \d{2}:\d{2}/);
     expect(subscribers.getAttribute("title")).toContain("Buttondown API");
     expect(subscribers.getAttribute("data-status")).toBe("ok");
+    const rate = await testing.screen.findByTestId("metric-open-rate");
+    expect(rate.textContent).toContain("48.25");
+    expect(rate.textContent).toContain("+0.5 in 24h");
     const visits = await testing.screen.findByTestId("metric-visits");
     expect(visits.textContent).toContain("stale");
     expect(visits.textContent).toContain("/day");
@@ -165,7 +175,9 @@ test("metric tiles show value, change, time, source and their state", async () =
     expect(revenue.textContent).toContain("unavailable");
     const followers = await testing.screen.findByTestId("metric-followers");
     expect(followers.textContent).toContain("bots disagree");
-    expect(followers.textContent).toContain("Research 12.4k");
+    // Exact values: 12.4k for both would hide the disagreement.
+    expect(followers.textContent).toContain("Research 12,380");
+    expect(followers.textContent).toContain("Social 12,400");
     expect(followers.textContent).toContain("-20 in 24h");
   } finally {
     harness.stop();
