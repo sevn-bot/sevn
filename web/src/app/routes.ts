@@ -26,3 +26,20 @@ export function go(path: string): void {
   window.history.pushState(null, "", path);
   window.dispatchEvent(new PopStateEvent("popstate"));
 }
+
+export function isBriefPath(path: string): boolean {
+  return path === "/brief";
+}
+
+export type ShareRoute = { shareId: string; secret: string };
+
+/** ``/share/<id>/<secret>``: a read-only page that needs no login. */
+export function shareFromPath(path: string): ShareRoute | null {
+  const match = /^\/share\/([A-Za-z0-9_]+)\/([A-Za-z0-9_-]+)$/.exec(path);
+  const shareId = match?.[1];
+  const secret = match?.[2];
+  if (shareId === undefined || secret === undefined) {
+    return null;
+  }
+  return { shareId, secret };
+}

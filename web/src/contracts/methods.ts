@@ -36,6 +36,11 @@ export const methods = {
     params: "BotsUpdateParams",
     result: "BotRecord",
   },
+  "fleet.brief": {
+    mutating: false,
+    params: "FleetBriefParams",
+    result: "FleetBrief",
+  },
   "fleet.overview": {
     mutating: false,
     params: "FleetOverviewParams",
@@ -125,6 +130,21 @@ export const methods = {
     mutating: true,
     params: "RoutinesUpdateParams",
     result: "RoutineRecord",
+  },
+  "shares.create": {
+    mutating: true,
+    params: "SharesCreateParams",
+    result: "SharesCreateResult",
+  },
+  "shares.list": {
+    mutating: false,
+    params: "SharesListParams",
+    result: "SharesListResult",
+  },
+  "shares.revoke": {
+    mutating: true,
+    params: "SharesRevokeParams",
+    result: "ShareRecord",
   },
   "sync.since": {
     mutating: false,

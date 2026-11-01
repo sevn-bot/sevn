@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from statistics import median
 from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -14,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sevn.domain.cron import parse, runs_between
 from sevn.domain.spend import ENDED, priced_cost
 from sevn.runtime.usage import cost_source_of
+from sevn.store.models import Bot as BotRow
 from sevn.store.models import Job as JobRow
 from sevn.store.models import Routine
 from sevn.store.models import Turn as TurnRow
@@ -24,6 +26,7 @@ WINDOW = timedelta(days=30)
 NOTHING_USEFUL = timedelta(days=14)
 PROJECTION = timedelta(days=7)
 _RUN_LIMIT = 7 * 24 * 60
+LAST_RUNS = 10
 
 
 class FleetRoutine(BaseModel):
@@ -54,12 +57,22 @@ class FleetRoutine(BaseModel):
 @dataclass(slots=True)
 class _Runs:
     count: int = 0
-    priced: int = 0
     cost: float = 0.0
     unpriced: int = 0
     useful: datetime | None = None
     latest: tuple[datetime, Outcome] | None = None
-    jobs: list[str] = field(default_factory=list[str])
+    # Each ended run, newest first once sorted: its time and its dollar cost,
+    # or None when any of its turns has no dollar cost.
+    ended: list[tuple[datetime, float | None]] = field(
+        default_factory=list[tuple[datetime, float | None]]
+    )
+
+    def per_run(self) -> float | None:
+        """Median cost of the last 10 runs; null when any of them has no known cost."""
+        recent = [cost for _when, cost in sorted(self.ended, reverse=True)[:LAST_RUNS]]
+        if not recent or any(cost is None for cost in recent):
+            return None
+        return round(median(cost for cost in recent if cost is not None), 6)
 
 
 async def upcoming(
@@ -73,13 +86,15 @@ async def upcoming(
     if not routines:
         return [], 0.0, 0
     runs = await _runs(session, [row.id for row in routines], now)
+    # The scheduler skips a paused bot's slots, so they are not runs ahead.
+    paused_bots = set(await session.scalars(select(BotRow.id).where(BotRow.paused.is_(True))))
     items: list[FleetRoutine] = []
     projection = 0.0
     unpriced = 0
     for row in routines:
         stats = runs.get(row.id, _Runs())
-        per_run = round(stats.cost / stats.priced, 6) if stats.priced else None
-        ahead = _runs_ahead(row, now)
+        per_run = stats.per_run()
+        ahead = 0 if row.bot_id in paused_bots else _runs_ahead(row, now)
         if per_run is not None:
             projection += per_run * ahead
         elif ahead > 0:
@@ -117,13 +132,27 @@ async def _runs(session: AsyncSession, ids: list[str], now: datetime) -> dict[st
             select(JobRow).where(JobRow.routine_id.in_(ids)).where(JobRow.created_at >= since)
         )
     )
+    owner = {job.id: job.routine_id for job in jobs if job.routine_id is not None}
+    # Dollar cost of each turn, per run (job). None: subscription or unknown.
+    costs: dict[str, list[float | None]] = {}
+    sources: dict[str, set[str]] = {}
+    turns = await session.execute(
+        select(TurnRow.job_ids, TurnRow.usage)
+        .where(TurnRow.status.in_(ENDED))
+        .where(TurnRow.finished_at.is_not(None))
+        .where(TurnRow.finished_at >= since)
+    )
+    for job_ids, usage in turns:
+        job_id = next((job for job in job_ids if job in owner), None)
+        if job_id is None or not usage:
+            continue
+        costs.setdefault(job_id, []).append(priced_cost(usage))
+        sources.setdefault(job_id, set()).add(cost_source_of(usage))
     found: dict[str, _Runs] = {}
-    owner: dict[str, str] = {}
     for job in jobs:
         if job.routine_id is None:
             continue
         stats = found.setdefault(job.routine_id, _Runs())
-        owner[job.id] = job.routine_id
         outcome = _outcome(job)
         created = _utc(job.created_at)
         if stats.latest is None or created > stats.latest[0]:
@@ -135,22 +164,16 @@ async def _runs(session: AsyncSession, ids: list[str], now: datetime) -> dict[st
             finished = _utc(job.finished_at)
             if stats.useful is None or finished > stats.useful:
                 stats.useful = finished
-    turns = await session.execute(
-        select(TurnRow.job_ids, TurnRow.usage)
-        .where(TurnRow.status.in_(ENDED))
-        .where(TurnRow.finished_at.is_not(None))
-        .where(TurnRow.finished_at >= since)
-    )
-    for job_ids, usage in turns:
-        routine_id = next((owner[job] for job in job_ids if job in owner), None)
-        if routine_id is None or not usage:
-            continue
-        stats = found[routine_id]
-        cost = priced_cost(usage)
-        if cost is not None:
-            stats.priced += 1
-            stats.cost += cost
-        elif cost_source_of(usage) == "unknown":
+        run_costs = costs.get(job.id, [None])
+        run_cost = (
+            None
+            if any(cost is None for cost in run_costs)
+            else sum(cost for cost in run_costs if cost is not None)
+        )
+        stats.ended.append((created, run_cost))
+        if run_cost is not None:
+            stats.cost += run_cost
+        elif "unknown" in sources.get(job.id, {"unknown"}):
             stats.unpriced += 1
     return found
 

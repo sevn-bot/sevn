@@ -164,6 +164,9 @@ class RoutineService:
         async with open_session() as session:
             row = await _open(session, routine_id)
             now = utcnow()
+            if row.paused_reason == "budget":
+                # The owner's call over the budget holds until the day ends.
+                row.budget_resumed_at = now
             row.status = "active"
             row.paused_reason = None
             row.next_run = next_after(_spec(row.schedule), now, _zone(row.timezone))
@@ -295,28 +298,50 @@ def _utc(moment: datetime) -> datetime:
 
 
 async def _apply_budgets(hub: Hub, now: datetime) -> None:
+    """Pause routines whose scope is over today's budget; resume them once it is not.
+
+    A budget pause ends with its period: the first sweep of a new day, or a
+    raised limit, starts the routine again from its next slot. A routine the
+    owner resumed today stays running.
+    """
     budgets = Settings.load().budgets
-    if budgets.daily_usd_per_bot is None and budgets.daily_usd_host is None:
-        return
+    start = day_start(now)
     async with open_session() as session:
-        spent = await spend_by_bot(session, day_start(now))
+        spent = await spend_by_bot(session, start)
         host_over = (
             budgets.daily_usd_host is not None and sum(spent.values()) >= budgets.daily_usd_host
         )
         per_bot = budgets.daily_usd_per_bot
         over = {bot for bot, value in spent.items() if per_bot is not None and value >= per_bot}
-        rows = list(await session.scalars(select(Routine).where(Routine.status == "active")))
-        paused: list[Routine] = []
+        rows = list(
+            await session.scalars(
+                select(Routine).where(
+                    (Routine.status == "active")
+                    | ((Routine.status == "paused") & (Routine.paused_reason == "budget"))
+                )
+            )
+        )
+        changed: list[Routine] = []
         for row in rows:
-            if host_over or row.bot_id in over:
+            in_breach = host_over or row.bot_id in over
+            resumed = row.budget_resumed_at
+            if resumed is not None and _utc(resumed) >= start:
+                in_breach = False
+            if row.status == "active" and in_breach:
                 row.status = "paused"
                 row.paused_reason = "budget"
                 row.next_run = None
-                row.updated_at = utcnow()
-                paused.append(row)
+            elif row.status == "paused" and not in_breach:
+                row.status = "active"
+                row.paused_reason = None
+                row.next_run = next_after(_spec(row.schedule), now, _zone(row.timezone))
+            else:
+                continue
+            row.updated_at = utcnow()
+            changed.append(row)
         await session.commit()
-    for row in paused:
-        logger.info("routine paused by budget")
+    for row in changed:
+        logger.info("routine {state} by budget", state=row.status)
         await hub.emit("routine.updated", row.id, routine_event(_record(row)))
 
 

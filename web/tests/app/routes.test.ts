@@ -25,3 +25,16 @@ test("agent paths are encoded", () => {
     agentId: "agent/b",
   });
 });
+
+test("brief and share routes", async () => {
+  const routes = await import("../../src/app/routes.ts");
+  expect(routes.isBriefPath("/brief")).toBe(true);
+  expect(routes.isBriefPath("/briefing")).toBe(false);
+  expect(routes.shareFromPath("/share/shr_1/abc-DEF_9")).toEqual({
+    shareId: "shr_1",
+    secret: "abc-DEF_9",
+  });
+  expect(routes.shareFromPath("/share/shr_1")).toBeNull();
+  expect(routes.shareFromPath("/share/shr_1/x/data")).toBeNull();
+  expect(routes.shareFromPath("/bots/x")).toBeNull();
+});

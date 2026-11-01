@@ -25,6 +25,9 @@ _PATTERNS = (
     re.compile(r"Bearer\s+\S{8,}"),
     re.compile(r"AKIA[0-9A-Z]{16}"),
 )
+# A share link is a bearer URL: /share/<id>/<secret>. uvicorn's access log
+# writes the path, so the secret segment is masked wherever a path is logged.
+_SHARE_PATH = re.compile(r"(/share/[A-Za-z0-9_-]+/)[A-Za-z0-9_-]{8,}")
 _JSON_KEY = "_json"
 _EXCEPTION_KEY = "_exception_text"
 _HIDDEN_EXTRA = frozenset({_JSON_KEY, _EXCEPTION_KEY})
@@ -46,7 +49,7 @@ def _redact_text(text: str, secrets: tuple[tuple[str, str], ...]) -> str:
             text = text.replace(value, f"«redacted:{name}»")
     for pattern in _PATTERNS:
         text = pattern.sub("«redacted»", text)
-    return text
+    return _SHARE_PATH.sub(r"\1«redacted»", text)
 
 
 def _redact_value(value: object, secrets: tuple[tuple[str, str], ...]) -> object:

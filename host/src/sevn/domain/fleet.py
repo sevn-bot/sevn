@@ -17,6 +17,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sevn.config import Settings
 from sevn.domain.fleet_routines import FleetRoutine, upcoming
+from sevn.domain.host_status import FleetHost, host_status, ollama_status
+from sevn.domain.metrics import FleetMetric
+from sevn.domain.metrics import tiles as metric_tiles
 from sevn.domain.session import open_session
 from sevn.runtime.usage import cost_of, cost_source_of, tokens_of
 from sevn.store.db import utcnow
@@ -139,6 +142,8 @@ class FleetOverview(BaseModel):
     days: list[str]
     kpis: list[FleetKpi]
     bots: list[FleetBot]
+    metrics: list[FleetMetric]
+    host: FleetHost
     upcoming: list[FleetRoutine]
     projection_7d_usd: float
     projection_unpriced: int
@@ -151,6 +156,8 @@ async def overview(*, bot_id: str | None = None) -> FleetOverview:
     """Read the dashboard. ``bot_id`` narrows only the finished list."""
     now = utcnow()
     days = _days(now.date())
+    # Checked before the session opens, so a slow Ollama holds no connection.
+    ollama = await ollama_status()
     async with open_session() as session:
         bots = list(await session.scalars(select(BotRow).order_by(BotRow.created_at, BotRow.id)))
         names = {bot.id: bot.name for bot in bots}
@@ -161,6 +168,8 @@ async def overview(*, bot_id: str | None = None) -> FleetOverview:
         today = await _today(session, days[-1])
         running = await _running_turns(session)
         routines, projection, unpriced = await upcoming(session, names, now)
+        metrics = await metric_tiles(session, names, now)
+        host = await host_status(session, ollama)
     counts = Counter(item.bot_id for item in waiting)
     return FleetOverview(
         as_of=now,
@@ -170,6 +179,8 @@ async def overview(*, bot_id: str | None = None) -> FleetOverview:
         waiting=waiting,
         finished=finished,
         activity=activity,
+        metrics=metrics,
+        host=host,
         upcoming=routines,
         projection_7d_usd=projection,
         projection_unpriced=unpriced,
@@ -300,23 +311,36 @@ def _due(body: dict[str, object]) -> datetime | None:
     return parsed.astimezone(UTC)
 
 
+async def finished_since(since: datetime, *, status: str, limit: int) -> list[FleetFinished]:
+    """The newest ``limit`` turns that ended with ``status`` since ``since``."""
+    async with open_session() as session:
+        names = {bot.id: bot.name for bot in await session.scalars(select(BotRow))}
+        return await _finished(session, names, None, statuses=(status,), since=since, limit=limit)
+
+
 async def _finished(
     session: AsyncSession,
     names: dict[str, str],
     bot_id: str | None,
+    *,
+    statuses: tuple[str, ...] = _ENDED,
+    since: datetime | None = None,
+    limit: int = FINISHED_LIMIT,
 ) -> list[FleetFinished]:
     stmt = (
         select(TurnRow, AgentRow)
         .join(AgentRow, TurnRow.agent_id == AgentRow.id)
-        .where(TurnRow.status.in_(_ENDED))
+        .where(TurnRow.status.in_(statuses))
         .where(TurnRow.finished_at.is_not(None))
     )
     if bot_id is not None:
         stmt = stmt.where(AgentRow.bot_id == bot_id)
+    if since is not None:
+        stmt = stmt.where(TurnRow.finished_at >= since)
     rows = list(
         (
             await session.execute(
-                stmt.order_by(TurnRow.finished_at.desc(), TurnRow.id.desc()).limit(FINISHED_LIMIT)
+                stmt.order_by(TurnRow.finished_at.desc(), TurnRow.id.desc()).limit(limit)
             )
         ).all()
     )

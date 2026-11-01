@@ -1,6 +1,6 @@
 # Plan: fleet dashboards
 
-Status: phase 1 in review (PR #11), phase 2 in review (PR #12), phase 3 in review (PR #14), phase 4 on hold until plan 0050 merges (PR #15). Integration branch: `wave/fleet-dashboards`, cut from `wave/0020-bot-core` (PR #9). Every PR for this plan targets `wave/fleet-dashboards`, not `test` or `main`.
+Status: phases 1–4 merged into `wave/fleet-dashboards` (PRs #11, #12, #14, #15); phase 6 in review (PR #16). Phase 5 waits on bot-to-bot delegation and A2UI. Phase 4's routine model still has to move onto plan 0050's tables when 0050 lands (see below). Integration branch: `wave/fleet-dashboards`, which includes the merged bot core (PR #9). Every PR for this plan targets `wave/fleet-dashboards`, not `test` or `main`.
 
 Source: the "Agent Fleet Dashboards" playbook, which restates ideas from Alex Finn's video on running a fleet of about 20 agents. This plan maps those ideas onto sevn.
 
@@ -127,7 +127,7 @@ Done when:
 
 ### What PR #15 built ahead of plan 0050
 
-PR #15 was written before this section named plan 0050 as the owner of the routine tables. It ships a smaller routine model of its own. **Decision: PR #15 waits for plan 0050.** It does not merge with its own `0004_routines` migration; once 0050 lands, it is rebased onto 0050's tables and methods, and the parts below that 0050 already provides are dropped. What PR #15 holds today:
+PR #15 was written before this section named plan 0050 as the owner of the routine tables. It ships a smaller routine model of its own. PR #15 merged with its own `0004_routines` migration. When 0050 lands, this model moves onto 0050's tables and methods, and the parts below that 0050 already provides are dropped. What PR #15 built:
 
 - Migration `0004_routines`: `routines` (bot, name, five-field cron `schedule`, IANA `timezone`, prompt `text`, `status`, `paused_reason`, `next_run`, `last_run`) and `jobs.routine_id` and `jobs.silent`. Last outcome, last useful run and costs are read from jobs and turns, not stored.
 - `domain/cron.py` evaluates the schedule on the routine's wall clock: a time daylight saving skips does not run, a repeated time runs once.
@@ -149,12 +149,13 @@ Depends on bot-to-bot delegation (`route.owner`, `delegate.needed`) and A2UI (pl
 - The coordinator adds panels as A2UI surfaces (`ui.surface`). Each definition is versioned so a change can be undone. A dashboard index lists them with a pin flag.
 - Proposal: the coordinator asks each bot what it owns, what it waits on the owner for, which numbers matter, which routines could stop, and what must never be shared. It proposes up to five dashboards and builds none until the owner picks.
 
-## Phase 6: optional
+## Phase 6: metrics, host panel, daily brief, share links
 
-- `report_metric` tool and a `metrics` table with `source`, `as_of`, status and a freshness budget.
-- Host panel: Ollama reachable, models loaded, queue depth.
-- A morning brief as a routine whose output is a surface.
-- Read-only share links on the existing `read_only` scope.
+- Metrics: the `metric.report` tool takes a key, a finite value (null records a failed read), a required `source`, `as_of` (ISO 8601 with a timezone, default now), a freshness budget and a `shareable` flag. Bad input goes back to the model as `invalid_params`. `metric_points` keeps every report; reads use each bot's latest point per key and one indexed lookup for the 24-hour change. `fleet.overview` shows up to 8 tiles, newest first. A tile is stale past its budget, unavailable after a failed read, and a conflict when two bots' fresh values differ (both values are shown).
+- Host panel: version, queued jobs, running turns against the limit, and Ollama (not set up, reachable with its models and what is loaded, or unreachable). The Ollama check asks both questions at once within 2 seconds. After the first check a read returns the last status, and one older than 30 seconds refreshes in the background.
+- Daily brief: `fleet.brief` and the `/brief` page, built when opened. KPIs, metrics that changed or need attention, the top 3 decisions, the last 24 hours, routines in the next 24 hours with their cost, and what is broken. It checks every metric key and reads its done turns directly, so the dashboard's caps do not hide anything. It is a page rather than a routine with an A2UI surface, because A2UI is not in this repo yet.
+- Share links: `shares.create`, `list`, `revoke` (owner only). A link `/share/<id>/<secret>` expires (1 hour to 30 days), can be revoked, can be scoped to one bot, and counts its opens; only a SHA-256 of the secret is stored. The secret is masked in logs, and the op log's replay copy of `shares.create` has a blank path. The link page fetches `GET /share/<id>/<secret>/data` over plain HTTP and never opens the protocol socket. The snapshot has counts, statuses, schedules and shareable metrics, and never message text, lane titles, question text, approval arguments or routine prompts. A conflict tile shows each bot's value. The KPI tiles leave out the owner's budget and run limit, and a bot-scoped link leaves out host-wide spend and tokens. Unknown, wrong, revoked and expired links are the same 404. This uses its own endpoint, not the protocol's `read_only` scope, so the protocol, its events and replay stay owner only.
+- Not done: who opened a link is not known (only when and how often). A link is only useful when the host is reachable by the person opening it.
 
 ## Open questions
 

@@ -725,6 +725,78 @@
       "title": "BotsUpdateParams",
       "type": "object"
     },
+    "BriefIssue": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/IssueKind"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "text"
+      ],
+      "title": "BriefIssue",
+      "type": "object"
+    },
+    "BriefRoutine": {
+      "additionalProperties": false,
+      "properties": {
+        "bot_name": {
+          "title": "Bot Name",
+          "type": "string"
+        },
+        "cost_per_run_usd": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Cost Per Run Usd"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "next_run": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Next Run"
+        },
+        "runs": {
+          "title": "Runs",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "bot_name",
+        "next_run",
+        "runs",
+        "cost_per_run_usd"
+      ],
+      "title": "BriefRoutine",
+      "type": "object"
+    },
     "Challenge": {
       "properties": {
         "host": {
@@ -870,6 +942,107 @@
       ],
       "type": "string"
     },
+    "FleetBrief": {
+      "additionalProperties": false,
+      "description": "What needs the owner, what finished, what runs today, and what broke.",
+      "properties": {
+        "broken": {
+          "items": {
+            "$ref": "#/$defs/BriefIssue"
+          },
+          "title": "Broken",
+          "type": "array"
+        },
+        "built_at": {
+          "format": "date-time",
+          "title": "Built At",
+          "type": "string"
+        },
+        "decisions": {
+          "items": {
+            "$ref": "#/$defs/FleetWaiting"
+          },
+          "title": "Decisions",
+          "type": "array"
+        },
+        "decisions_total": {
+          "title": "Decisions Total",
+          "type": "integer"
+        },
+        "finished_done": {
+          "title": "Finished Done",
+          "type": "integer"
+        },
+        "finished_failed": {
+          "title": "Finished Failed",
+          "type": "integer"
+        },
+        "finished_top": {
+          "items": {
+            "$ref": "#/$defs/FleetFinished"
+          },
+          "title": "Finished Top",
+          "type": "array"
+        },
+        "kpis": {
+          "items": {
+            "$ref": "#/$defs/FleetKpi"
+          },
+          "title": "Kpis",
+          "type": "array"
+        },
+        "metric_changes": {
+          "items": {
+            "$ref": "#/$defs/FleetMetric"
+          },
+          "title": "Metric Changes",
+          "type": "array"
+        },
+        "routines_today": {
+          "items": {
+            "$ref": "#/$defs/BriefRoutine"
+          },
+          "title": "Routines Today",
+          "type": "array"
+        },
+        "routines_today_unpriced": {
+          "title": "Routines Today Unpriced",
+          "type": "integer"
+        },
+        "routines_today_usd": {
+          "title": "Routines Today Usd",
+          "type": "number"
+        },
+        "since": {
+          "format": "date-time",
+          "title": "Since",
+          "type": "string"
+        }
+      },
+      "required": [
+        "built_at",
+        "since",
+        "kpis",
+        "metric_changes",
+        "decisions",
+        "decisions_total",
+        "finished_done",
+        "finished_failed",
+        "finished_top",
+        "routines_today",
+        "routines_today_usd",
+        "routines_today_unpriced",
+        "broken"
+      ],
+      "title": "FleetBrief",
+      "type": "object"
+    },
+    "FleetBriefParams": {
+      "additionalProperties": false,
+      "properties": {},
+      "title": "FleetBriefParams",
+      "type": "object"
+    },
     "FleetDay": {
       "additionalProperties": false,
       "description": "Turns one bot finished on one UTC day, and what the priced ones cost.",
@@ -954,6 +1127,45 @@
         "finished_at"
       ],
       "title": "FleetFinished",
+      "type": "object"
+    },
+    "FleetHost": {
+      "additionalProperties": false,
+      "properties": {
+        "as_of": {
+          "format": "date-time",
+          "title": "As Of",
+          "type": "string"
+        },
+        "max_running_turns": {
+          "title": "Max Running Turns",
+          "type": "integer"
+        },
+        "ollama": {
+          "$ref": "#/$defs/OllamaStatus"
+        },
+        "queued_jobs": {
+          "title": "Queued Jobs",
+          "type": "integer"
+        },
+        "running_turns": {
+          "title": "Running Turns",
+          "type": "integer"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "as_of",
+        "version",
+        "queued_jobs",
+        "running_turns",
+        "max_running_turns",
+        "ollama"
+      ],
+      "title": "FleetHost",
       "type": "object"
     },
     "FleetKpi": {
@@ -1068,6 +1280,98 @@
       "title": "FleetKpi",
       "type": "object"
     },
+    "FleetMetric": {
+      "additionalProperties": false,
+      "description": "One metric tile: the newest report, plus every bot's when they disagree.",
+      "properties": {
+        "as_of": {
+          "format": "date-time",
+          "title": "As Of",
+          "type": "string"
+        },
+        "bot_id": {
+          "title": "Bot Id",
+          "type": "string"
+        },
+        "bot_name": {
+          "title": "Bot Name",
+          "type": "string"
+        },
+        "delta_24h": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Delta 24H"
+        },
+        "freshness_minutes": {
+          "title": "Freshness Minutes",
+          "type": "integer"
+        },
+        "key": {
+          "title": "Key",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "reports": {
+          "items": {
+            "$ref": "#/$defs/MetricReport"
+          },
+          "title": "Reports",
+          "type": "array"
+        },
+        "shareable": {
+          "title": "Shareable",
+          "type": "boolean"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/MetricStatus"
+        },
+        "unit": {
+          "title": "Unit",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value"
+        }
+      },
+      "required": [
+        "key",
+        "label",
+        "value",
+        "unit",
+        "source",
+        "as_of",
+        "bot_id",
+        "bot_name",
+        "status",
+        "delta_24h",
+        "freshness_minutes",
+        "shareable",
+        "reports"
+      ],
+      "title": "FleetMetric",
+      "type": "object"
+    },
     "FleetOption": {
       "additionalProperties": false,
       "description": "One answer a question offers.",
@@ -1125,11 +1429,21 @@
           "title": "Finished",
           "type": "array"
         },
+        "host": {
+          "$ref": "#/$defs/FleetHost"
+        },
         "kpis": {
           "items": {
             "$ref": "#/$defs/FleetKpi"
           },
           "title": "Kpis",
+          "type": "array"
+        },
+        "metrics": {
+          "items": {
+            "$ref": "#/$defs/FleetMetric"
+          },
+          "title": "Metrics",
           "type": "array"
         },
         "projection_7d_usd": {
@@ -1160,6 +1474,8 @@
         "days",
         "kpis",
         "bots",
+        "metrics",
+        "host",
         "upcoming",
         "projection_7d_usd",
         "projection_unpriced",
@@ -1478,6 +1794,19 @@
       "title": "Hello",
       "type": "object"
     },
+    "IssueKind": {
+      "enum": [
+        "failed_turns",
+        "failed_routine",
+        "overdue_question",
+        "paused_by_budget",
+        "stale_metric",
+        "error_metric",
+        "conflict_metric",
+        "ollama_down"
+      ],
+      "type": "string"
+    },
     "JsonObject": {
       "additionalProperties": {
         "$ref": "#/$defs/JsonValue"
@@ -1514,6 +1843,32 @@
           "type": "null"
         }
       ]
+    },
+    "LoadedModel": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "vram_bytes": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Vram Bytes"
+        }
+      },
+      "required": [
+        "name",
+        "vram_bytes"
+      ],
+      "title": "LoadedModel",
+      "type": "object"
     },
     "MemoriesDeleteParams": {
       "additionalProperties": false,
@@ -1962,6 +2317,58 @@
       "title": "MessagesSendResult",
       "type": "object"
     },
+    "MetricReport": {
+      "additionalProperties": false,
+      "description": "One bot's latest value for a key.",
+      "properties": {
+        "as_of": {
+          "format": "date-time",
+          "title": "As Of",
+          "type": "string"
+        },
+        "bot_id": {
+          "title": "Bot Id",
+          "type": "string"
+        },
+        "bot_name": {
+          "title": "Bot Name",
+          "type": "string"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value"
+        }
+      },
+      "required": [
+        "bot_id",
+        "bot_name",
+        "value",
+        "as_of",
+        "source"
+      ],
+      "title": "MetricReport",
+      "type": "object"
+    },
+    "MetricStatus": {
+      "enum": [
+        "ok",
+        "stale",
+        "error",
+        "conflict"
+      ],
+      "type": "string"
+    },
     "ModelInfo": {
       "additionalProperties": false,
       "properties": {
@@ -2015,6 +2422,74 @@
         "off"
       ],
       "type": "string"
+    },
+    "OllamaStatus": {
+      "additionalProperties": false,
+      "description": "``reachable`` is null when no Ollama URL is set.",
+      "properties": {
+        "checked_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Checked At"
+        },
+        "configured": {
+          "title": "Configured",
+          "type": "boolean"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Error"
+        },
+        "loaded": {
+          "items": {
+            "$ref": "#/$defs/LoadedModel"
+          },
+          "title": "Loaded",
+          "type": "array"
+        },
+        "models": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Models",
+          "type": "array"
+        },
+        "reachable": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reachable"
+        }
+      },
+      "required": [
+        "configured",
+        "reachable",
+        "models",
+        "loaded",
+        "error",
+        "checked_at"
+      ],
+      "title": "OllamaStatus",
+      "type": "object"
     },
     "Origin": {
       "enum": [
@@ -2640,6 +3115,204 @@
       "title": "SandboxModeResult",
       "type": "object"
     },
+    "ShareRecord": {
+      "additionalProperties": false,
+      "description": "A share link as the owner sees it. The secret is shown once, at create.",
+      "properties": {
+        "bot_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Bot Id"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "expires_at": {
+          "format": "date-time",
+          "title": "Expires At",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "last_opened_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Last Opened At"
+        },
+        "opens": {
+          "title": "Opens",
+          "type": "integer"
+        },
+        "revoked_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Revoked At"
+        },
+        "status": {
+          "$ref": "#/$defs/ShareStatus"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "bot_id",
+        "status",
+        "created_at",
+        "expires_at",
+        "revoked_at",
+        "last_opened_at",
+        "opens"
+      ],
+      "title": "ShareRecord",
+      "type": "object"
+    },
+    "ShareStatus": {
+      "enum": [
+        "active",
+        "expired",
+        "revoked"
+      ],
+      "type": "string"
+    },
+    "SharesCreateParams": {
+      "additionalProperties": false,
+      "description": "A read-only link. The returned ``path`` holds the only copy of its secret.",
+      "properties": {
+        "bot_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bot Id"
+        },
+        "expires_in_hours": {
+          "default": 168,
+          "title": "Expires In Hours",
+          "type": "integer"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "op_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op Id"
+        }
+      },
+      "required": [
+        "label"
+      ],
+      "title": "SharesCreateParams",
+      "type": "object"
+    },
+    "SharesCreateResult": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "share": {
+          "$ref": "#/$defs/ShareRecord"
+        }
+      },
+      "required": [
+        "share",
+        "path"
+      ],
+      "title": "SharesCreateResult",
+      "type": "object"
+    },
+    "SharesListParams": {
+      "additionalProperties": false,
+      "properties": {},
+      "title": "SharesListParams",
+      "type": "object"
+    },
+    "SharesListResult": {
+      "additionalProperties": false,
+      "properties": {
+        "shares": {
+          "items": {
+            "$ref": "#/$defs/ShareRecord"
+          },
+          "title": "Shares",
+          "type": "array"
+        }
+      },
+      "required": [
+        "shares"
+      ],
+      "title": "SharesListResult",
+      "type": "object"
+    },
+    "SharesRevokeParams": {
+      "additionalProperties": false,
+      "properties": {
+        "op_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op Id"
+        },
+        "share_id": {
+          "title": "Share Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "share_id"
+      ],
+      "title": "SharesRevokeParams",
+      "type": "object"
+    },
     "SyncSinceParams": {
       "additionalProperties": false,
       "properties": {
@@ -3026,6 +3699,11 @@
       "params": "BotsUpdateParams",
       "result": "BotRecord"
     },
+    "fleet.brief": {
+      "mutating": false,
+      "params": "FleetBriefParams",
+      "result": "FleetBrief"
+    },
     "fleet.overview": {
       "mutating": false,
       "params": "FleetOverviewParams",
@@ -3115,6 +3793,21 @@
       "mutating": true,
       "params": "RoutinesUpdateParams",
       "result": "RoutineRecord"
+    },
+    "shares.create": {
+      "mutating": true,
+      "params": "SharesCreateParams",
+      "result": "SharesCreateResult"
+    },
+    "shares.list": {
+      "mutating": false,
+      "params": "SharesListParams",
+      "result": "SharesListResult"
+    },
+    "shares.revoke": {
+      "mutating": true,
+      "params": "SharesRevokeParams",
+      "result": "ShareRecord"
     },
     "sync.since": {
       "mutating": false,

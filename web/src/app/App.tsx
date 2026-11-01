@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { type Connection, cancelConnect, connect } from "../client/index.ts";
 import { BotList } from "./bots/BotList.tsx";
 import { Chat } from "./chat/Chat.tsx";
+import { BriefPage } from "./fleet/BriefPage.tsx";
 import { Dashboard } from "./fleet/Dashboard.tsx";
-import { routeFromPath } from "./routes.ts";
+import { SharePage } from "./fleet/SharePage.tsx";
+import { isBriefPath, routeFromPath, shareFromPath } from "./routes.ts";
 
 type Status =
   | "connecting"
@@ -34,6 +36,15 @@ function remember(
 }
 
 export default function App() {
+  // A share link is for someone who is not the owner: no login and no socket.
+  const share = shareFromPath(window.location.pathname);
+  if (share !== null) {
+    return <SharePage shareId={share.shareId} secret={share.secret} />;
+  }
+  return <OwnerApp />;
+}
+
+function OwnerApp() {
   const [status, setStatus] = useState<Status>("connecting");
   const [hostId, setHostId] = useState("");
   const [events, setEvents] = useState<ShownEvent[]>([]);
@@ -126,7 +137,9 @@ export default function App() {
         >
           Ping
         </button>
-        {route.botId === null ? (
+        {isBriefPath(path) ? (
+          <BriefPage />
+        ) : route.botId === null ? (
           <>
             <Dashboard />
             <BotList />
