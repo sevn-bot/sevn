@@ -1,6 +1,11 @@
 import { createElement } from "react";
 import { afterEach, expect, test } from "vitest";
-import { loadDashboard, requestParams, startHarness } from "../chat/host.ts";
+import {
+  loadDashboard,
+  requestParams,
+  rpcError,
+  startHarness,
+} from "../chat/host.ts";
 
 const now = new Date();
 const today = now.toISOString().slice(0, 10);
@@ -367,6 +372,53 @@ test("activity grid switches to cost", async () => {
     );
     expect(cell.getAttribute("data-cost")).toBe("0.5");
     expect(cost.getAttribute("aria-pressed")).toBe("true");
+  } finally {
+    harness.stop();
+  }
+});
+
+test("a failed refresh keeps the data and says so", async () => {
+  const harness = await startHarness({
+    "fleet.overview": (_params, nth) =>
+      nth === 1 ? full : rpcError("internal", "host busy"),
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Dashboard = await loadDashboard();
+    testing.render(createElement(Dashboard));
+    await testing.screen.findByText("Which subject line?");
+    expect(testing.screen.queryByText("refresh failed")).toBeNull();
+    harness.event("turn.finished", { turn_id: "turn_x" });
+    await testing.screen.findByText("refresh failed");
+    expect(testing.screen.getByText("Which subject line?")).not.toBeNull();
+  } finally {
+    harness.stop();
+  }
+});
+
+test("the bot filter clears when that bot is gone", async () => {
+  const withoutAtlas = {
+    ...full,
+    bots: full.bots.filter((item) => item.id !== "bot_atlas"),
+  };
+  const harness = await startHarness({
+    "fleet.overview": (params) =>
+      params.bot_id === "bot_atlas" ? withoutAtlas : full,
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const Dashboard = await loadDashboard();
+    testing.render(createElement(Dashboard));
+    (await testing.screen.findByRole("button", { name: "Only Atlas" })).click();
+    await testing.waitFor(() => {
+      const calls = requestParams(harness.requests, "fleet.overview");
+      expect(calls.at(-1)?.bot_id).toBeUndefined();
+      expect(calls.some((call) => call.bot_id === "bot_atlas")).toBe(true);
+    });
+    const all = await testing.screen.findByRole("button", { name: "All bots" });
+    await testing.waitFor(() => {
+      expect(all.getAttribute("aria-pressed")).toBe("true");
+    });
   } finally {
     harness.stop();
   }

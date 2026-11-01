@@ -155,9 +155,11 @@ function ChatView({
     try {
       await call(
         "messages.send",
-        focused === undefined
+        // The route names the lane. Send to it even before agents.list has
+        // loaded; the host refuses an unknown lane instead of rerouting.
+        agentId === null
           ? { bot_id: botId, text }
-          : { bot_id: botId, text, agent_id: focused.id },
+          : { bot_id: botId, text, agent_id: agentId },
       );
     } catch {
       setDraft(text);
@@ -215,9 +217,9 @@ function ChatView({
           />
         ))}
       </div>
-      {focused !== undefined ? (
+      {agentId !== null ? (
         <div className="flex flex-wrap items-baseline gap-2 text-sm text-zinc-400">
-          <p>{`Sending to ${focused.title !== "" ? focused.title : focused.id}`}</p>
+          <p>{`Sending to ${focused !== undefined && focused.title !== "" ? focused.title : agentId}`}</p>
           <button
             type="button"
             className="underline"

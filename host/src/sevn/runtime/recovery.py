@@ -44,8 +44,9 @@ async def recover() -> Recovery:
     """Requeue ``started`` jobs whose turn has no committed result.
 
     A ``waiting`` turn that still has an open approval stays waiting, and so
-    does its job. A ``waiting`` turn whose approvals are already saved is
-    returned in ``resume``; the caller continues it. Leaving that job
+    does its job. A ``waiting`` turn whose approvals are already saved, or a
+    ``running`` turn that was resuming from them, is returned in ``resume``;
+    the caller continues it. Leaving that job
     ``started`` would wedge the agent. A committed ``model_messages`` value
     is a result, including an empty list. A Claude turn that was blocked on
     ``can_use_tool`` only holds that wait in memory, so a restart marks the
@@ -135,12 +136,18 @@ def _agent_updated(agent_id: str, now: datetime) -> Event:
 
 
 def _answered_turns(related: list[TurnRow], pendings: list[PendingRow]) -> list[AnsweredTurn]:
-    """Waiting turns with every approval already saved, and none still open."""
+    """Turns with every approval already saved, and none still open.
+
+    A ``waiting`` turn whose answers landed before the stop, and a ``running``
+    turn the stop hit while it resumed. Resuming marks the turn ``running`` but
+    keeps its approval checkpoint in ``model_messages``. That checkpoint is not
+    a committed result, so the turn is resumed again from it.
+    """
     if any(turn.status == "waiting" and _open_pending(turn.id, pendings) for turn in related):
         return []
     ready: list[AnsweredTurn] = []
     for turn in related:
-        if turn.status != "waiting":
+        if turn.status not in {"waiting", "running"} or turn.model_messages is None:
             continue
         decisions = _saved_decisions(turn.id, pendings, turn.model_messages)
         if len(decisions) == 0:

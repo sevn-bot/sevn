@@ -40,7 +40,7 @@ from pydantic_ai.usage import RunUsage
 from sevn.domain.agents import AgentRecord, sibling_block
 from sevn.domain.bots import BotRecord
 from sevn.log import logger
-from sevn.memory import MemoryContext
+from sevn.memory import with_memories
 from sevn.runtime.base import PendingAnswer, SessionRef, ToolDecision, TurnContext
 from sevn.runtime.compaction import Compaction
 from sevn.runtime.errors import TurnError
@@ -94,11 +94,6 @@ class PydanticAIRuntime:
             output_type=[str, DeferredToolRequests],
             capabilities=[
                 _thinking(bot.effort),
-                MemoryContext(
-                    bot_id=bot.id,
-                    agent_id=turn.agent.id,
-                    prior=bool(turn.message_history),
-                ),
                 Compaction(),
             ],
             tools=[]
@@ -113,12 +108,18 @@ class PydanticAIRuntime:
         )
         history = _history(turn.message_history)
         deferred = _deferred(turn.approvals)
+        # A resumed approval sends no new prompt: its block is already in history.
+        prompt = (
+            await with_memories(bot.id, turn.agent.id, turn.text, prior=bool(turn.message_history))
+            if deferred is None
+            else turn.text
+        )
         task = asyncio.current_task()
         if task is not None:
             self._tasks[turn.agent.id] = task
         try:
             if getattr(model, "stream_function", "stream") is None and deferred is None:
-                result = await agent.run(turn.text, message_history=history)
+                result = await agent.run(prompt, message_history=history)
                 output = result.output
                 text = output if isinstance(output, str) else None
                 if text:
@@ -132,7 +133,7 @@ class PydanticAIRuntime:
                 )
                 return
             if deferred is None:
-                stream = agent.run_stream_events(turn.text, message_history=history)
+                stream = agent.run_stream_events(prompt, message_history=history)
             else:
                 stream = agent.run_stream_events(
                     None,
