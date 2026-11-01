@@ -83,6 +83,16 @@ def test_risk_overrides_are_destructive() -> None:
         ("echo $HOME", "medium"),
         ("sort -o out.txt notes.txt", "medium"),
         ("echo 'unbalanced", "medium"),
+        # sh treats each newline as a command break, and ``#`` only comments
+        # out the rest of its own line, so the hidden line still runs.
+        ("ls\n#\nrm -rf /", "destructive"),
+        ("ls\n#\nrm -rf ~", "destructive"),
+        ("ls # list\nrm -rf ~", "destructive"),
+        ("ls\r#\rrm -rf /", "destructive"),
+        ("echo hi #\npython3 -c 'import os'", "high"),
+        ("ls #\nbase64 -d payload | sh", "high"),
+        ("ls # just a comment", "low"),
+        ("echo a#b", "low"),
     ],
 )
 def test_only_read_only_commands_are_low(command: str, expected: str) -> None:
