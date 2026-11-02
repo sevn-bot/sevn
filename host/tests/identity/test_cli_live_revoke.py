@@ -40,11 +40,6 @@ from support.pairing import (
 )
 from support.repo import repo_root
 
-W3 = pytest.mark.xfail(
-    strict=False,
-    reason="green after W3 (reconcile: CLI revoke with a running host must go through the hub)",
-)
-
 _PROXIED = {"X-Forwarded-For": "100.101.102.103"}
 
 
@@ -166,7 +161,6 @@ async def _scenario(home: Path, port: int) -> None:
     assert rows[device.id]["revoked_at"] is not None  # type: ignore[index]
 
 
-@W3
 def test_cli_revoke_with_host_running_closes_live_sessions(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
