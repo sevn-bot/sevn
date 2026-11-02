@@ -20,6 +20,14 @@ class ProbeError(Exception):
     """The probe could not complete a call. The message never includes the token."""
 
 
+class HostRefused(ProbeError):
+    """The host answered the call with an error response (``code`` is its error code)."""
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+
+
 async def call_method(method: str, params: JsonObject) -> JsonObject:
     """Handshake and return the ``res.r`` object for ``method``."""
 
@@ -31,7 +39,7 @@ async def call_method(method: str, params: JsonObject) -> JsonObject:
                 continue
             if isinstance(frame, Res):
                 if frame.e is not None:
-                    raise ProbeError(frame.e.message)
+                    raise HostRefused(frame.e.code, frame.e.message)
                 if frame.r is None:
                     raise ProbeError("empty result")
                 return frame.r

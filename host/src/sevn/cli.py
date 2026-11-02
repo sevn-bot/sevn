@@ -249,7 +249,7 @@ def devices_revoke(
     device_id: str,
     home: Annotated[Path | None, typer.Option("--home")] = None,
 ) -> None:
-    """Revoke a device in the store. A running host refuses its next ``auth``."""
+    """Revoke a device. A running host revokes it and closes its live sessions at once."""
     from sevn.identity.devices import DeviceError
 
     _apply_home(home)
@@ -287,9 +287,41 @@ async def _devices_list() -> list[DeviceRecord]:
 async def _devices_revoke(device_id: str) -> DeviceRecord:
     from sevn.identity.devices import revoke
 
+    live = await _devices_revoke_live(device_id)
+    if live is not None:
+        return live
     await _store_ready()
     # The host's own CLI is local, so it may revoke the last owner device.
     return await revoke(device_id, allow_last_owner=True)
+
+
+async def _devices_revoke_live(device_id: str) -> DeviceRecord | None:
+    """Revoke through a running host's hub, which closes the device's live sessions (D2).
+
+    ``None`` when no host answers for this home; the caller then writes offline.
+    """
+    import secrets
+
+    from sevn.identity.devices import DeviceError, DeviceRecord
+    from sevn.probe import HostRefused
+
+    run = Paths.from_env().run
+    if not (run / "token").is_file() or not (run / "bind").is_file():
+        return None
+    try:
+        result = await call_method(
+            "devices.revoke", {"id": device_id, "op_id": "op_cli_" + secrets.token_hex(8)}
+        )
+    except HostRefused as exc:
+        # The host answered: its refusal stands, and nothing is written offline.
+        if exc.code == "not_found":
+            raise DeviceError("not_found", str(exc)) from exc
+        if exc.code == "last_owner":
+            raise DeviceError("last_owner", str(exc)) from exc
+        raise DeviceError("internal", str(exc)) from exc
+    except ProbeError:
+        return None
+    return DeviceRecord.model_validate(result)
 
 
 def _qr_text(data: str) -> str:
