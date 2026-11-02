@@ -44,6 +44,8 @@ from support.pairing import (
     verify_host_sig,
 )
 
+D12 = pytest.mark.xfail(strict=False, reason="green after D12 member scope")
+
 
 @asynccontextmanager
 async def _host(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[MemoryHost]:
@@ -120,7 +122,10 @@ async def test_loopback_cookie_does_not_open_a_non_loopback_session(
         assert session.scope != "owner"
 
 
-@pytest.mark.parametrize("scope", ["owner", "member", "read_only"])
+@pytest.mark.parametrize(
+    "scope",
+    ["owner", pytest.param("member", marks=D12), "read_only"],
+)
 async def test_valid_device_auth_sets_device_scope(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, scope: str
 ) -> None:
@@ -134,11 +139,30 @@ async def test_valid_device_auth_sets_device_scope(
         me = await call(client, "devices.self", {})
         assert me["r"]["id"] == device.id
         assert me["r"]["scope"] == scope
+        # D12: `member` = `owner` for now; `read_only` is refused every owner-scoped method.
         owner_only = await call(client, "devices.list", {})
-        if scope == "owner":
+        writes = [
+            await call(
+                client,
+                "messages.send",
+                {"bot_id": "bot_missing", "text": "hi", "op_id": op_id()},
+            ),
+            await call(
+                client,
+                "pending.answer",
+                {"pending_id": "pend_missing", "answer": "approve", "op_id": op_id()},
+            ),
+        ]
+        if scope in {"owner", "member"}:
             assert "r" in owner_only, owner_only
+            for res in writes:
+                assert res.get("e", {}).get("code") != "forbidden", res
         else:
             assert owner_only["e"]["code"] == "forbidden"
+            for res in writes:
+                assert res["e"]["code"] == "forbidden", res
+        # The stored scope is not rewritten: a member device still reports `member`.
+        assert session.scope == scope
         listed = await call(owner, "devices.list", {})
         row = next(item for item in listed["r"]["devices"] if item["id"] == device.id)
         assert row["last_seen"] is not None

@@ -27,6 +27,8 @@ from support.migrations import down_revision_of, revision_ending, script_head
 from support.pairing import call, op_id, owner_client, pair_device, register_methods
 from support.repo import repo_root
 
+D12 = pytest.mark.xfail(strict=False, reason="green after D12 member scope")
+
 LAST_OWNER = "cannot revoke the last owner device"
 DEVICE_COLUMNS = {
     "id",
@@ -84,7 +86,7 @@ async def test_list_and_rename_are_owner_only(
         assert renamed["r"]["name"] == "Work phone"
         again = await call(owner, "devices.list", {})
         assert again["r"]["devices"][0]["name"] == "Work phone"
-        for scope in ("member", "read_only"):
+        for scope in ("read_only",):
             session = _remote(host, scope=scope, device_id=phone.id)
             for method, params in (
                 ("devices.list", {}),
@@ -94,6 +96,34 @@ async def test_list_and_rename_are_owner_only(
                 res = await _dispatch(session, method, params)
                 assert res.e is not None, (scope, method)
                 assert res.e.code == "forbidden", (scope, method)
+
+
+@D12
+async def test_member_device_may_admin_devices_but_keeps_its_scope(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D12: a ``member`` session passes owner-scoped device methods; the stored scope stays
+    ``member``, and D2's last-owner rule still reads the stored scope."""
+    async with _host(tmp_path, monkeypatch) as host:
+        owner = await owner_client(host)
+        laptop = await pair_device(host, owner, scope="owner", name="Laptop")
+        phone = await pair_device(host, owner, scope="member", name="Phone")
+        member = _remote(host, scope="member", device_id=phone.id)
+        listed = await _dispatch(member, "devices.list", {})
+        assert listed.e is None, listed.e
+        assert {row["id"] for row in listed.r["devices"]} == {laptop.id, phone.id}
+        renamed = await _dispatch(
+            member, "devices.rename", {"id": phone.id, "name": "My phone", "op_id": op_id()}
+        )
+        assert renamed.e is None, renamed.e
+        assert renamed.r["scope"] == "member"
+        refused = await _dispatch(member, "devices.revoke", {"id": laptop.id, "op_id": op_id()})
+        assert refused.e is not None
+        assert refused.e.code == "last_owner"
+        assert refused.e.message == LAST_OWNER
+        rows = {row["id"]: row for row in (await call(owner, "devices.list", {}))["r"]["devices"]}
+        assert rows[phone.id]["scope"] == "member"
+        assert rows[laptop.id]["revoked_at"] is None
 
 
 async def test_revoke_unknown_device_is_not_found(

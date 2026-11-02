@@ -38,6 +38,8 @@ from support.pairing import (
     start_pairing,
 )
 
+D12 = pytest.mark.xfail(strict=False, reason="green after D12 member scope")
+
 SHORT_CODE = re.compile(r"^[0-9A-HJKMNP-TV-Z]{8}$")
 BAD_TICKET = "invalid pairing ticket"
 RATE_LIMITED = "too many pairing attempts"
@@ -86,19 +88,39 @@ async def _dispatch(session: Any, method: str, params: dict[str, Any]) -> Any:
 # --- pairing.start ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("scope", ["member", "read_only"])
-async def test_start_is_owner_only(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, scope: str
-) -> None:
+async def test_start_refuses_read_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """``pairing.start`` is owner-scoped; ``read_only`` is refused (D12 keeps that)."""
     from sevn.protocol.session import Session
 
     async with _host(tmp_path, monkeypatch) as host:
-        session = Session.for_test(scope=scope, loopback=True, hub=host.hub)  # type: ignore[call-arg]
+        session = Session.for_test(scope="read_only", loopback=True, hub=host.hub)  # type: ignore[call-arg]
         res = await _dispatch(session, "pairing.start", {"op_id": op_id()})
         assert res.e is not None
         assert res.e.code == "forbidden"
         tickets = await asyncio.to_thread(_rows, tmp_path / "sevn.db", "pairing_tickets")
         assert tickets == []
+
+
+@D12
+async def test_member_may_start_pairing_but_not_an_owner_ticket(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D12: ``member`` passes owner-scoped methods; D1's owner-ticket rule still holds."""
+    from sevn.protocol.session import Session
+
+    async with _host(tmp_path, monkeypatch) as host:
+        member = Session.for_test(  # type: ignore[call-arg]
+            scope="member", loopback=False, hub=host.hub, device_id="dev_remote_member"
+        )
+        started = await _dispatch(member, "pairing.start", {"scope": "member", "op_id": op_id()})
+        assert started.e is None, started.e
+        assert started.r is not None and started.r["ticket"]
+        owner_ticket = await _dispatch(
+            member, "pairing.start", {"scope": "owner", "op_id": op_id()}
+        )
+        assert owner_ticket.e is not None
+        assert owner_ticket.e.code == "forbidden"
+        assert owner_ticket.e.message == OWNER_NEEDS_LOOPBACK
 
 
 async def test_owner_ticket_needs_loopback_owner(

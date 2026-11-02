@@ -77,12 +77,13 @@ async def test_allow_all_requires_owner_and_confirm(
     from sevn.protocol.session import Session
 
     load_modules("sevn.sandbox.policy")
-    member = Session.for_test(scope="member")
+    # D12: `member` = `owner` for now, so the scope that is refused is `read_only`.
+    read_only = Session.for_test(scope="read_only")
     refused = await dispatch(
-        member,
+        read_only,
         Req(
             t="req",
-            id="member",
+            id="read_only",
             m="host.set_sandbox_mode",
             p={"mode": "allow_all", "confirm": "I understand", "op_id": mint_id("op_")},
         ),
