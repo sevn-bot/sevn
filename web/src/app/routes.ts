@@ -1,21 +1,38 @@
 export type Route = {
+  /** A paired host's id for `/hosts/:hostId/bots/...`; null for the serving host. */
+  hostId: string | null;
   botId: string | null;
   agentId: string | null;
 };
 
-const home: Route = { botId: null, agentId: null };
+const home: Route = { hostId: null, botId: null, agentId: null };
 
 export function routeFromPath(path: string): Route {
-  const match = /^\/bots\/([^/]+)(?:\/agents\/([^/]+))?$/.exec(path);
-  const bot = match?.[1];
+  const match =
+    /^(?:\/hosts\/([^/]+))?\/bots\/([^/]+)(?:\/agents\/([^/]+))?$/.exec(path);
+  const bot = match?.[2];
   if (bot === undefined || bot === "") {
     return home;
   }
-  const agent = match?.[2];
+  const host = match?.[1];
+  const agent = match?.[3];
   return {
+    hostId: host === undefined ? null : decodeURIComponent(host),
     botId: decodeURIComponent(bot),
     agentId: agent === undefined ? null : decodeURIComponent(agent),
   };
+}
+
+/** A bot on a paired host (plan 0055 W6 follow-up). */
+export function hostBotPath(hostId: string, botId: string): string {
+  return `/hosts/${encodeURIComponent(hostId)}/bots/${encodeURIComponent(botId)}`;
+}
+
+/** A bot's chat on the serving host (`hostId` null) or on a paired host. */
+export function botPath(hostId: string | null, botId: string): string {
+  return hostId === null
+    ? `/bots/${encodeURIComponent(botId)}`
+    : hostBotPath(hostId, botId);
 }
 
 export function agentPath(botId: string, agentId: string): string {

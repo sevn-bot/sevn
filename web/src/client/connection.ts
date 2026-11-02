@@ -562,6 +562,22 @@ export type Connection = {
 };
 
 /**
+ * One host's protocol surface as the app uses it (plan 0055 W6 follow-up): the serving
+ * host's module-level connection, or one paired host's direct connection.
+ */
+export type HostClient = {
+  call: <M extends MethodName>(
+    method: M,
+    params: MethodParams[M],
+  ) => Promise<MethodResult[M]>;
+  onEvent: (handler: (event: ProtocolEvent) => void) => () => void;
+  onTick: (
+    kind: string,
+    handler: (data: Record<string, unknown>) => void,
+  ) => () => void;
+};
+
+/**
  * A paired device's credentials for one host (plan 0055 D3, D6). With these, the client
  * answers the host's `challenge` instead of sending a token.
  */

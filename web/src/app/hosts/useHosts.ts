@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   call,
   type FleetWaiting,
+  type HostClient,
   type MethodResult,
   onEvent,
   type ProtocolEvent,
@@ -82,6 +83,8 @@ export type MultiHost = {
   remotes: HostProfile[];
   views: HostView[];
   forget: (hostId: string) => Promise<void>;
+  /** A paired host's client, once its connection has been up at least once; else null. */
+  client: (hostId: string) => HostClient | null;
 };
 
 /**
@@ -97,6 +100,8 @@ export function useMultiHost(
   const [statuses, setStatuses] = useState<Record<string, HostStatus>>({});
   const [data, setData] = useState<Record<string, HostData>>({});
   const hostsRef = useRef<Hosts | null>(null);
+  const [hosts, setHosts] = useState<Hosts | null>(null);
+  const [opened, setOpened] = useState<ReadonlySet<string>>(new Set());
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: version is the reload signal.
   useEffect(() => {
@@ -134,6 +139,8 @@ export function useMultiHost(
     let alive = true;
     const hosts = createHosts({ profiles: remotes });
     hostsRef.current = hosts;
+    setHosts(hosts);
+    setOpened(new Set());
     const refresh = (hostId: string): void => {
       void fetchHost(
         () => hosts.call(hostId, "bots.list", {}),
@@ -150,6 +157,9 @@ export function useMultiHost(
       }
       setStatuses((current) => ({ ...current, [hostId]: next }));
       if (next === "connected") {
+        setOpened((current) =>
+          current.has(hostId) ? current : new Set([...current, hostId]),
+        );
         refresh(hostId);
       }
     });
@@ -175,6 +185,7 @@ export function useMultiHost(
       if (hostsRef.current === hosts) {
         hostsRef.current = null;
       }
+      setHosts((current) => (current === hosts ? null : current));
     };
   }, [remoteKey]);
 
@@ -263,7 +274,13 @@ export function useMultiHost(
       views.push(view);
     }
   }
-  return { remotes, views, forget };
+  const client = useCallback(
+    (hostId: string): HostClient | null =>
+      hosts !== null && opened.has(hostId) ? hosts.client(hostId) : null,
+    [hosts, opened],
+  );
+
+  return { remotes, views, forget, client };
 }
 
 async function fetchHost(

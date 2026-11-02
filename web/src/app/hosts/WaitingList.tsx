@@ -6,8 +6,6 @@ export type WaitingHost = {
   /** False when the host does not answer: its items are unknown, not empty. */
   available: boolean;
   waiting: FleetWaiting[];
-  /** False when this window cannot open the host's agents (default true). */
-  openable?: boolean;
 };
 
 /** Every host's waiting items in one list, newest first, each labelled with its host. */
@@ -58,7 +56,7 @@ export function WaitingList({
                 <span>{item.bot_name}</span>
                 <span>{item.agent_title}</span>
               </p>
-              {onOpen === undefined || host.openable === false ? (
+              {onOpen === undefined ? (
                 <p>{item.text}</p>
               ) : (
                 <button

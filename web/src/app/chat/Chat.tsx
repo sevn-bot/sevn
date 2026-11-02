@@ -1,21 +1,18 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { type UIEvent, useEffect, useRef, useState } from "react";
-import {
-  call,
-  type MethodResult,
-  type ProtocolEvent,
-} from "../../client/connection.ts";
+import type { MethodResult, ProtocolEvent } from "../../client/connection.ts";
 import {
   createQueryClient,
   useCall,
   useEvents,
+  useHostClient,
   useTicks,
 } from "../../client/hooks.ts";
 import { ApprovalCard } from "../approvals/ApprovalCard.tsx";
 import { MemoriesPanel } from "../bots/MemoriesPanel.tsx";
 import { SandboxSettings } from "../bots/SandboxSettings.tsx";
 import { ModelPicker } from "../models/ModelPicker.tsx";
-import { go } from "../routes.ts";
+import { botPath, go } from "../routes.ts";
 import { type LaneAgent, Lanes, toLane } from "./Lanes.tsx";
 import { AskChips, RoutingChip } from "./RoutingChip.tsx";
 
@@ -35,14 +32,17 @@ const refreshKinds = new Set([
 export function Chat({
   botId,
   agentId = null,
+  hostId = null,
 }: {
   botId: string;
   agentId?: string | null;
+  /** The paired host the chat's client talks to; null for the serving host (routes only). */
+  hostId?: string | null;
 }) {
   const [client] = useState(() => createQueryClient());
   return (
     <QueryClientProvider client={client}>
-      <ChatView botId={botId} agentId={agentId} />
+      <ChatView botId={botId} agentId={agentId} hostId={hostId} />
     </QueryClientProvider>
   );
 }
@@ -50,10 +50,13 @@ export function Chat({
 function ChatView({
   botId,
   agentId,
+  hostId,
 }: {
   botId: string;
   agentId: string | null;
+  hostId: string | null;
 }) {
+  const host = useHostClient();
   const messagesQuery = useCall("messages.list", { bot_id: botId });
   const agentsQuery = useCall("agents.list", { bot_id: botId });
   const pendingQuery = useCall("pending.list", {});
@@ -134,7 +137,7 @@ function ChatView({
     }
     loadingOlder.current = true;
     try {
-      const next = await call("messages.list", { bot_id: botId, cursor });
+      const next = await host.call("messages.list", { bot_id: botId, cursor });
       olderCursor.current = next.next_cursor;
       setOlder((current) => [...chronological(next.messages), ...current]);
     } catch {
@@ -161,7 +164,7 @@ function ChatView({
     }
     setDraft("");
     try {
-      await call(
+      await host.call(
         "messages.send",
         // The route names the lane. Send to it even before agents.list has
         // loaded; the host refuses an unknown lane instead of rerouting.
@@ -232,7 +235,7 @@ function ChatView({
             type="button"
             className="underline"
             onClick={() => {
-              go(`/bots/${encodeURIComponent(botId)}`);
+              go(botPath(hostId, botId));
             }}
           >
             Any lane

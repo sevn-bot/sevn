@@ -14,6 +14,7 @@ import { BriefPage } from "./fleet/BriefPage.tsx";
 import { Dashboard } from "./fleet/Dashboard.tsx";
 import { SharePage } from "./fleet/SharePage.tsx";
 import { Approvals } from "./hosts/Approvals.tsx";
+import { type HostClient, HostClientProvider } from "./hosts/HostClient.tsx";
 import { HostSidebar } from "./hosts/HostSidebar.tsx";
 import { Inbox } from "./hosts/Inbox.tsx";
 import {
@@ -29,9 +30,11 @@ import {
 } from "./pairing/PairingPage.tsx";
 import {
   agentPath,
+  botPath,
   devicesPath,
   fleetPath,
   go,
+  hostBotPath,
   isBriefPath,
   pairingPath,
   routeFromPath,
@@ -224,6 +227,19 @@ function OwnerApp() {
     <PairingPage pair={pairHost} />
   ) : path === fleetPath ? (
     <Dashboard />
+  ) : route.botId !== null &&
+    route.hostId !== null &&
+    route.hostId !== hostId ? (
+    <RemoteChat
+      hostId={route.hostId}
+      botId={route.botId}
+      agentId={route.agentId}
+      client={multiHost.client(route.hostId)}
+      name={
+        multiHost.views.find((view) => view.host_id === route.hostId)?.name ??
+        null
+      }
+    />
   ) : route.botId !== null ? (
     <Chat key={route.botId} botId={route.botId} agentId={route.agentId} />
   ) : multi ? (
@@ -271,13 +287,15 @@ function OwnerApp() {
                 reachable: view.reachable,
                 bots: view.bots,
                 removable: !view.local,
-                pickable: view.local,
                 ...(view.problem === undefined
                   ? {}
                   : { problem: view.problem }),
               }))}
-              onPick={(_hostId, botId) => {
-                go(`/bots/${encodeURIComponent(botId)}`);
+              onPick={(pickedHost, botId) => {
+                const local = multiHost.views.find(
+                  (view) => view.host_id === pickedHost,
+                )?.local;
+                go(botPath(local === false ? pickedHost : null, botId));
               }}
               onForget={(hostId) => {
                 void multiHost.forget(hostId);
@@ -308,6 +326,39 @@ function OwnerApp() {
   );
 }
 
+/** A bot's chat on a paired host: Chat talks to that host's connection only. */
+function RemoteChat({
+  hostId,
+  botId,
+  agentId,
+  client,
+  name,
+}: {
+  hostId: string;
+  botId: string;
+  agentId: string | null;
+  client: HostClient | null;
+  name: string | null;
+}) {
+  if (client === null) {
+    return (
+      <p className="text-sm text-zinc-400">
+        {name === null ? "Connecting…" : `Connecting to ${name}…`}
+      </p>
+    );
+  }
+  return (
+    <HostClientProvider client={client}>
+      <Chat
+        key={`${hostId}|${botId}`}
+        hostId={hostId}
+        botId={botId}
+        agentId={agentId}
+      />
+    </HostClientProvider>
+  );
+}
+
 /** Home with paired hosts (plan 0055 D9): one Inbox and one Approvals across hosts. */
 function MultiHostHome({ views }: { views: HostView[] }) {
   const hosts = views.map((view) => ({
@@ -315,13 +366,14 @@ function MultiHostHome({ views }: { views: HostView[] }) {
     name: view.name,
     available: view.available,
     waiting: view.waiting,
-    openable: view.local,
   }));
-  const open = (
-    _hostId: string,
-    item: { bot_id: string; agent_id: string },
-  ) => {
-    go(agentPath(item.bot_id, item.agent_id));
+  const open = (hostId: string, item: { bot_id: string; agent_id: string }) => {
+    const local = views.find((view) => view.host_id === hostId)?.local;
+    go(
+      local === false
+        ? `${hostBotPath(hostId, item.bot_id)}/agents/${encodeURIComponent(item.agent_id)}`
+        : agentPath(item.bot_id, item.agent_id),
+    );
   };
   return (
     <>

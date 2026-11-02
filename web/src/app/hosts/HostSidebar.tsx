@@ -7,8 +7,6 @@ export type SidebarHost = {
   problem?: string;
   /** Set for paired hosts: forget this host (revokes this device there first). */
   removable?: boolean;
-  /** False when this window cannot open the host's bots (default true). */
-  pickable?: boolean;
 };
 
 /**
@@ -61,7 +59,7 @@ export function HostSidebar({
             <ul className="space-y-0.5 pl-4 text-sm">
               {host.bots.map((bot) => (
                 <li key={bot.id}>
-                  {onPick === undefined || host.pickable === false ? (
+                  {onPick === undefined ? (
                     <span>{bot.name}</span>
                   ) : (
                     <button

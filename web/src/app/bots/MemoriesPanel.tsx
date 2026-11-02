@@ -1,8 +1,11 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import type { MethodResult } from "../../client/connection.ts";
-import { createQueryClient, useCall } from "../../client/hooks.ts";
-import { call } from "../../client/index.ts";
+import {
+  createQueryClient,
+  useCall,
+  useHostClient,
+} from "../../client/hooks.ts";
 
 type Memory = MethodResult["memories.list"]["memories"][number];
 
@@ -44,27 +47,31 @@ function MemoryRow({
   memory: Memory;
   onChanged: () => void;
 }) {
+  const host = useHostClient();
   const [text, setText] = useState(memory.text);
   const pinned = memory.tier === "pinned";
 
   function pin(): void {
     const tier = pinned ? "recall" : undefined;
-    void call(
-      "memories.pin",
-      tier === undefined ? { id: memory.id } : { id: memory.id, tier },
-    )
+    void host
+      .call(
+        "memories.pin",
+        tier === undefined ? { id: memory.id } : { id: memory.id, tier },
+      )
       .then(onChanged)
       .catch(() => undefined);
   }
 
   function remove(): void {
-    void call("memories.delete", { id: memory.id })
+    void host
+      .call("memories.delete", { id: memory.id })
       .then(onChanged)
       .catch(() => undefined);
   }
 
   function save(): void {
-    void call("memories.update", { id: memory.id, text })
+    void host
+      .call("memories.update", { id: memory.id, text })
       .then(onChanged)
       .catch(() => undefined);
   }

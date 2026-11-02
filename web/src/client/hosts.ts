@@ -6,6 +6,7 @@
  */
 import {
   type Connection,
+  type HostClient,
   type MethodName,
   type MethodParams,
   type MethodResult,
@@ -39,7 +40,11 @@ export type Hosts = {
     method: M,
     params: MethodParams[M],
   ) => Promise<MethodResult[M]>;
+  /** One host's calls, events and ticks (the same object for the same host). */
+  client: (hostId: string) => HostClient;
 };
+
+type TickHandler = (data: Record<string, unknown>) => void;
 
 type Entry = {
   profile: HostProfile;
@@ -47,6 +52,8 @@ type Entry = {
   status: HostStatus;
   error: Error | null;
   lastSeq: number;
+  /** Tick subscriptions; re-attached to every new connection of this host. */
+  ticks: { kind: string; handler: TickHandler }[];
 };
 
 /** Statuses the client never leaves on its own: the user has to act (re-pair, fix the URL). */
@@ -69,6 +76,7 @@ export function createHosts(options: {
       status: "idle",
       error: null,
       lastSeq: 0,
+      ticks: [],
     });
   }
   const handlers: HostEventHandler[] = [];
@@ -113,6 +121,9 @@ export function createHosts(options: {
       },
     });
     entry.connection = connection;
+    for (const tick of entry.ticks) {
+      connection.onTick(tick.kind, tick.handler);
+    }
     connection.onStatus((next) => {
       if (entry.connection === connection) {
         setStatus(entry, next);
@@ -159,7 +170,48 @@ export function createHosts(options: {
     }
   }
 
-  return {
+  const clients = new Map<string, HostClient>();
+
+  function hostClient(hostId: string): HostClient {
+    const known = clients.get(hostId);
+    if (known !== undefined) {
+      return known;
+    }
+    const made: HostClient = {
+      call: (method, params) => api.call(hostId, method, params),
+      onEvent: (handler) =>
+        api.onEvent((from, event) => {
+          if (from === hostId) {
+            handler(event);
+          }
+        }),
+      onTick: (kind, handler) => {
+        const entry = entries.get(hostId);
+        if (entry === undefined) {
+          return () => undefined;
+        }
+        // A wrapper per subscription, so the same handler twice unsubscribes once each.
+        const tick = {
+          kind,
+          handler: (data: Record<string, unknown>) => handler(data),
+        };
+        entry.ticks.push(tick);
+        entry.connection?.onTick(kind, tick.handler);
+        return () => {
+          const index = entry.ticks.indexOf(tick);
+          if (index >= 0) {
+            entry.ticks.splice(index, 1);
+          }
+          entry.connection?.offTick(kind, tick.handler);
+        };
+      },
+    };
+    clients.set(hostId, made);
+    return made;
+  }
+
+  const api: Hosts = {
+    client: hostClient,
     start() {
       if (!running && typeof document !== "undefined") {
         document.addEventListener("visibilitychange", onVisibility);
@@ -217,4 +269,5 @@ export function createHosts(options: {
       return entry.connection.call(method, params);
     },
   };
+  return api;
 }

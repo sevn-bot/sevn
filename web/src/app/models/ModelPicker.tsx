@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { useCall } from "../../client/hooks.ts";
-import { call } from "../../client/index.ts";
+import { useCall, useHostClient } from "../../client/hooks.ts";
 
 export function ModelPicker({
   botId,
@@ -9,6 +8,7 @@ export function ModelPicker({
   botId: string;
   model: string;
 }) {
+  const host = useHostClient();
   const models = useCall("models.list", {});
   const listed = models.data?.models ?? [];
   const [chosen, setChosen] = useState(model);
@@ -26,9 +26,9 @@ export function ModelPicker({
     if (next === "") {
       return;
     }
-    void call("bots.update", { bot_id: botId, model: next }).catch(
-      () => undefined,
-    );
+    void host
+      .call("bots.update", { bot_id: botId, model: next })
+      .catch(() => undefined);
   }
 
   return (
