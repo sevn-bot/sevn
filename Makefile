@@ -116,3 +116,15 @@ image:
 
 image-ubuntu:
 	docker build -f deploy/Dockerfile.ubuntu -t sevn:$(IMAGE_VERSION)-ubuntu .
+
+# Release wheel (plan 0025 D3): the SPA goes into host/src/sevn/_web, then
+# dist/sevn-<version>-py3-none-any.whl and dist/SHA256SUMS. release.yml runs
+# the same steps on a v* tag.
+.PHONY: wheel
+
+wheel: build-web
+	rm -f dist/sevn-*.whl dist/SHA256SUMS
+	uv build --package sevn --wheel --out-dir dist
+	uv run --no-project python -c "import glob, sys, zipfile; whl = glob.glob('dist/sevn-*-py3-none-any.whl'); sys.exit(None if len(whl) == 1 and 'sevn/_web/index.html' in zipfile.ZipFile(whl[0]).namelist() else 'the wheel has no sevn/_web/index.html')"
+	cd dist && if command -v sha256sum >/dev/null 2>&1; then sha256sum sevn-*-py3-none-any.whl; else shasum -a 256 sevn-*-py3-none-any.whl; fi > SHA256SUMS
+	cat dist/SHA256SUMS
