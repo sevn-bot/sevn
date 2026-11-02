@@ -13,8 +13,6 @@ from typing import Any
 import pytest
 from support.repo import repo_root
 
-pytestmark = pytest.mark.xfail(strict=False, reason="green after W5")
-
 _COMPOSE = repo_root() / "deploy" / "compose.yaml"
 _SERVE = repo_root() / "deploy" / "tailscale" / "serve.json"
 _UPSTREAM = "http://127.0.0.1:8787"

@@ -50,13 +50,12 @@ def test_ci_workflow_runs_make_ci_without_secrets() -> None:
 
 # --- plan 0025: Linux images (D8, D9, W5) ------------------------------------
 
-_W5 = pytest.mark.xfail(strict=False, reason="green after W5")
 _RUNTIMES_DIR = "/opt/sevn/runtimes"
 _CMD = '["sevn", "serve", "--host", "0.0.0.0", "--port", "8787", "--allow-remote-bind"]'
 _HEALTH = "CMD curl -fsS http://127.0.0.1:8787/health || exit 1"
 _IMAGES = [
     pytest.param("Dockerfile", id="debian"),
-    pytest.param("Dockerfile.ubuntu", id="ubuntu", marks=_W5),
+    pytest.param("Dockerfile.ubuntu", id="ubuntu"),
 ]
 
 
@@ -99,26 +98,14 @@ def _installed_packages(lines: list[str]) -> set[str]:
     return packages
 
 
-@pytest.mark.parametrize(
-    "name",
-    [
-        pytest.param("Dockerfile", id="debian", marks=_W5),
-        pytest.param("Dockerfile.ubuntu", id="ubuntu", marks=_W5),
-    ],
-)
+@pytest.mark.parametrize("name", _IMAGES)
 def test_images_install_bubblewrap_git_and_certificates(name: str) -> None:
     _from, lines = _final(_dockerfile(name))
     packages = _installed_packages(lines)
     assert {"bubblewrap", "git", "ca-certificates", "curl"} <= packages, packages
 
 
-@pytest.mark.parametrize(
-    "name",
-    [
-        pytest.param("Dockerfile", id="debian", marks=_W5),
-        pytest.param("Dockerfile.ubuntu", id="ubuntu", marks=_W5),
-    ],
-)
+@pytest.mark.parametrize("name", _IMAGES)
 def test_runtimes_stage_writes_opt_sevn_runtimes(name: str) -> None:
     stages = _stages(_dockerfile(name))
     named = [(head, lines) for head, lines in stages if re.search(r"(?i)\sAS\s+runtimes\s*$", head)]
@@ -137,13 +124,7 @@ def test_runtimes_stage_writes_opt_sevn_runtimes(name: str) -> None:
     )
 
 
-@pytest.mark.parametrize(
-    "name",
-    [
-        pytest.param("Dockerfile", id="debian", marks=_W5),
-        pytest.param("Dockerfile.ubuntu", id="ubuntu", marks=_W5),
-    ],
-)
+@pytest.mark.parametrize("name", _IMAGES)
 def test_runtimes_are_read_only_to_the_sevn_user(name: str) -> None:
     _from, final = _final(_dockerfile(name))
     assert any("--from=runtimes" in line for line in final), final
@@ -172,7 +153,6 @@ def test_image_keeps_user_volume_healthcheck_and_cmd(name: str) -> None:
     assert cmds[-1] == f"CMD {_CMD}"
 
 
-@_W5
 def test_ubuntu_image_is_ubuntu_24_04_with_uv_python() -> None:
     text = _dockerfile("Dockerfile.ubuntu")
     head, final = _final(text)
@@ -180,7 +160,6 @@ def test_ubuntu_image_is_ubuntu_24_04_with_uv_python() -> None:
     assert re.search(r"uv\s+python\s+install\s+[^\n]*3\.13", "\n".join(final))
 
 
-@_W5
 @pytest.mark.parametrize(
     ("target", "dockerfile", "tag"),
     [("image", "deploy/Dockerfile", None), ("image-ubuntu", "deploy/Dockerfile.ubuntu", "-ubuntu")],
