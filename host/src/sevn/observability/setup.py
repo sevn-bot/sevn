@@ -15,6 +15,7 @@ import threading
 import time
 from collections.abc import Callable, Generator, Mapping, Sequence
 from contextlib import contextmanager
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from urllib.parse import urljoin, urlsplit
 
@@ -74,15 +75,25 @@ def choose_exporter(settings: Settings) -> ExporterName:
 class ObservabilityHandle:
     """What ``setup`` installed. ``shutdown`` flushes within ``SHUTDOWN_CAP_S``."""
 
-    def __init__(self, exporter: ExporterName, close: Callable[[], object] | None = None) -> None:
+    def __init__(
+        self,
+        exporter: ExporterName,
+        close: Callable[[], object] | None = None,
+        notice: FailureNotice | None = None,
+    ) -> None:
         self._exporter: ExporterName = exporter
         self._close = close
+        self._notice = notice
         self._lock = threading.Lock()
         self._closed = False
 
     @property
     def exporter(self) -> ExporterName:
         return self._exporter
+
+    def last_export(self, signal: str) -> ExportResult | None:
+        """The latest export result for ``signal`` (``traces``, ``logs``, ``metrics``), if any."""
+        return None if self._notice is None else self._notice.result(signal)
 
     def shutdown(self) -> None:
         """Flush and stop the exporters. Idempotent, never raises, never blocks past the cap."""
@@ -166,7 +177,7 @@ def _setup_otlp(settings: Settings, identity: HostIdentity) -> ObservabilityHand
         ),
     )
     trace.set_tracer_provider(provider)
-    return ObservabilityHandle("otlp", close=close)
+    return ObservabilityHandle("otlp", close=close, notice=notice)
 
 
 def _otlp_span_exporter(target: ExportTarget, headers: dict[str, str]) -> SpanExporter:
@@ -279,7 +290,7 @@ def _setup_logfire(settings: Settings, identity: HostIdentity) -> ObservabilityH
         ),
     )
     trace.set_tracer_provider(instance.config.get_tracer_provider())
-    return ObservabilityHandle("logfire", close=close)
+    return ObservabilityHandle("logfire", close=close, notice=notice)
 
 
 def _close_logfire(instance: Logfire) -> None:
@@ -394,17 +405,39 @@ def _quiet_otel_loggers() -> None:
         logging.getLogger(name).setLevel(logging.CRITICAL)
 
 
+@dataclass(frozen=True, slots=True)
+class ExportResult:
+    """One export attempt's outcome; ``detail`` says why it failed."""
+
+    ok: bool
+    detail: str = ""
+
+
 class FailureNotice:
-    """One WARNING per ``_WARN_EVERY_S`` for the exporters one ``setup`` call built (D12)."""
+    """One WARNING per ``_WARN_EVERY_S`` for the exporters one ``setup`` call built (D12).
+
+    It also keeps the latest result per signal, so ``sevn traces test`` and
+    ``sevn doctor --check`` can tell whether the collector accepted an export.
+    """
 
     def __init__(self, clock: Callable[[], float] = time.monotonic) -> None:
         self._clock = clock
         self._lock = threading.Lock()
         self._last: float | None = None
+        self._results: dict[str, ExportResult] = {}
+
+    def succeeded(self, signal: str) -> None:
+        with self._lock:
+            self._results[signal] = ExportResult(ok=True)
+
+    def result(self, signal: str) -> ExportResult | None:
+        with self._lock:
+            return self._results.get(signal)
 
     def report(self, signal: str, host: str, detail: str) -> None:
         now = self._clock()
         with self._lock:
+            self._results[signal] = ExportResult(ok=False, detail=detail)
             if self._last is not None and now - self._last < _WARN_EVERY_S:
                 return
             self._last = now
@@ -432,7 +465,9 @@ class _ReportingExporter(SpanExporter):
         except Exception as exc:  # noqa: BLE001 — a failed export is dropped, not raised
             self._notice.report(self._signal, self._host, type(exc).__name__)
             return SpanExportResult.FAILURE
-        if result is not SpanExportResult.SUCCESS:
+        if result is SpanExportResult.SUCCESS:
+            self._notice.succeeded(self._signal)
+        else:
             self._notice.report(self._signal, self._host, "rejected or unreachable")
         return result
 
@@ -473,6 +508,7 @@ def uninstrument_fastapi(app: FastAPI) -> None:
 __all__ = [
     "LOGFIRE_TOKEN_SECRET",
     "SHUTDOWN_CAP_S",
+    "ExportResult",
     "FailureNotice",
     "ObservabilityHandle",
     "choose_exporter",
