@@ -13,13 +13,15 @@ import pytest
 from fakes.fake_ollama import FakeOllama
 from support.canary import canary
 from support.chat import connected, insert_job, load_modules, mint_id, ok, request
-from support.observability import arm_observability, otlp_section, start_observability
+from support.observability import (
+    arm_observability,
+    otlp_section,
+    start_observability,
+    write_observability_config,
+)
 from support.spans import OtlpReceiver, dead_port
 
-pytestmark = [
-    pytest.mark.usefixtures("otel_clean"),
-    pytest.mark.xfail(reason="green after W4: logs and host metrics", strict=False),
-]
+pytestmark = pytest.mark.usefixtures("otel_clean")
 
 _GAUGES = ("sevn.jobs.queued", "sevn.turns.running", "sevn.agents.open", "sevn.ollama.reachable")
 
@@ -177,12 +179,16 @@ async def test_gauges_report_queue_running_and_ollama(
     from sevn.domain.agents import AgentService
 
     metrics = importlib.import_module("sevn.observability.metrics")
-    arm_observability(monkeypatch, tmp_path, otlp_section(otlp_receiver.url))
+    section = otlp_section(otlp_receiver.url)
+    arm_observability(monkeypatch, tmp_path, section)
     load_modules("sevn.api.bots")
     with FakeOllama("{}") as ollama:
         url = ollama.url if ollama_up else f"http://127.0.0.1:{dead_port()}"
-        monkeypatch.setenv("SEVN_OLLAMA_URL", url)
         async with connected(tmp_path, monkeypatch) as (_host, client):
+            # ``connected`` rewrites config.toml and clears SEVN_OLLAMA_URL when it
+            # opens; set both again before setup and the sample read them.
+            write_observability_config(tmp_path, section)
+            monkeypatch.setenv("SEVN_OLLAMA_URL", url)
             frame, _earlier = await request(
                 client, "bots.create", {"name": "Nimbus", "op_id": mint_id("op_")}
             )
@@ -193,6 +199,7 @@ async def test_gauges_report_queue_running_and_ollama(
                     tmp_path, bot_id=str(bot["id"]), agent_id=agent.id, text=f"wait {index}"
                 )
             handle = start_observability()
+            assert handle.exporter == "otlp"
             try:
                 await metrics.sample()
             finally:

@@ -61,6 +61,17 @@ def arm_observability(
     for key in list(os.environ):
         if key.startswith(_SETTINGS_PREFIX):
             monkeypatch.delenv(key, raising=False)
+    write_observability_config(home, section, extra=extra)
+    arm_home(monkeypatch, home)
+
+
+def write_observability_config(home: Path, section: str = "", *, extra: str = "") -> None:
+    """Write ``config.toml`` with ``[secrets]``, ``extra`` and an ``[observability]`` table.
+
+    ``support.memory.memory_host`` (under ``support.chat.connected``) rewrites
+    ``config.toml`` when it opens, so a test that needs these tables in a live
+    in-process host calls this again inside the ``connected`` block.
+    """
     home.mkdir(parents=True, exist_ok=True)
     text = '[secrets]\nbackend = "age-file"\n'
     if extra:
@@ -68,7 +79,6 @@ def arm_observability(
     if section:
         text += "\n[observability]\n" + section.strip() + "\n"
     (home / "config.toml").write_text(text, encoding="utf-8")
-    arm_home(monkeypatch, home)
 
 
 def otlp_section(endpoint: str, *lines: str) -> str:
@@ -144,4 +154,5 @@ __all__ = [
     "start_observability",
     "store_secret",
     "warning_texts",
+    "write_observability_config",
 ]

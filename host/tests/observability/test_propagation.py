@@ -15,13 +15,16 @@ import pytest
 from fakes.fake_claude import FakeClaudeClient
 from support.canary import canary
 from support.chat import connected, load_modules, mint_id, ok, poll_rows, request
-from support.observability import arm_observability, fake_logfire_token, otlp_section, store_secret
+from support.observability import (
+    arm_observability,
+    fake_logfire_token,
+    otlp_section,
+    store_secret,
+    write_observability_config,
+)
 from support.spans import named, one, traceparent_of, wait_spans
 
-pytestmark = [
-    pytest.mark.usefixtures("otel_clean"),
-    pytest.mark.xfail(reason="green after W4: trace context for cli runtimes", strict=False),
-]
+pytestmark = pytest.mark.usefixtures("otel_clean")
 
 _OTEL_KEYS = (
     "OTEL_EXPORTER_OTLP_ENDPOINT",
@@ -55,8 +58,16 @@ def _span(name: str = "turn") -> Any:
 
 
 async def _claude_turn(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fake: FakeClaudeClient
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    fake: FakeClaudeClient,
+    section: str = "",
 ) -> None:
+    """One Claude turn through the protocol. ``section`` is the ``[observability]`` table.
+
+    ``connected`` rewrites ``config.toml`` when the host opens, so the table is
+    written again inside the block, before the turn reads its settings.
+    """
     from sevn.runtime.runtimes.claude import use_client
     from sevn.runtime.worker import bind
 
@@ -64,6 +75,7 @@ async def _claude_turn(
     load_modules("sevn.api.bots", "sevn.api.messages")
     try:
         async with connected(tmp_path, monkeypatch) as (host, client):
+            write_observability_config(tmp_path, section)
             bind(host.hub)
             frame, _earlier = await request(
                 client,
@@ -280,9 +292,10 @@ async def test_claude_runtime_gets_loopback_collector_env(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, span_exporter: Any
 ) -> None:
     _propagate()
-    arm_observability(monkeypatch, tmp_path, otlp_section("http://127.0.0.1:4318"))
+    section = otlp_section("http://127.0.0.1:4318")
+    arm_observability(monkeypatch, tmp_path, section)
     fake = FakeClaudeClient(script=_CLAUDE_SCRIPT)
-    await _claude_turn(tmp_path, monkeypatch, fake)
+    await _claude_turn(tmp_path, monkeypatch, fake, section)
     await wait_spans(span_exporter, lambda found: bool(named(found, "turn")))
     env = _connect_env(fake)
     assert env["OTEL_EXPORTER_OTLP_ENDPOINT"] == "http://127.0.0.1:4318"
@@ -295,21 +308,22 @@ async def test_claude_runtime_child_env_holds_no_export_credential(
 ) -> None:
     """K-CANARY: the token and header secret stay out of the Claude CLI env."""
     _propagate()
-    arm_observability(
-        monkeypatch,
-        tmp_path,
-        otlp_section("http://127.0.0.1:4318", 'headers = { "x-api-key" = "secret://ops/otlp" }'),
+    section = otlp_section(
+        "http://127.0.0.1:4318", 'headers = { "x-api-key" = "secret://ops/otlp" }'
     )
+    arm_observability(monkeypatch, tmp_path, section)
     # A token in the parent env must not ride along either.
     monkeypatch.setenv("LOGFIRE_TOKEN", fake_logfire_token())
     with canary() as probe:
         store_secret("ops/otlp", probe.value)
         store_secret("logfire/token", probe.value)
         fake = FakeClaudeClient(script=_CLAUDE_SCRIPT)
-        await _claude_turn(tmp_path, monkeypatch, fake)
+        await _claude_turn(tmp_path, monkeypatch, fake, section)
         await wait_spans(span_exporter, lambda found: bool(named(found, "turn")))
         env = _connect_env(fake)
         assert "TRACEPARENT" in env
+        # The loopback collector is configured, so the turn did read this config.
+        assert env["OTEL_EXPORTER_OTLP_ENDPOINT"] == "http://127.0.0.1:4318"
         assert "OTEL_EXPORTER_OTLP_HEADERS" not in env
         assert env.get("LOGFIRE_TOKEN", "") == ""
         assert all(probe.value not in value for value in env.values())
