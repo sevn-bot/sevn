@@ -302,10 +302,6 @@ async def test_list_bots_ordered_by_updated_desc(
         assert ids == [first["id"], second["id"]]
 
 
-@pytest.mark.xfail(
-    reason="green after W3: alembic head moves to 0010_trace_context (plan 0015)",
-    strict=False,
-)
 def test_migrations_single_head() -> None:
     completed = subprocess.run(
         ["make", "--no-print-directory", "db-heads"],  # noqa: S607
@@ -321,10 +317,6 @@ def test_migrations_single_head() -> None:
     assert "(head)" in lines[0]
 
 
-@pytest.mark.xfail(
-    reason="green after W3: alembic head moves to 0010_trace_context (plan 0015)",
-    strict=False,
-)
 def test_upgrade_from_0001_reaches_head(tmp_path: Path) -> None:
     from alembic import command
     from alembic.config import Config

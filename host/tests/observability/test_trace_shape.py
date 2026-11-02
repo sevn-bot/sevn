@@ -52,10 +52,7 @@ from support.spans import (
     wait_spans,
 )
 
-pytestmark = [
-    pytest.mark.usefixtures("otel_clean"),
-    pytest.mark.xfail(reason="green after W3: one trace per message, job to tool", strict=False),
-]
+pytestmark = pytest.mark.usefixtures("otel_clean")
 
 _PREVIOUS_HEAD = "0005_metrics_shares"
 _HEAD = "0010_trace_context"

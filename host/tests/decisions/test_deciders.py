@@ -875,10 +875,6 @@ def test_core_modules_import_no_feature_modules() -> None:
         assert offenders == [], f"{path.name} imports feature modules: {offenders}"
 
 
-@pytest.mark.xfail(
-    reason="green after W3: alembic head moves to 0010_trace_context (plan 0015)",
-    strict=False,
-)
 def test_migrations_single_head() -> None:
     completed = subprocess.run(
         ["make", "db-heads"],  # noqa: S607 — the repo Makefile target CI runs
