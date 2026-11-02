@@ -20,8 +20,6 @@ from fakes.fake_keyring import FakeKeyring
 from support.canary import canary
 from support.chat import connected, error_body, load_modules, mint_id, ok, request
 
-_WV_R = pytest.mark.xfail(strict=False, reason="green after WV-R")
-
 _STATES = [
     pytest.param("locked", "secrets_locked", id="locked"),
     pytest.param("unavailable", "secrets_unavailable", id="unavailable"),
@@ -91,7 +89,6 @@ def logs() -> Iterator[_Logs]:
 # --- protocol calls ----------------------------------------------------------
 
 
-@_WV_R
 @pytest.mark.parametrize(("state", "code"), _STATES)
 async def test_models_list_reports_a_typed_secrets_error(
     tmp_path: Path,
@@ -113,7 +110,6 @@ async def test_models_list_reports_a_typed_secrets_error(
         assert isinstance(ok(recovered)["models"], list)
 
 
-@_WV_R
 @pytest.mark.parametrize(("state", "code"), _STATES)
 async def test_bots_create_reports_a_typed_secrets_error(
     tmp_path: Path,
@@ -155,7 +151,6 @@ def test_resolving_a_keyed_model_fails_typed(
     assert caught.value.code == code
 
 
-@_WV_R
 @pytest.mark.parametrize(("state", "_code"), _STATES)
 def test_cheapest_configured_model_treats_the_store_as_unavailable(
     tmp_path: Path,
@@ -200,7 +195,6 @@ def _context() -> Any:
     )
 
 
-@_WV_R
 @pytest.mark.parametrize(("state", "code"), _STATES)
 async def test_jev_routing_treats_the_store_as_unavailable(
     jev_home: Any, ring: FakeKeyring, logs: _Logs, state: str, code: str
@@ -243,3 +237,43 @@ async def test_jev_still_uses_the_key_when_the_store_answers(
     client = await jev_home._resolve_client()
     assert client is not None
     assert seen == [key]
+
+
+# --- CLI: a failing store exits 1 with the code (beyond D13, 1c6328b) ---------
+
+
+@pytest.mark.parametrize(("state", "code"), _STATES)
+@pytest.mark.parametrize(
+    "args",
+    [["secret", "set", "provider/openai"], ["secret", "list"], ["secret", "rm", "provider/openai"]],
+    ids=["set", "list", "rm"],
+)
+def test_secret_cli_reports_a_failing_store(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    ring: FakeKeyring,
+    args: list[str],
+    state: str,
+    code: str,
+) -> None:
+    from sevn.cli import app
+    from sevn.config import Settings
+    from sevn.paths import Paths
+    from sevn.secrets.backends import open_backend
+    from typer.testing import CliRunner
+
+    _arm(tmp_path, monkeypatch)
+    stored = secrets.token_urlsafe(16)
+    open_backend(Settings.load(), Paths.from_env()).set("provider/openai", stored)
+    fresh = secrets.token_urlsafe(16)
+    monkeypatch.setattr("getpass.getpass", lambda *_a, **_k: fresh)
+    _break(ring, state)
+
+    result = CliRunner().invoke(app, args)
+    output = f"{result.output}\n{getattr(result, 'stderr', '') or ''}"
+    assert result.exit_code == 1, output
+    assert code in output
+    assert "Traceback" not in output
+    assert result.exception is None or isinstance(result.exception, SystemExit)
+    assert stored not in output
+    assert fresh not in output

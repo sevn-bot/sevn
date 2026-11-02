@@ -530,7 +530,6 @@ _KALI = 'NAME="Kali GNU/Linux"\nVERSION_ID="2025.1"\nID=kali\nID_LIKE=debian\n'
 _ROCKY = 'NAME="Rocky Linux"\nVERSION_ID="9.4"\nID="rocky"\nID_LIKE="rhel centos fedora"\n'
 
 
-@pytest.mark.xfail(strict=False, reason="green after WV-R")
 @pytest.mark.parametrize(
     ("os_release", "expected"),
     [

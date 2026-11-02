@@ -334,14 +334,13 @@ def test_unsupported_platform_is_refused(
 
 # --- WV F2: an unchanged reinstall restarts a running service (D13) ----------
 
-_WV_R = pytest.mark.xfail(strict=False, reason="green after WV-R")
 _SHOW = "LoadState=loaded\nActiveState={active}\nSubState={sub}\nExecMainStatus=0\n"
 
 
 @pytest.mark.parametrize(
     ("active", "sub", "restarted"),
     [
-        pytest.param("active", "running", True, marks=_WV_R),
+        ("active", "running", True),
         ("inactive", "dead", False),
         ("failed", "failed", False),
     ],

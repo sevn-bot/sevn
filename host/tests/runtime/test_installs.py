@@ -1048,7 +1048,6 @@ def test_install_never_touches_credential_dirs(
 
 # --- WV F4: a read-only runtimes root fails typed (D13) -----------------------
 
-_WV_R = pytest.mark.xfail(strict=False, reason="green after WV-R")
 _needs_non_root = pytest.mark.skipif(
     hasattr(os, "geteuid") and os.geteuid() == 0, reason="root ignores directory permissions"
 )
@@ -1072,7 +1071,6 @@ def freeze() -> Iterator[Any]:
             path.chmod(0o755)
 
 
-@_WV_R
 @_needs_non_root
 def test_install_into_a_read_only_root_fails_typed(
     env: Env, server: FileServer, use_manifest: Any, freeze: Any
@@ -1091,7 +1089,6 @@ def test_install_into_a_read_only_root_fails_typed(
     assert list(env.root.iterdir()) == []
 
 
-@_WV_R
 @_needs_non_root
 def test_remove_from_a_read_only_root_fails_typed(
     env: Env, server: FileServer, use_manifest: Any, freeze: Any
@@ -1108,7 +1105,6 @@ def test_remove_from_a_read_only_root_fails_typed(
     assert (env.root / "opencode" / "1.0.0" / "opencode").is_file()
 
 
-@_WV_R
 @_needs_non_root
 @pytest.mark.parametrize("command", ["install", "remove"])
 def test_cli_reports_a_read_only_root(

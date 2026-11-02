@@ -259,13 +259,11 @@ def test_logs_without_a_log_names_the_path(mac_host: MacHost) -> None:
 
 # --- WV F2: an unchanged reinstall restarts a running service (D13) ----------
 
-_WV_R = pytest.mark.xfail(strict=False, reason="green after WV-R")
-
 
 @pytest.mark.parametrize(
     ("state", "code", "restarted"),
     [
-        pytest.param("running", "(never exited)", True, marks=_WV_R),
+        ("running", "(never exited)", True),
         ("not running", "0", False),
         ("not running", "3", False),
     ],
