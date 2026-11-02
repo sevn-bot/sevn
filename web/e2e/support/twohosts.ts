@@ -54,13 +54,14 @@ async function waitForHealth(port: number): Promise<void> {
 
 function env(home: string): NodeJS.ProcessEnv {
   const clean = { ...process.env };
-  delete clean.SEVN_DEV;
   delete clean.SEVN_ALLOWED_HOSTS;
   return {
     ...clean,
     SEVN_HOME: home,
     SEVN_WEB_DIST: path.join(repo, "web", "dist"),
     SEVN_SECRETS__BACKEND: "age-file",
+    // The echo test model needs both flags (sevn.runtime.models.echo_enabled).
+    SEVN_DEV: "1",
     SEVN_TEST_MODEL: "echo",
     SEVN_WORKSPACES: path.join(home, "workspaces"),
   };

@@ -11,16 +11,20 @@ import {
 
 /**
  * Plan 0055 W6 follow-up (WV.1): chat with a bot on each host from one window.
- * Gated: green after W6 follow-up (per-host chat); runs only with SEVN_RUN_MARKED=1.
+ *
+ * Host B is paired as `member`. Gated until the pending member-scope decision lands: today
+ * `messages.send` is owner-only, so the member send is refused `forbidden`. Both options under
+ * decision make `messages.send` member-callable; then remove this gate. Runs only with
+ * SEVN_RUN_MARKED=1.
  */
 const RUN_MARKED = process.env.SEVN_RUN_MARKED === "1";
 
 test.use({ launchOptions: { args: RESOLVER_ARGS } });
 
-test.describe("per-host chat [green after W6 follow-up: per-host chat]", () => {
+test.describe("per-host chat [green after member scopes allow messages.send]", () => {
   test.skip(
     !RUN_MARKED,
-    "green after W6 follow-up: per-host chat (set SEVN_RUN_MARKED=1)",
+    "green after the member-scope change makes messages.send member-callable (set SEVN_RUN_MARKED=1)",
   );
   test.setTimeout(90_000);
 
@@ -46,6 +50,29 @@ test.describe("per-host chat [green after W6 follow-up: per-host chat]", () => {
     if (hostA === undefined || hostB === undefined) {
       throw new Error("hosts did not start");
     }
+    // Every `messages.send` answer this page receives, to name a refusal precisely.
+    const sendIds = new Set<string>();
+    const sendErrors: unknown[] = [];
+    page.on("websocket", (socket) => {
+      socket.on("framesent", (event) => {
+        const frame = JSON.parse(String(event.payload)) as Record<
+          string,
+          unknown
+        >;
+        if (frame.t === "req" && frame.m === "messages.send") {
+          sendIds.add(String(frame.id));
+        }
+      });
+      socket.on("framereceived", (event) => {
+        const frame = JSON.parse(String(event.payload)) as Record<
+          string,
+          unknown
+        >;
+        if (frame.t === "res" && sendIds.has(String(frame.id)) && frame.e) {
+          sendErrors.push(frame.e);
+        }
+      });
+    });
     const code = shortCode(hostB);
     await page.goto(
       `${hostA.base}/auth/login?token=${encodeURIComponent(hostA.token)}`,
@@ -71,6 +98,12 @@ test.describe("per-host chat [green after W6 follow-up: per-host chat]", () => {
     const message = page.getByRole("textbox", { name: "Message" });
     await message.fill("hi from A to B");
     await page.getByRole("button", { name: "Send" }).click();
+    // B is paired as `member`: the send must be allowed for that scope.
+    await expect
+      .poll(() => sendIds.size, { timeout: 5_000 })
+      .toBeGreaterThan(0);
+    await page.waitForTimeout(500);
+    expect(sendErrors).toEqual([]);
     await expect(
       page.getByText("echo: hi from A to B", { exact: true }),
     ).toBeVisible({ timeout: 15_000 });

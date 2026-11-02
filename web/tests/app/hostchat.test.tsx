@@ -1,5 +1,5 @@
 import { createElement } from "react";
-import { afterEach, expect, vi } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import { requestParams, startHarness } from "../chat/host.ts";
 import {
   type DirectHost,
@@ -11,7 +11,6 @@ import {
   stubSockets,
   until,
 } from "../support/direct.ts";
-import { red } from "../support/red.ts";
 
 /**
  * Plan 0055 W6 follow-up (WV.1 "chat with a bot on each host from one window"): a remote
@@ -30,7 +29,6 @@ import { red } from "../support/red.ts";
  *   app wraps a remote chat in `HostClientProvider` with it. Remote bots in the sidebar are
  *   pickable and open `hostBotPath(...)`.
  */
-const perHost = red("W6 follow-up: per-host chat");
 
 type ProtocolEvent = { s: number; k: string; d: Record<string, unknown> };
 type HostClient = {
@@ -153,7 +151,7 @@ const remoteReplies = {
   "messages.send": { job_id: "job_b", seq: 2 },
 };
 
-perHost("routes name the host for a remote bot", async () => {
+test("routes name the host for a remote bot", async () => {
   const routes = await load<{
     hostBotPath: (hostId: string, botId: string) => string;
     routeFromPath: (path: string) => {
@@ -180,85 +178,79 @@ perHost("routes name the host for a remote bot", async () => {
   });
 });
 
-perHost(
-  "a chat inside HostClientProvider fetches, sends and listens on that host only",
-  async () => {
-    // The serving host is connected too: nothing from the remote chat may reach it.
-    const local = await startHarness({
-      "messages.list": {
-        messages: [message("msg_local", "local only")],
-        next_cursor: null,
-      },
-      "pending.list": { pending: [] },
+test("a chat inside HostClientProvider fetches, sends and listens on that host only", async () => {
+  // The serving host is connected too: nothing from the remote chat may reach it.
+  const local = await startHarness({
+    "messages.list": {
+      messages: [message("msg_local", "local only")],
+      next_cursor: null,
+    },
+    "pending.list": { pending: [] },
+  });
+  const testing = await import("@testing-library/react");
+  const remote = fakeClient(remoteReplies);
+  try {
+    const { HostClientProvider } = await load<{
+      HostClientProvider: Component;
+    }>("../../src/app/hosts/HostClient.tsx");
+    const { Chat } = await load<{ Chat: Component }>(
+      "../../src/app/chat/Chat.tsx",
+    );
+    testing.render(
+      createElement(
+        HostClientProvider as never,
+        { client: remote.client },
+        createElement(Chat as never, { botId: "bot_remote" }),
+      ),
+    );
+    await testing.screen.findByText("hello from B");
+    expect(testing.screen.queryByText("local only")).toBeNull();
+    const listed = remote.calls.filter((c) => c.method === "messages.list");
+    expect(listed[0]?.params.bot_id).toBe("bot_remote");
+    expect(requestParams(local.requests, "messages.list")).toEqual([]);
+    expect(requestParams(local.requests, "bots.get")).toEqual([]);
+
+    testing.fireEvent.change(await testing.screen.findByLabelText("Message"), {
+      target: { value: "hi B" },
     });
-    const testing = await import("@testing-library/react");
-    const remote = fakeClient(remoteReplies);
-    try {
-      const { HostClientProvider } = await load<{
-        HostClientProvider: Component;
-      }>("../../src/app/hosts/HostClient.tsx");
-      const { Chat } = await load<{ Chat: Component }>(
-        "../../src/app/chat/Chat.tsx",
-      );
-      testing.render(
-        createElement(
-          HostClientProvider as never,
-          { client: remote.client },
-          createElement(Chat as never, { botId: "bot_remote" }),
-        ),
-      );
-      await testing.screen.findByText("hello from B");
-      expect(testing.screen.queryByText("local only")).toBeNull();
-      const listed = remote.calls.filter((c) => c.method === "messages.list");
-      expect(listed[0]?.params.bot_id).toBe("bot_remote");
-      expect(requestParams(local.requests, "messages.list")).toEqual([]);
-      expect(requestParams(local.requests, "bots.get")).toEqual([]);
+    (await testing.screen.findByRole("button", { name: "Send" })).click();
+    await testing.waitFor(() => {
+      expect(
+        remote.calls.filter((c) => c.method === "messages.send").length,
+      ).toBe(1);
+    });
+    const sent = remote.calls.find((c) => c.method === "messages.send");
+    expect(sent?.params).toMatchObject({
+      bot_id: "bot_remote",
+      text: "hi B",
+    });
+    expect(requestParams(local.requests, "messages.send")).toEqual([]);
 
-      testing.fireEvent.change(
-        await testing.screen.findByLabelText("Message"),
-        {
-          target: { value: "hi B" },
-        },
-      );
-      (await testing.screen.findByRole("button", { name: "Send" })).click();
-      await testing.waitFor(() => {
-        expect(
-          remote.calls.filter((c) => c.method === "messages.send").length,
-        ).toBe(1);
-      });
-      const sent = remote.calls.find((c) => c.method === "messages.send");
-      expect(sent?.params).toMatchObject({
-        bot_id: "bot_remote",
-        text: "hi B",
-      });
-      expect(requestParams(local.requests, "messages.send")).toEqual([]);
+    // Live events from B refresh the open chat; events from the serving host do not.
+    const fetches = () =>
+      remote.calls.filter((c) => c.method === "messages.list").length;
+    const before = fetches();
+    local.event("message.created", { bot_id: "bot_remote" });
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(fetches()).toBe(before);
+    remote.emit({ s: 3, k: "message.created", d: { bot_id: "bot_remote" } });
+    await testing.waitFor(() => {
+      expect(fetches()).toBeGreaterThan(before);
+    });
 
-      // Live events from B refresh the open chat; events from the serving host do not.
-      const fetches = () =>
-        remote.calls.filter((c) => c.method === "messages.list").length;
-      const before = fetches();
-      local.event("message.created", { bot_id: "bot_remote" });
-      await new Promise((resolve) => setTimeout(resolve, 200));
-      expect(fetches()).toBe(before);
-      remote.emit({ s: 3, k: "message.created", d: { bot_id: "bot_remote" } });
-      await testing.waitFor(() => {
-        expect(fetches()).toBeGreaterThan(before);
-      });
+    // Streaming ticks come from B too.
+    remote.tick("turn.delta", {
+      turn_id: "turn_live",
+      agent_id: "agent_1",
+      text: "streamed from B",
+    });
+    await testing.screen.findByText("streamed from B", { exact: false });
+  } finally {
+    local.stop();
+  }
+});
 
-      // Streaming ticks come from B too.
-      remote.tick("turn.delta", {
-        turn_id: "turn_live",
-        agent_id: "agent_1",
-        text: "streamed from B",
-      });
-      await testing.screen.findByText("streamed from B", { exact: false });
-    } finally {
-      local.stop();
-    }
-  },
-);
-
-perHost("without a provider the chat still uses the serving host", async () => {
+test("without a provider the chat still uses the serving host", async () => {
   const local = await startHarness({
     "messages.list": {
       messages: [message("msg_local", "local only")],
@@ -334,94 +326,88 @@ async function servingHost(
   return { requests, stop: () => server.stop() };
 }
 
-perHost(
-  "the app opens a remote host's bot from the sidebar and talks to that host",
-  async () => {
-    const mock = await stubSockets();
-    const key = await newHostKey();
-    const url = "ws://100.101.102.2:8787/ws";
-    const made = await makeProfile(
-      { host_id: "host_b", name: "Omarchy", direct_url: url },
+test("the app opens a remote host's bot from the sidebar and talks to that host", async () => {
+  const mock = await stubSockets();
+  const key = await newHostKey();
+  const url = "ws://100.101.102.2:8787/ws";
+  const made = await makeProfile(
+    { host_id: "host_b", name: "Omarchy", direct_url: url },
+    key,
+  );
+  const remoteProfile: HostProfile = made.profile;
+  let remote: DirectHost | undefined;
+  let local: LocalHost | undefined;
+  const testing = await import("@testing-library/react");
+  try {
+    remote = await directHost(mock, {
+      url,
+      hostId: "host_b",
       key,
+      devicePubkey: made.devicePubkey,
+      replies: {
+        ...remoteReplies,
+        "bots.list": { bots: [bot("bot_remote", "Beta on B")] },
+        "fleet.overview": { waiting: [] },
+      },
+    });
+    local = await servingHost(mock);
+    const { profileStore } = await load<{
+      profileStore: () => { put: (profile: HostProfile) => Promise<void> };
+    }>("../../src/app/hosts/useHosts.ts");
+    await profileStore().put(remoteProfile);
+    const app = await load<{ default: Component }>("../../src/app/App.tsx");
+    testing.render(createElement(app.default as never));
+
+    const region = await testing.screen.findByRole(
+      "region",
+      { name: "Omarchy" },
+      { timeout: 4000 },
     );
-    const remoteProfile: HostProfile = made.profile;
-    let remote: DirectHost | undefined;
-    let local: LocalHost | undefined;
-    const testing = await import("@testing-library/react");
-    try {
-      remote = await directHost(mock, {
-        url,
-        hostId: "host_b",
-        key,
-        devicePubkey: made.devicePubkey,
-        replies: {
-          ...remoteReplies,
-          "bots.list": { bots: [bot("bot_remote", "Beta on B")] },
-          "fleet.overview": { waiting: [] },
-        },
-      });
-      local = await servingHost(mock);
-      const { profileStore } = await load<{
-        profileStore: () => { put: (profile: HostProfile) => Promise<void> };
-      }>("../../src/app/hosts/useHosts.ts");
-      await profileStore().put(remoteProfile);
-      const app = await load<{ default: Component }>("../../src/app/App.tsx");
-      testing.render(createElement(app.default as never));
+    const open = await testing
+      .within(region)
+      .findByRole("button", { name: "Beta on B" }, { timeout: 4000 });
+    open.click();
+    await testing.waitFor(() => {
+      expect(window.location.pathname).toBe("/hosts/host_b/bots/bot_remote");
+    });
+    await testing.screen.findByText("hello from B", {}, { timeout: 4000 });
 
-      const region = await testing.screen.findByRole(
-        "region",
-        { name: "Omarchy" },
-        { timeout: 4000 },
+    const sentToB = (method: string) =>
+      (remote?.connections.flat() ?? []).filter(
+        (frame) => frame.t === "req" && frame.m === method,
       );
-      const open = await testing
-        .within(region)
-        .findByRole("button", { name: "Beta on B" }, { timeout: 4000 });
-      open.click();
-      await testing.waitFor(() => {
-        expect(window.location.pathname).toBe("/hosts/host_b/bots/bot_remote");
-      });
-      await testing.screen.findByText("hello from B", {}, { timeout: 4000 });
-
-      const sentToB = (method: string) =>
-        (remote?.connections.flat() ?? []).filter(
-          (frame) => frame.t === "req" && frame.m === method,
-        );
-      const byBot = (frames: Frame[]) =>
-        frames.filter(
-          (frame) =>
-            typeof frame.p === "object" &&
-            frame.p !== null &&
-            (frame.p as Record<string, unknown>).bot_id === "bot_remote",
-        );
-      expect(byBot(sentToB("messages.list")).length).toBeGreaterThan(0);
-      expect(byBot(local.requests)).toEqual([]);
-
-      testing.fireEvent.change(
-        await testing.screen.findByLabelText("Message"),
-        {
-          target: { value: "hi B" },
-        },
+    const byBot = (frames: Frame[]) =>
+      frames.filter(
+        (frame) =>
+          typeof frame.p === "object" &&
+          frame.p !== null &&
+          (frame.p as Record<string, unknown>).bot_id === "bot_remote",
       );
-      (await testing.screen.findByRole("button", { name: "Send" })).click();
-      await until(() => sentToB("messages.send").length === 1, 3000);
-      const send = sentToB("messages.send")[0]?.p as Record<string, unknown>;
-      expect(send).toMatchObject({ bot_id: "bot_remote", text: "hi B" });
-      expect(typeof send.op_id).toBe("string");
-      expect(String(send.op_id).length).toBeGreaterThan(0);
-      expect(
-        local.requests.filter((frame) => frame.m === "messages.send"),
-      ).toEqual([]);
+    expect(byBot(sentToB("messages.list")).length).toBeGreaterThan(0);
+    expect(byBot(local.requests)).toEqual([]);
 
-      // The serving host's own bot still opens on its own connection.
-      const own = await testing.screen.findByRole("region", {
-        name: "This host",
-      });
-      testing.within(own).getByRole("button", { name: "Alpha on A" }).click();
-      await testing.screen.findByText("hello from A", {}, { timeout: 4000 });
-      expect(window.location.pathname).toBe("/bots/bot_local");
-    } finally {
-      remote?.stop();
-      local?.stop();
-    }
-  },
-);
+    testing.fireEvent.change(await testing.screen.findByLabelText("Message"), {
+      target: { value: "hi B" },
+    });
+    (await testing.screen.findByRole("button", { name: "Send" })).click();
+    await until(() => sentToB("messages.send").length === 1, 3000);
+    const send = sentToB("messages.send")[0]?.p as Record<string, unknown>;
+    expect(send).toMatchObject({ bot_id: "bot_remote", text: "hi B" });
+    expect(typeof send.op_id).toBe("string");
+    expect(String(send.op_id).length).toBeGreaterThan(0);
+    expect(
+      local.requests.filter((frame) => frame.m === "messages.send"),
+    ).toEqual([]);
+
+    // The serving host's own bot still opens on its own connection.
+    const own = await testing.screen.findByRole("region", {
+      name: "This host",
+    });
+    testing.within(own).getByRole("button", { name: "Alpha on A" }).click();
+    await testing.screen.findByText("hello from A", {}, { timeout: 4000 });
+    expect(window.location.pathname).toBe("/bots/bot_local");
+  } finally {
+    remote?.stop();
+    local?.stop();
+  }
+});
