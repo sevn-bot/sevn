@@ -69,8 +69,9 @@ sevn service uninstall
 ```
 
 Installing again with the same settings leaves the unit as it is (`unchanged`) but restarts the
-service when it is running, so re-running `install.sh` for an upgrade takes effect. A stopped or
-failed service is not restarted. A unit with other content is replaced only with `--force`.
+service when it is running, so re-running `install.sh` for an upgrade takes effect. Install
+always ends with `enable --now`, so a stopped service is started again. A unit with other content
+is replaced only with `--force`.
 `--home PATH` and `--port N` go into the unit.
 
 A user service stops when your last session ends. To keep sevn running after you log out (on a
