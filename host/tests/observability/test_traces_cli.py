@@ -23,7 +23,6 @@ from support.spans import OtlpReceiver, dead_port
 
 pytestmark = [
     pytest.mark.usefixtures("otel_clean"),
-    pytest.mark.xfail(reason="green after W5: observability doctor and test span", strict=False),
 ]
 
 _TRACE_ID = re.compile(r"\b[0-9a-f]{32}\b")

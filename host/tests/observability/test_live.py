@@ -26,7 +26,6 @@ from support.observability import arm_observability, store_secret
 pytestmark = [
     pytest.mark.live,
     pytest.mark.usefixtures("otel_clean"),
-    pytest.mark.xfail(reason="green after W5: live export through sevn traces test", strict=False),
 ]
 
 _TRACE_ID = re.compile(r"\b[0-9a-f]{32}\b")
