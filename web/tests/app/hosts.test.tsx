@@ -1,7 +1,6 @@
 import { createElement } from "react";
-import { afterEach, expect } from "vitest";
+import { afterEach, expect, test } from "vitest";
 import { loadComponent } from "../support/components.ts";
-import { red } from "../support/red.ts";
 
 /**
  * Plan 0055 D9: one window across hosts.
@@ -16,7 +15,6 @@ import { red } from "../support/red.ts";
  *   with the host name in it; Approvals lists only `kind === "approval"`; an unavailable
  *   host shows "<name> unavailable".
  */
-const w6 = red("W6");
 
 afterEach(async () => {
   const testing = await import("@testing-library/react");
@@ -66,7 +64,7 @@ const hosts = [
   { host_id: "host_pi", name: "Pi", available: false, waiting: [] },
 ];
 
-w6("the sidebar groups bots by host with a reachability dot", async () => {
+test("the sidebar groups bots by host with a reachability dot", async () => {
   const testing = await import("@testing-library/react");
   const HostSidebar = await loadComponent(
     "../../src/app/hosts/HostSidebar.tsx",
@@ -107,7 +105,7 @@ w6("the sidebar groups bots by host with a reachability dot", async () => {
   ).toBeTruthy();
 });
 
-w6("one inbox lists every host's waiting items with a host label", async () => {
+test("one inbox lists every host's waiting items with a host label", async () => {
   const testing = await import("@testing-library/react");
   const Inbox = await loadComponent("../../src/app/hosts/Inbox.tsx", "Inbox");
   testing.render(createElement(Inbox, { hosts }));
@@ -123,7 +121,7 @@ w6("one inbox lists every host's waiting items with a host label", async () => {
   expect(testing.screen.getByText("Pi unavailable")).toBeTruthy();
 });
 
-w6("one approvals view shows only approvals, each with its host", async () => {
+test("one approvals view shows only approvals, each with its host", async () => {
   const testing = await import("@testing-library/react");
   const Approvals = await loadComponent(
     "../../src/app/hosts/Approvals.tsx",

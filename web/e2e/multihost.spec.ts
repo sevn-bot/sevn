@@ -6,14 +6,12 @@ import path from "node:path";
 import { expect, test } from "@playwright/test";
 
 /**
- * Plan 0055 W1.6 (green after W6): two `sevn serve` hosts, one SPA.
+ * Plan 0055 W1.6: two `sevn serve` hosts, one SPA.
  *
  * Host B is reached as `host-b.sevn.test` (Chromium maps it to 127.0.0.1), so its Host
  * header is not loopback and every session must pass pairing and the D3 handshake — the
- * same shape as `tailscale serve`. Skipped unless SEVN_RUN_MARKED=1 so `make e2e` stays
- * green until W6.R removes the gate.
+ * same shape as `tailscale serve`.
  */
-const RUN_MARKED = process.env.SEVN_RUN_MARKED === "1";
 const TEST_HOSTNAME = "host-b.sevn.test";
 const CROCKFORD_CODE = /\b[0-9A-HJKMNP-TV-Z]{8}\b/;
 
@@ -143,8 +141,7 @@ function probe(
   return JSON.parse(out) as Record<string, unknown>;
 }
 
-test.describe("direct multi-host [green after W6]", () => {
-  test.skip(!RUN_MARKED, "green after W6 (set SEVN_RUN_MARKED=1)");
+test.describe("direct multi-host", () => {
   test.setTimeout(90_000);
 
   let hostA: Host | undefined;

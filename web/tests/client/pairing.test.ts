@@ -1,4 +1,4 @@
-import { afterEach, expect, vi } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import {
   b64u,
   type Frame,
@@ -8,7 +8,6 @@ import {
   stubSockets,
   unb64u,
 } from "../support/direct.ts";
-import { red } from "../support/red.ts";
 
 /**
  * Plan 0055 D1, D6, D7, D8: the device side of pairing.
@@ -53,7 +52,6 @@ async function load<T>(specifier: string): Promise<T> {
 const pairingPath = "../../src/client/pairing.ts";
 const profilesPath = "../../src/client/profiles.ts";
 const errorsPath = "../../src/client/errors.ts";
-const w6 = red("W6");
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -104,7 +102,7 @@ async function pairingHost(
   return { frames, stop: () => server.stop() };
 }
 
-w6("parsePairUri reads host, fingerprint, ticket and direct URL", async () => {
+test("parsePairUri reads host, fingerprint, ticket and direct URL", async () => {
   const { parsePairUri } = await load<Pairing>(pairingPath);
   const direct = encodeURIComponent("wss://linux.tailnet.ts.net/ws");
   expect(
@@ -123,96 +121,90 @@ w6("parsePairUri reads host, fingerprint, ticket and direct URL", async () => {
   );
 });
 
-w6(
-  "pairing sends pair.complete after hello and stores a non-extractable profile",
-  async () => {
-    const { pairDevice } = await load<Pairing>(pairingPath);
-    const key = await newHostKey();
-    const url = "wss://linux.tailnet.ts.net/ws";
-    const host = await pairingHost(url, () => ({
-      t: "paired",
-      device_id: "dev_new_phone",
+test("pairing sends pair.complete after hello and stores a non-extractable profile", async () => {
+  const { pairDevice } = await load<Pairing>(pairingPath);
+  const key = await newHostKey();
+  const url = "wss://linux.tailnet.ts.net/ws";
+  const host = await pairingHost(url, () => ({
+    t: "paired",
+    device_id: "dev_new_phone",
+    host_id: "host_linux",
+    host_pubkey: key.pubkey,
+    scope: "member",
+  }));
+  const store = await memoryStore();
+  try {
+    const profile = await pairDevice({
+      url,
+      ticket: "ABCD2345",
+      deviceName: "Phone",
+      platform: "web",
+      store,
+      expectedFp: key.fp,
+    });
+    expect(host.frames.map((frame) => frame.t)).toEqual([
+      "hello",
+      "pair.complete",
+    ]);
+    expect(host.frames[0]?.origin).toBe("wss://linux.tailnet.ts.net");
+    const complete = host.frames[1] ?? {};
+    expect(complete.ticket).toBe("ABCD2345");
+    expect(complete.device_name).toBe("Phone");
+    expect(complete.platform).toBe("web");
+    const pubkey = String(complete.device_pubkey_ed25519);
+    expect(unb64u(pubkey).length).toBe(32);
+    expect(profile).toMatchObject({
       host_id: "host_linux",
-      host_pubkey: key.pubkey,
+      device_id: "dev_new_phone",
       scope: "member",
-    }));
-    const store = await memoryStore();
-    try {
-      const profile = await pairDevice({
+      transport: "direct",
+      direct_url: url,
+      host_pubkey: key.pubkey,
+      host_pubkey_fp: await fingerprintOf(unb64u(key.pubkey)),
+      allow_plain_ws: false,
+    });
+    expect(profile.device_key.extractable).toBe(false);
+    await expect(
+      crypto.subtle.exportKey("pkcs8", profile.device_key),
+    ).rejects.toThrow();
+    expect(await store.get("host_linux")).toEqual(profile);
+  } finally {
+    host.stop();
+  }
+});
+
+test("a paired host whose key does not match the QR fingerprint is refused", async () => {
+  const { pairDevice } = await load<Pairing>(pairingPath);
+  const { HostIdentityChanged } =
+    await load<Record<string, ErrorClass>>(errorsPath);
+  const real = await newHostKey();
+  const swapped = await newHostKey();
+  const url = "wss://linux.tailnet.ts.net/ws";
+  const host = await pairingHost(url, () => ({
+    t: "paired",
+    device_id: "dev_x",
+    host_id: "host_linux",
+    host_pubkey: swapped.pubkey,
+    scope: "owner",
+  }));
+  const store = await memoryStore();
+  try {
+    await expect(
+      pairDevice({
         url,
         ticket: "ABCD2345",
         deviceName: "Phone",
-        platform: "web",
         store,
-        expectedFp: key.fp,
-      });
-      expect(host.frames.map((frame) => frame.t)).toEqual([
-        "hello",
-        "pair.complete",
-      ]);
-      expect(host.frames[0]?.origin).toBe("wss://linux.tailnet.ts.net");
-      const complete = host.frames[1] ?? {};
-      expect(complete.ticket).toBe("ABCD2345");
-      expect(complete.device_name).toBe("Phone");
-      expect(complete.platform).toBe("web");
-      const pubkey = String(complete.device_pubkey_ed25519);
-      expect(unb64u(pubkey).length).toBe(32);
-      expect(profile).toMatchObject({
-        host_id: "host_linux",
-        device_id: "dev_new_phone",
-        scope: "member",
-        transport: "direct",
-        direct_url: url,
-        host_pubkey: key.pubkey,
-        host_pubkey_fp: await fingerprintOf(unb64u(key.pubkey)),
-        allow_plain_ws: false,
-      });
-      expect(profile.device_key.extractable).toBe(false);
-      await expect(
-        crypto.subtle.exportKey("pkcs8", profile.device_key),
-      ).rejects.toThrow();
-      expect(await store.get("host_linux")).toEqual(profile);
-    } finally {
-      host.stop();
-    }
-  },
-);
+        expectedFp: real.fp,
+      }),
+    ).rejects.toBeInstanceOf(HostIdentityChanged as ErrorClass);
+    expect(await store.list()).toEqual([]);
+  } finally {
+    host.stop();
+  }
+});
 
-w6(
-  "a paired host whose key does not match the QR fingerprint is refused",
-  async () => {
-    const { pairDevice } = await load<Pairing>(pairingPath);
-    const { HostIdentityChanged } =
-      await load<Record<string, ErrorClass>>(errorsPath);
-    const real = await newHostKey();
-    const swapped = await newHostKey();
-    const url = "wss://linux.tailnet.ts.net/ws";
-    const host = await pairingHost(url, () => ({
-      t: "paired",
-      device_id: "dev_x",
-      host_id: "host_linux",
-      host_pubkey: swapped.pubkey,
-      scope: "owner",
-    }));
-    const store = await memoryStore();
-    try {
-      await expect(
-        pairDevice({
-          url,
-          ticket: "ABCD2345",
-          deviceName: "Phone",
-          store,
-          expectedFp: real.fp,
-        }),
-      ).rejects.toBeInstanceOf(HostIdentityChanged as ErrorClass);
-      expect(await store.list()).toEqual([]);
-    } finally {
-      host.stop();
-    }
-  },
-);
-
-w6("a LAN ws:// URL is refused before any socket opens", async () => {
+test("a LAN ws:// URL is refused before any socket opens", async () => {
   const { pairDevice } = await load<Pairing>(pairingPath);
   const { DirectUrlRefused } =
     await load<Record<string, ErrorClass>>(errorsPath);
@@ -242,37 +234,34 @@ w6("a LAN ws:// URL is refused before any socket opens", async () => {
   expect(await store.list()).toEqual([]);
 });
 
-w6(
-  "a dial blocked by CSP reports the origin to add to connect_src",
-  async () => {
-    const { pairDevice } = await load<Pairing>(pairingPath);
-    const { CspBlocked } = await load<Record<string, ErrorClass>>(errorsPath);
-    vi.stubGlobal(
-      "WebSocket",
-      class {
-        constructor() {
-          throw new DOMException("Refused to connect", "SecurityError");
-        }
-      },
-    );
-    const store = await memoryStore();
-    const error = await pairDevice({
-      url: "wss://linux.tailnet.ts.net/ws",
-      ticket: "ABCD2345",
-      deviceName: "Phone",
-      store,
-    }).then(
-      () => null,
-      (reason: unknown) => reason,
-    );
-    expect(error).toBeInstanceOf(CspBlocked as ErrorClass);
-    expect((error as { origin?: string }).origin).toBe(
-      "wss://linux.tailnet.ts.net",
-    );
-  },
-);
+test("a dial blocked by CSP reports the origin to add to connect_src", async () => {
+  const { pairDevice } = await load<Pairing>(pairingPath);
+  const { CspBlocked } = await load<Record<string, ErrorClass>>(errorsPath);
+  vi.stubGlobal(
+    "WebSocket",
+    class {
+      constructor() {
+        throw new DOMException("Refused to connect", "SecurityError");
+      }
+    },
+  );
+  const store = await memoryStore();
+  const error = await pairDevice({
+    url: "wss://linux.tailnet.ts.net/ws",
+    ticket: "ABCD2345",
+    deviceName: "Phone",
+    store,
+  }).then(
+    () => null,
+    (reason: unknown) => reason,
+  );
+  expect(error).toBeInstanceOf(CspBlocked as ErrorClass);
+  expect((error as { origin?: string }).origin).toBe(
+    "wss://linux.tailnet.ts.net",
+  );
+});
 
-w6("a refused ticket rejects Unauthorized and stores nothing", async () => {
+test("a refused ticket rejects Unauthorized and stores nothing", async () => {
   const { pairDevice } = await load<Pairing>(pairingPath);
   const { Unauthorized } = await load<Record<string, ErrorClass>>(errorsPath);
   const url = "wss://linux.tailnet.ts.net/ws";

@@ -1,8 +1,7 @@
 import { createElement } from "react";
-import { expect } from "vitest";
+import { expect, test } from "vitest";
 import { requestParams, startHarness } from "../chat/host.ts";
 import { loadComponent } from "../support/components.ts";
-import { red } from "../support/red.ts";
 
 /**
  * Plan 0055 D9: Settings → Devices on the host itself.
@@ -15,7 +14,6 @@ import { red } from "../support/red.ts";
  * - `web/src/app/devices/DevicesList.tsx` → `DevicesList`: one list item per device with its
  *   name, platform and scope; live devices have a "Revoke" button, revoked ones say "revoked".
  */
-const w6 = red("W6");
 const cardPath = "../../src/app/devices/PairingCard.tsx";
 const listPath = "../../src/app/devices/DevicesList.tsx";
 
@@ -28,45 +26,44 @@ function started(expiresInMs: number): Record<string, unknown> {
   };
 }
 
-w6(
-  "the pairing card starts a ticket with the chosen scope and shows QR, code and countdown",
-  async () => {
-    const harness = await startHarness({ "pairing.start": started(600_000) });
-    const testing = await import("@testing-library/react");
-    try {
-      const PairingCard = await loadComponent(cardPath, "PairingCard");
-      testing.render(createElement(PairingCard));
-      const scope = (await testing.screen.findByLabelText(
-        "Scope",
-      )) as HTMLSelectElement;
-      expect(scope.value).toBe("member");
-      expect(
-        Array.from(scope.options, (option) => option.value).sort(),
-      ).toEqual(["member", "owner", "read_only"]);
-      testing.fireEvent.change(scope, { target: { value: "owner" } });
-      (
-        await testing.screen.findByRole("button", { name: "Start pairing" })
-      ).click();
-      await testing.waitFor(() => {
-        expect(requestParams(harness.requests, "pairing.start").length).toBe(1);
-      });
-      expect(requestParams(harness.requests, "pairing.start")[0]?.scope).toBe(
-        "owner",
-      );
-      await testing.screen.findByRole("img", { name: "Pairing QR code" });
-      const code = await testing.screen.findByTestId("pairing-code");
-      expect(code.textContent?.replaceAll("-", "").replaceAll(" ", "")).toBe(
-        "K7M2Q9XR",
-      );
-      await testing.screen.findByText(/^Expires in (10:00|9:5\d)$/);
-    } finally {
-      harness.stop();
-      testing.cleanup();
-    }
-  },
-);
+test("the pairing card starts a ticket with the chosen scope and shows QR, code and countdown", async () => {
+  const harness = await startHarness({ "pairing.start": started(600_000) });
+  const testing = await import("@testing-library/react");
+  try {
+    const PairingCard = await loadComponent(cardPath, "PairingCard");
+    testing.render(createElement(PairingCard));
+    const scope = (await testing.screen.findByLabelText(
+      "Scope",
+    )) as HTMLSelectElement;
+    expect(scope.value).toBe("member");
+    expect(Array.from(scope.options, (option) => option.value).sort()).toEqual([
+      "member",
+      "owner",
+      "read_only",
+    ]);
+    testing.fireEvent.change(scope, { target: { value: "owner" } });
+    (
+      await testing.screen.findByRole("button", { name: "Start pairing" })
+    ).click();
+    await testing.waitFor(() => {
+      expect(requestParams(harness.requests, "pairing.start").length).toBe(1);
+    });
+    expect(requestParams(harness.requests, "pairing.start")[0]?.scope).toBe(
+      "owner",
+    );
+    await testing.screen.findByRole("img", { name: "Pairing QR code" });
+    const code = await testing.screen.findByTestId("pairing-code");
+    expect(code.textContent?.replaceAll("-", "").replaceAll(" ", "")).toBe(
+      "K7M2Q9XR",
+    );
+    await testing.screen.findByText(/^Expires in (10:00|9:5\d)$/);
+  } finally {
+    harness.stop();
+    testing.cleanup();
+  }
+});
 
-w6("an expired ticket says so", async () => {
+test("an expired ticket says so", async () => {
   const harness = await startHarness({ "pairing.start": started(-1000) });
   const testing = await import("@testing-library/react");
   try {
@@ -85,7 +82,7 @@ w6("an expired ticket says so", async () => {
   }
 });
 
-w6("the devices list shows each device and revokes a live one", async () => {
+test("the devices list shows each device and revokes a live one", async () => {
   const now = new Date().toISOString();
   const harness = await startHarness({
     "devices.list": {
