@@ -38,8 +38,6 @@ from support.pairing import (
     start_pairing,
 )
 
-W3 = pytest.mark.xfail(strict=False, reason="green after W3")
-
 SHORT_CODE = re.compile(r"^[0-9A-HJKMNP-TV-Z]{8}$")
 BAD_TICKET = "invalid pairing ticket"
 RATE_LIMITED = "too many pairing attempts"
@@ -347,7 +345,6 @@ async def test_complete_refuses_a_malformed_device_key(
         assert await asyncio.to_thread(_rows, tmp_path / "sevn.db", "devices") == []
 
 
-@W3
 async def test_complete_stores_device_and_replies_paired_then_closes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -373,7 +370,6 @@ async def test_complete_stores_device_and_replies_paired_then_closes(
         assert paired[0]["device_id"] in {row["id"] for row in listed["r"]["devices"]}
 
 
-@W3
 async def test_pair_complete_with_a_bad_ticket_closes_4001(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

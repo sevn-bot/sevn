@@ -44,8 +44,6 @@ from support.pairing import (
     verify_host_sig,
 )
 
-W3 = pytest.mark.xfail(strict=False, reason="green after W3")
-
 
 @asynccontextmanager
 async def _host(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[MemoryHost]:
@@ -75,7 +73,6 @@ async def _refused(client: Any) -> None:
     assert all(frame.get("t") != "welcome" for frame in frames), frames
 
 
-@W3
 async def test_non_loopback_session_gets_challenge(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -97,7 +94,6 @@ async def test_non_loopback_session_gets_challenge(
         assert nonces[0] != nonces[1]
 
 
-@W3
 async def test_loopback_token_is_refused_on_a_non_loopback_session(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -113,7 +109,6 @@ async def test_loopback_token_is_refused_on_a_non_loopback_session(
         assert session.scope != "owner"
 
 
-@W3
 async def test_loopback_cookie_does_not_open_a_non_loopback_session(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -125,7 +120,6 @@ async def test_loopback_cookie_does_not_open_a_non_loopback_session(
         assert session.scope != "owner"
 
 
-@W3
 @pytest.mark.parametrize("scope", ["owner", "member", "read_only"])
 async def test_valid_device_auth_sets_device_scope(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, scope: str
@@ -168,7 +162,6 @@ async def _revoked(host: MemoryHost, owner: Any) -> Device:
     return device
 
 
-@W3
 @pytest.mark.parametrize(
     "make_device", [_bad_sig, _unknown, _revoked], ids=["bad-sig", "unknown-device", "revoked"]
 )
@@ -185,7 +178,6 @@ async def test_bad_sig_unknown_revoked_device_close_4001(
         assert session.scope != "owner"
 
 
-@W3
 @pytest.mark.parametrize(
     ("origin", "allowed"),
     [
@@ -212,7 +204,6 @@ async def test_origin_not_in_allowed_hosts_closes_4001(
         await _refused(client)
 
 
-@W3
 async def test_allowed_host_with_port_is_accepted(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -224,7 +215,6 @@ async def test_allowed_host_with_port_is_accepted(
         assert welcome["t"] == "welcome"
 
 
-@W3
 async def test_nonce_reuse_closes_4001(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     import sevn.identity.handshake as handshake_module
 
@@ -248,7 +238,6 @@ async def test_nonce_reuse_closes_4001(tmp_path: Path, monkeypatch: pytest.Monke
         assert session.scope != "owner"
 
 
-@W3
 async def test_revoke_closes_live_sessions_within_1s_with_4003(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -274,7 +263,6 @@ async def test_revoke_closes_live_sessions_within_1s_with_4003(
         await _refused(again)
 
 
-@W3
 async def test_token_and_cookie_paths_unchanged_for_loopback(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
