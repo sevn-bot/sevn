@@ -31,13 +31,7 @@ from support.spans import (
     global_tracer_provider_is_sdk,
 )
 
-pytestmark = [
-    pytest.mark.usefixtures("otel_clean"),
-    pytest.mark.xfail(
-        reason="green after W2: observability config, setup, exporters and presets",
-        strict=False,
-    ),
-]
+pytestmark = pytest.mark.usefixtures("otel_clean")
 
 
 def _choose() -> str:

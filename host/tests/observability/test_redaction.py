@@ -29,10 +29,7 @@ from support.observability import (
 )
 from support.spans import OtlpReceiver
 
-pytestmark = [
-    pytest.mark.usefixtures("otel_clean"),
-    pytest.mark.xfail(reason="green after W2: redaction and content capture", strict=False),
-]
+pytestmark = pytest.mark.usefixtures("otel_clean")
 
 _ALNUM = string.ascii_letters + string.digits
 
