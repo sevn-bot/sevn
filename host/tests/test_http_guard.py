@@ -20,8 +20,6 @@ from typing import Any
 import pytest
 from support.http_app import CSP, running_app
 
-W4 = pytest.mark.xfail(strict=False, reason="green after W4")
-
 LOGIN_REFUSED = "login is loopback only"
 PORT = 8787
 TAILNET = "mac.tailnet.ts.net"
@@ -68,7 +66,6 @@ def _config(home: Path, http: str = "") -> Path:
 # --- loopback detection (D4) -----------------------------------------------------------------
 
 
-@W4
 @pytest.mark.parametrize(
     ("headers", "peer", "loopback"),
     [
@@ -107,7 +104,6 @@ def test_is_loopback_rule(headers: dict[str, str], peer: str | None, loopback: b
     assert is_loopback(Headers(headers), peer, PORT) is loopback
 
 
-@W4
 @pytest.mark.parametrize("header", sorted(PROXY_HEADERS))
 def test_proxied_loopback_request_is_remote(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, header: str
@@ -135,7 +131,6 @@ def test_proxied_loopback_request_is_remote(
         assert first["t"] == "challenge", first
 
 
-@W4
 def test_tailscale_identity_header_is_never_auth(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -162,7 +157,6 @@ def test_tailscale_identity_header_is_never_auth(
         assert closed.value.code == 4001
 
 
-@W4
 @pytest.mark.parametrize(
     ("peer", "host_header", "extra"),
     [
@@ -203,7 +197,6 @@ def test_auth_login_still_works_on_loopback(
 # --- guard config (D5) -----------------------------------------------------------------------
 
 
-@W4
 def test_http_settings_defaults_and_validation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -230,7 +223,6 @@ def test_http_settings_defaults_and_validation(
     assert loaded.connect_src == ["wss://linux.tailnet.ts.net"]
 
 
-@W4
 def test_allowed_hosts_from_config_and_env_merge(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -249,7 +241,6 @@ def test_allowed_hosts_from_config_and_env_merge(
             assert denied.text.strip() == "forbidden host", host
 
 
-@W4
 def test_allowed_origin_accepted_other_refused(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -278,7 +269,6 @@ def test_allowed_origin_accepted_other_refused(
             assert ws.text.strip() == "forbidden origin", origin
 
 
-@W4
 @pytest.mark.parametrize("http", ["", f'allowed_hosts = ["{TAILNET}"]\n'], ids=["none", "tailnet"])
 def test_remote_bind_without_allowed_hosts_refused(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, http: str
@@ -328,7 +318,6 @@ def test_default_csp_is_unchanged(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
         assert response.headers["content-security-policy"] == CSP
 
 
-@W4
 def test_csp_connect_src_lists_allowed_hosts_and_config(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -356,7 +345,6 @@ def test_csp_connect_src_lists_allowed_hosts_and_config(
 # --- guard order (D5) ------------------------------------------------------------------------
 
 
-@W4
 def test_guard_order_host_then_origin_then_auth(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

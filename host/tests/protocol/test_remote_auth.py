@@ -299,3 +299,39 @@ async def test_token_and_cookie_paths_unchanged_for_loopback(
         bad_cookie, _ = open_loopback("not-the-token")
         await send_frame(bad_cookie, hello_frame())
         await _refused(bad_cookie)
+
+
+@pytest.mark.parametrize(
+    "origin",
+    ["wss://evil.example", "wss://mac.tailnet.ts.net.evil.example", None],
+    ids=["foreign-host", "suffix-trick", "no-origin"],
+)
+async def test_unallowed_origin_challenge_is_not_a_signing_oracle(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, origin: str | None
+) -> None:
+    """A challenge sent for an unallowed origin (a decoy) carries no valid host signature.
+
+    Otherwise anyone could make the host sign challenges for an origin of their choosing.
+    """
+    from cryptography.exceptions import InvalidSignature
+    from sevn.transports.base import ConnectionClosed
+
+    async with _host(tmp_path, monkeypatch) as host:
+        owner = await owner_client(host)
+        device = await pair_device(host, owner)
+        client, session = host.open_remote()
+        await send_frame(client, hello(device.id, origin))
+        try:
+            challenge = await recv_frame(client)
+        except ConnectionClosed:
+            return  # closing at once is also allowed
+        if challenge.get("t") == "challenge":
+            nonce = unb64u(challenge["nonce"])
+            identity = host.hub.identity
+            for presented in {origin or "", ORIGIN}:
+                with pytest.raises((InvalidSignature, ValueError)):
+                    verify_host_sig(identity.public_key, nonce, presented, challenge["host_sig"])
+            sig = sign_auth(device.key, nonce, origin or "", identity.host_pubkey_fp)
+            await send_frame(client, {"t": "auth", "device_sig": sig})
+        await _refused(client)
+        assert session.scope != "owner"
