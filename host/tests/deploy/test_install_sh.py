@@ -22,8 +22,6 @@ import pytest
 from support.archives import sha256
 from support.repo import repo_root
 
-pytestmark = pytest.mark.xfail(strict=False, reason="green after W6")
-
 _SCRIPT = repo_root() / "deploy" / "install.sh"
 _APT = {"bubblewrap", "git", "curl", "ca-certificates", "libsecret-1-0"}
 _PACMAN = {"bubblewrap", "git", "curl", "libsecret"}

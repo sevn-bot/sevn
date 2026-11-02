@@ -18,7 +18,6 @@ from typing import Any
 import pytest
 from support.repo import repo_root
 
-_W6 = pytest.mark.xfail(strict=False, reason="green after W6")
 _ROOT = repo_root()
 
 
@@ -61,7 +60,6 @@ def _make_dry_run(target: str) -> str:
 # --- wheel (D3) --------------------------------------------------------------
 
 
-@_W6
 def test_make_wheel_builds_the_spa_then_the_wheel_and_sums() -> None:
     plan = _make_dry_run("wheel")
     web_at = min(
@@ -104,7 +102,6 @@ def test_built_wheel_contains_the_web_app(tmp_path: Path) -> None:
     )
 
 
-@_W6
 def test_release_workflow_publishes_wheel_and_sums_on_tags() -> None:
     path = _ROOT / ".github" / "workflows" / "release.yml"
     workflow = _yaml(path)
@@ -136,7 +133,6 @@ def test_existing_ci_job_keeps_its_name() -> None:
     assert "make ci" in _steps_text(jobs["ci"])
 
 
-@_W6
 def test_host_arch_job_runs_host_tests_in_archlinux() -> None:
     job = _ci()["jobs"]["host-arch"]
     container = job["container"]
@@ -148,7 +144,6 @@ def test_host_arch_job_runs_host_tests_in_archlinux() -> None:
     assert "make test-host" in text
 
 
-@_W6
 def test_install_sh_job_runs_shellcheck_and_both_distros() -> None:
     job = _ci()["jobs"]["install-sh"]
     text = _steps_text(job) + str(job.get("strategy", ""))
@@ -161,7 +156,6 @@ def test_install_sh_job_runs_shellcheck_and_both_distros() -> None:
     assert "doctor --json" in text
 
 
-@_W6
 def test_images_job_builds_both_images_and_checks_runtimes() -> None:
     job = _ci()["jobs"]["images"]
     text = _steps_text(job) + str(job.get("strategy", ""))
@@ -171,7 +165,6 @@ def test_images_job_builds_both_images_and_checks_runtimes() -> None:
     assert "runtimes list" in text
 
 
-@_W6
 def test_new_ci_jobs_use_no_secrets() -> None:
     jobs = _ci()["jobs"]
     for name in ("host-arch", "install-sh", "images"):
