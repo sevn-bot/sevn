@@ -1,5 +1,12 @@
 import { methods } from "../contracts/methods.ts";
-import { IncompatibleHost, ProtocolError, Unauthorized } from "./errors.ts";
+import {
+  CspBlocked,
+  HostIdentityChanged,
+  IncompatibleHost,
+  ProtocolError,
+  Unauthorized,
+} from "./errors.ts";
+import { fingerprint, signAuth, verifyChallenge } from "./keys.ts";
 
 const INITIAL_BACKOFF_MS = 500;
 const MAX_BACKOFF_MS = 10_000;
@@ -525,7 +532,9 @@ export type Status =
   | "connected"
   | "reconnecting"
   | "unauthorized"
-  | "incompatible";
+  | "incompatible"
+  | "identity_changed"
+  | "blocked";
 
 export type ProtocolEvent = {
   s: number;
@@ -552,10 +561,24 @@ export type Connection = {
   close: () => void;
 };
 
+/**
+ * A paired device's credentials for one host (plan 0055 D3, D6). With these, the client
+ * answers the host's `challenge` instead of sending a token.
+ */
+export type DeviceAuth = {
+  id: string;
+  /** Non-extractable Ed25519 private key; it signs in place. */
+  key: CryptoKey;
+  /** The pinned host public key (base64url) and its fingerprint (`host_pubkey_fp`). */
+  hostPubkey: string;
+  hostFp: string;
+};
+
 export type ConnectOptions = {
   url: string;
   token?: string;
   lastSeq?: number;
+  device?: DeviceAuth;
 };
 
 type Pending = {
@@ -620,9 +643,33 @@ export function call<M extends MethodName>(
   return active.call(method, params);
 }
 
+/**
+ * Connect the app's one host connection: `call`, `onEvent` and `onTick` at module level go
+ * to it. This is the single-host API; {@link openConnection} opens one of many.
+ */
 export function connect(options: ConnectOptions): Promise<Connection> {
+  return start(options, true).ready;
+}
+
+/**
+ * Open a connection that is not the module-level one (plan 0055 D6: one per host profile).
+ * `connection` is usable at once for subscriptions and `close`; `ready` settles on the
+ * first `welcome` or on a refusal.
+ */
+export function openConnection(options: ConnectOptions): {
+  connection: Connection;
+  ready: Promise<Connection>;
+} {
+  return start(options, false);
+}
+
+function start(
+  options: ConnectOptions,
+  global: boolean,
+): { connection: Connection; ready: Promise<Connection> } {
   const url = options.url;
   const token = options.token;
+  const device = options.device;
   let lastSeq = options.lastSeq ?? 0;
   let nextSeq = lastSeq + 1;
   // Only the first welcome may skip ahead to the host's seq. After a
@@ -723,11 +770,15 @@ export function connect(options: ConnectOptions): Promise<Connection> {
   const stop = (): void => {
     connection.close();
   };
-  stopInflight = stop;
-  active = connection;
-  attachListeners(connection);
+  if (global) {
+    stopInflight = stop;
+    active = connection;
+    attachListeners(connection);
+  }
+  // A rejection nobody awaits (a host-side refusal after `close`) is not an error.
+  ready.catch(() => undefined);
   openSocket();
-  return ready;
+  return { connection, ready };
 
   function emitStatus(next: Status): void {
     status = next;
@@ -756,11 +807,95 @@ export function connect(options: ConnectOptions): Promise<Connection> {
     rejectReady(error);
   }
 
+  /** Stop for good: a refusal the client must not retry. */
+  function halt(error: Error, next: Status): void {
+    stopped = true;
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      timer = undefined;
+    }
+    if (connectTimer !== undefined) {
+      clearTimeout(connectTimer);
+      connectTimer = undefined;
+    }
+    const current = socket;
+    socket = null;
+    rejectPending(error);
+    if (
+      current !== null &&
+      current.readyState !== WebSocket.CLOSING &&
+      current.readyState !== WebSocket.CLOSED
+    ) {
+      current.close();
+    }
+    emitStatus(next);
+    fail(error);
+  }
+
+  function dial(): WebSocket | null {
+    try {
+      return new WebSocket(url);
+    } catch (error) {
+      // A connect-src violation surfaces as a SecurityError from the constructor.
+      if (error instanceof DOMException && error.name === "SecurityError") {
+        halt(new CspBlocked(originOf(url)), "blocked");
+      } else {
+        halt(
+          error instanceof Error ? error : new Error(String(error)),
+          "blocked",
+        );
+      }
+      return null;
+    }
+  }
+
+  async function answerChallenge(
+    target: WebSocket,
+    auth: DeviceAuth,
+    frame: Record<string, unknown>,
+  ): Promise<void> {
+    const nonce = frame.nonce;
+    const hostSig = frame.host_sig;
+    const origin = originOf(url);
+    // D6: the challenge must verify against the pinned key, and the pinned key must match
+    // the pinned fingerprint. Anything else is a hard error: no auth, no re-pin, no retry.
+    let trusted = false;
+    if (typeof nonce === "string" && typeof hostSig === "string") {
+      const pinnedFp = await fingerprint(auth.hostPubkey).catch(() => null);
+      trusted =
+        pinnedFp === auth.hostFp &&
+        (await verifyChallenge(auth.hostPubkey, nonce, origin, hostSig));
+    }
+    if (stopped || socket !== target) {
+      return;
+    }
+    if (!trusted || typeof nonce !== "string") {
+      halt(new HostIdentityChanged(), "identity_changed");
+      return;
+    }
+    let deviceSig: string;
+    try {
+      deviceSig = await signAuth(auth.key, nonce, origin, auth.hostFp);
+    } catch {
+      if (!stopped && socket === target) {
+        halt(new Unauthorized("device key cannot sign"), "unauthorized");
+      }
+      return;
+    }
+    if (stopped || socket !== target) {
+      return;
+    }
+    target.send(JSON.stringify({ t: "auth", device_sig: deviceSig }));
+  }
+
   function openSocket(): void {
     if (stopped) {
       return;
     }
-    const next = new WebSocket(url);
+    const next = dial();
+    if (next === null) {
+      return;
+    }
     socket = next;
     if (connectTimer !== undefined) {
       clearTimeout(connectTimer);
@@ -776,6 +911,21 @@ export function connect(options: ConnectOptions): Promise<Connection> {
     }, CONNECT_TIMEOUT_MS);
     next.addEventListener("open", () => {
       if (socket !== next) {
+        return;
+      }
+      if (device !== undefined) {
+        // A paired device: the host answers with a `challenge` (D3), never a token.
+        next.send(
+          JSON.stringify({
+            t: "hello",
+            proto: [1, 1],
+            client: "web",
+            device: device.id,
+            origin: originOf(url),
+            last_seq: lastSeq,
+            caps: [],
+          }),
+        );
         return;
       }
       next.send(
@@ -796,7 +946,7 @@ export function connect(options: ConnectOptions): Promise<Connection> {
       if (socket !== next) {
         return;
       }
-      onMessage(messageText(event));
+      onMessage(next, messageText(event));
     });
     next.addEventListener("close", (event) => {
       if (socket !== next) {
@@ -809,7 +959,7 @@ export function connect(options: ConnectOptions): Promise<Connection> {
     });
   }
 
-  function onMessage(text: string): void {
+  function onMessage(from: WebSocket, text: string): void {
     let frame: Record<string, unknown>;
     try {
       const parsed: unknown = JSON.parse(text);
@@ -818,6 +968,12 @@ export function connect(options: ConnectOptions): Promise<Connection> {
       }
       frame = parsed;
     } catch {
+      return;
+    }
+    if (frame.t === "challenge") {
+      if (device !== undefined) {
+        void answerChallenge(from, device, frame);
+      }
       return;
     }
     if (frame.t === "welcome") {
@@ -1086,6 +1242,15 @@ function uuidv7(): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** The WebSocket URL's origin as dialled (`hello.origin`, signed in the handshake). */
+function originOf(url: string): string {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return url;
+  }
 }
 
 function messageText(event: Event): string {

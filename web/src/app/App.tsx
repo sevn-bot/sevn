@@ -1,18 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { type Connection, cancelConnect, connect } from "../client/index.ts";
+import {
+  type Connection,
+  cancelConnect,
+  connect,
+  type Status,
+} from "../client/index.ts";
 import { BotList } from "./bots/BotList.tsx";
 import { Chat } from "./chat/Chat.tsx";
 import { BriefPage } from "./fleet/BriefPage.tsx";
 import { Dashboard } from "./fleet/Dashboard.tsx";
 import { SharePage } from "./fleet/SharePage.tsx";
 import { isBriefPath, routeFromPath, shareFromPath } from "./routes.ts";
-
-type Status =
-  | "connecting"
-  | "connected"
-  | "reconnecting"
-  | "unauthorized"
-  | "incompatible";
 
 type ShownEvent = {
   seq: number;
