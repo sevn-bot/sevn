@@ -3,18 +3,22 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import hmac
 import ipaddress
 import os
 import secrets
+import socket
+import stat
 import webbrowser
-from collections.abc import AsyncGenerator, Awaitable, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable, Generator, Mapping
 from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
 from typing import cast
 
+import uvicorn
 from fastapi import FastAPI, Request
 from starlette.datastructures import Headers
 from starlette.exceptions import HTTPException
@@ -36,7 +40,7 @@ import sevn.api.routines as routine_api
 import sevn.api.shares as share_api
 import sevn.sandbox.policy as sandbox_policy
 import sevn.system as system
-from sevn import __version__
+from sevn import __version__, control
 from sevn.config import HttpSettings, Settings
 from sevn.domain.agents import expire_agents
 from sevn.domain.errors import DomainError
@@ -175,8 +179,7 @@ def create_app(settings: Settings) -> ASGIApp:
     async def login(request: Request, token: str = "") -> Response:
         # Plan 0055 D4: only a loopback request may trade the token for a cookie. This runs
         # after the Host and Origin guard and before the token is looked at.
-        peer = request.client.host if request.client is not None else None
-        if not is_loopback(request.headers, peer, state.runtime.port):
+        if not _loopback_request(request.scope, request.headers, state.runtime.port):
             return PlainTextResponse(_LOGIN_LOOPBACK_ONLY, status_code=403)
         if not check_credentials(token, state.token):
             return PlainTextResponse("unauthorized", status_code=401)
@@ -242,6 +245,7 @@ async def _lifespan(app: ASGIApp) -> AsyncGenerator[None]:
     state.oplog = oplog
     await _retain(outbox, oplog)
     browser: asyncio.Task[None] | None = None
+    control_server: _ControlServer | None = None
     expiry: asyncio.Task[None] | None = None
     routines: asyncio.Task[None] | None = None
     worker: Worker | None = None
@@ -268,10 +272,13 @@ async def _lifespan(app: ASGIApp) -> AsyncGenerator[None]:
             state.runtime.port,
         )
         register("loopback/token", state.token)
+        control_server = await _ControlServer.start(app, paths)
         if state.runtime.open_browser:
             browser = asyncio.create_task(_open_browser(state))
         yield
     finally:
+        if control_server is not None:
+            await control_server.stop()
         retention.cancel()
         with suppress(asyncio.CancelledError):
             await retention
@@ -319,6 +326,7 @@ class OriginGuard:
             self._state.runtime.port,
             server=scope.get("server"),
             http=self._state.settings.http,
+            control=from_control_socket(scope),
         )
         if message is None:
             await self._app(scope, receive, send)
@@ -363,17 +371,19 @@ def refusal(
     *,
     server: object = None,
     http: HttpSettings | None = None,
+    control: bool = False,
 ) -> str | None:
     """Return a 403 body, or ``None`` when the request may proceed.
 
     Host is checked first, then Origin (same-origin, or an exact ``http.allowed_origins``
-    entry). This function does not read tokens or cookies.
+    entry). This function does not read tokens or cookies. A request on the unix control
+    socket skips the Host check: no browser can dial it, so there is no rebinding to stop.
     """
     settings = http if http is not None else HttpSettings()
     names = _allowed_hosts(port, settings)
     host = headers.get("host")
     presented = host.strip().lower() if host is not None else ""
-    if presented not in names and not _testclient_socket(presented, server):
+    if not control and presented not in names and not _testclient_socket(presented, server):
         return _FORBIDDEN_HOST
     origin = headers.get("origin")
     if origin is None or origin.strip() == "":
@@ -485,14 +495,13 @@ async def _serve_socket(websocket: WebSocket, state: AppState) -> None:
     await websocket.accept()
     raw_cookie = websocket.cookies.get("sevn_session")
     cookie = raw_cookie if raw_cookie else None
-    peer = websocket.client.host if websocket.client is not None else None
     session = Session(
         WsConnection(websocket),
         hub,
         token=state.token,
         queue_limit=state.settings.protocol.session_queue_limit,
         cookie=cookie,
-        loopback=is_loopback(websocket.headers, peer, state.runtime.port),
+        loopback=_loopback_request(websocket.scope, websocket.headers, state.runtime.port),
         allowed_hosts=sorted(_allowed_hosts(state.runtime.port, state.settings.http)),
     )
     await session.run()
@@ -512,6 +521,23 @@ _PROXY_HEADERS = (
     "tailscale-user-profile-pic",
     "tailscale-headers-info",
 )
+
+
+def _proxied(headers: Headers) -> bool:
+    return any(name in headers for name in _PROXY_HEADERS)
+
+
+def _loopback_request(scope: Mapping[str, object], headers: Headers, port: int) -> bool:
+    """D4 for either listener: the control socket, or the TCP rule in ``is_loopback``."""
+    if from_control_socket(scope):
+        return not _proxied(headers)
+    client = scope.get("client")
+    peer: str | None = None
+    if isinstance(client, tuple | list):
+        items = cast("tuple[object, ...] | list[object]", client)
+        if items and isinstance(items[0], str):
+            peer = items[0]
+    return is_loopback(headers, peer, port)
 
 
 def is_loopback(headers: Headers, peer: str | None, port: int) -> bool:
@@ -535,7 +561,120 @@ def is_loopback(headers: Headers, peer: str | None, port: int) -> bool:
     local = {f"127.0.0.1:{port}", f"localhost:{port}", f"[::1]:{port}"}
     if host.strip().lower() not in local:
         return False
-    return not any(name in headers for name in _PROXY_HEADERS)
+    return not _proxied(headers)
+
+
+# Set on the ASGI scope by ``_ControlListener`` only. Uvicorn builds every TCP scope itself,
+# so a client cannot add this key; nothing else in the host sets it.
+_CONTROL_SCOPE_KEY = "sevn.control"
+
+
+def from_control_socket(scope: Mapping[str, object]) -> bool:
+    """Whether the request arrived on the host's unix control socket."""
+    return scope.get(_CONTROL_SCOPE_KEY) is True
+
+
+class _ControlListener:
+    """The app as served on the control socket: it marks each request as such."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self._app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] in {"http", "websocket"}:
+            scope = {**scope, _CONTROL_SCOPE_KEY: True}
+        await self._app(scope, receive, send)
+
+
+class _QuietServer(uvicorn.Server):
+    """The main server owns the process signals; this one never touches them."""
+
+    @contextlib.contextmanager
+    def capture_signals(self) -> Generator[None]:
+        yield
+
+
+class _ControlServer:
+    """The app on ``<home>/run/control.sock`` (0600), next to the TCP listener (WV F1-F2).
+
+    It shares the app (state, hub) and runs no lifespan of its own. Only connections
+    on it can be loopback without the TCP rule's peer and Host checks.
+    """
+
+    def __init__(
+        self, server: uvicorn.Server, task: asyncio.Task[None], path: Path, run: Path
+    ) -> None:
+        self._server = server
+        self._task = task
+        self._path = path
+        self._run = run
+
+    @classmethod
+    async def start(cls, app: ASGIApp, paths: Paths) -> _ControlServer | None:
+        try:
+            path = await asyncio.to_thread(control.server_path, paths.home, paths.run)
+            sock = await asyncio.to_thread(_bind_control, path, paths.run)
+        except (OSError, control.ControlPathError) as exc:
+            logger.error("control socket unavailable: {}", exc)
+            return None
+        config = uvicorn.Config(
+            _ControlListener(app),
+            lifespan="off",
+            log_config=None,
+            access_log=False,
+            proxy_headers=False,
+            timeout_graceful_shutdown=2,
+        )
+        server = _QuietServer(config)
+        task = asyncio.create_task(server.serve(sockets=[sock]))
+        return cls(server, task, path, paths.run)
+
+    async def stop(self) -> None:
+        self._server.should_exit = True
+        try:
+            await asyncio.wait_for(asyncio.shield(self._task), 5)
+        except TimeoutError:
+            self._task.cancel()
+        except Exception:  # noqa: BLE001 — shutdown must still remove the socket
+            logger.exception("control socket server failed")
+        with suppress(asyncio.CancelledError, Exception):
+            await self._task
+        await asyncio.to_thread(_remove_control, self._path, self._run)
+
+
+def _bind_control(path: Path, run: Path) -> socket.socket:
+    """Bind the unix socket 0600; replace only a stale socket, never another file."""
+    with suppress(FileNotFoundError):
+        if not stat.S_ISSOCK(path.lstat().st_mode):
+            raise control.ControlPathError(f"{path} exists and is not a socket")
+        path.unlink()
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        sock.bind(str(path))
+        os.chmod(path, 0o600)
+    except OSError:
+        sock.close()
+        raise
+    pointer = run / control.POINTER_NAME
+    if path == run / control.SOCKET_NAME:
+        pointer.unlink(missing_ok=True)
+    else:
+        descriptor = os.open(pointer, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        try:
+            os.write(descriptor, (str(path) + "\n").encode("utf-8"))
+        finally:
+            os.close(descriptor)
+    return sock
+
+
+def _remove_control(path: Path, run: Path) -> None:
+    with suppress(OSError):
+        if stat.S_ISSOCK(path.lstat().st_mode):
+            path.unlink()
+    if path != run / control.SOCKET_NAME:
+        (run / control.POINTER_NAME).unlink(missing_ok=True)
+        with suppress(OSError):
+            path.parent.rmdir()
 
 
 async def _reject_websocket(send: Send, message: str) -> None:

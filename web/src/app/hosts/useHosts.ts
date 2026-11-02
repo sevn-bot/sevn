@@ -298,12 +298,19 @@ async function fetchHost(
   };
 }
 
+const HOST_IDENTITY_CHANGED = "Host identity changed — re-pair to continue";
+const ALLOWED_HOSTS_HINT =
+  "The host may also not list this address in http.allowed_hosts.";
+
 function problemText(
   status: HostStatus,
   error: Error | null | undefined,
 ): string | undefined {
   switch (status) {
     case "identity_changed":
+      // A host that does not list the dialled address in http.allowed_hosts answers with an
+      // unsigned decoy challenge, which looks exactly like a changed host key (WV A1).
+      return `${error?.message ?? HOST_IDENTITY_CHANGED}. ${ALLOWED_HOSTS_HINT}`;
     case "refused":
     case "blocked":
       return error?.message ?? status;

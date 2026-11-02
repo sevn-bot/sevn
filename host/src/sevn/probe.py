@@ -1,4 +1,8 @@
-"""Speak the loopback protocol using the token file (D7, D13)."""
+"""Speak the loopback protocol using the token file (D7, D13).
+
+The probe dials the host's unix control socket when there is one (a loopback session
+on any TCP bind, plan 0055 WV fix), else the TCP address ``sevn serve`` published.
+"""
 
 from __future__ import annotations
 
@@ -6,18 +10,27 @@ import asyncio
 import json
 from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Protocol, cast
+from typing import TYPE_CHECKING, Protocol, cast
 
+from sevn import control
 from sevn.config import Settings
 from sevn.contracts.errors import JsonObject, JsonValue
 from sevn.contracts.frames import AuthToken, Evt, Hello, Req, Res, Welcome, dump, parse
 from sevn.paths import Paths
 
+if TYPE_CHECKING:
+    from websockets.asyncio.client import ClientConnection
+
 _TIMEOUT = 10.0
+_CONNECT_TIMEOUT = 5.0
 
 
 class ProbeError(Exception):
     """The probe could not complete a call. The message never includes the token."""
+
+
+class HostUnreachable(ProbeError):
+    """Nothing answered: no listener on the control socket or at the TCP address."""
 
 
 class HostRefused(ProbeError):
@@ -106,38 +119,61 @@ class _Socket(Protocol):
 
 
 async def _session[T](work: Callable[[_Socket], Awaitable[T]]) -> T:
+    """Run ``work`` on a loopback session. ``HostUnreachable`` only when nothing answered."""
+    from websockets.asyncio.client import connect, unix_connect
+
     settings = Settings.load()
     paths = Paths.from_env()
     token = _read_token(paths.run / "token")
+    path = control.client_path(paths.run)
+    if path is not None:
+        try:
+            return await _attempt(
+                lambda: unix_connect(
+                    str(path), "ws://localhost/ws", max_size=1024 * 1024, open_timeout=None
+                ),
+                token,
+                work,
+            )
+        except HostUnreachable:
+            pass  # a socket file left by a host that is gone: try TCP
     host, port = _dial_target(paths, settings)
     url = _ws_url(host, port)
+    return await _attempt(
+        lambda: connect(url, max_size=1024 * 1024, open_timeout=None, origin=None, proxy=None),
+        token,
+        work,
+    )
+
+
+async def _attempt[T](
+    dial: Callable[[], Awaitable[ClientConnection]],
+    token: str,
+    work: Callable[[_Socket], Awaitable[T]],
+) -> T:
+    from websockets.exceptions import WebSocketException
+
     try:
-        return await asyncio.wait_for(_connected(url, token, work), _TIMEOUT)
+        ws = await asyncio.wait_for(dial(), _CONNECT_TIMEOUT)
+    except (OSError, TimeoutError) as exc:
+        raise HostUnreachable("host is not reachable") from exc
+    except WebSocketException as exc:
+        # Something answered the dial but refused the upgrade (the Host/Origin guard).
+        raise ProbeError("host refused the connection") from exc
+    try:
+        async with ws:
+            return await asyncio.wait_for(_talk(_Ws(ws), token, work), _TIMEOUT)
     except ProbeError:
         raise
     except TimeoutError as exc:
         raise ProbeError("timed out talking to the host") from exc
-    except OSError as exc:
-        raise ProbeError("host is not reachable") from exc
+    except (OSError, WebSocketException) as exc:
+        raise ProbeError("the host closed the connection") from exc
 
 
-async def _connected[T](url: str, token: str, work: Callable[[_Socket], Awaitable[T]]) -> T:
-    from websockets.asyncio.client import connect
-    from websockets.exceptions import WebSocketException
-
-    try:
-        async with connect(
-            url,
-            max_size=1024 * 1024,
-            open_timeout=_TIMEOUT,
-            origin=None,
-            proxy=None,
-        ) as ws:
-            socket = _Ws(ws)
-            await _handshake(socket, token)
-            return await work(socket)
-    except WebSocketException as exc:
-        raise ProbeError("host is not reachable") from exc
+async def _talk[T](socket: _Socket, token: str, work: Callable[[_Socket], Awaitable[T]]) -> T:
+    await _handshake(socket, token)
+    return await work(socket)
 
 
 class _Ws:

@@ -76,6 +76,14 @@ def serve(
     state = _app_state(api)
     state.runtime.host = bind_host
     state.runtime.port = bind_port
+    if open_browser and bind_host not in _LOOPBACK and bind_host not in _ANY_ADDRESS:
+        # The login link works only on loopback; on a specific overlay address it would 403.
+        typer.echo(
+            f"not opening a browser: {bind_host} is not loopback, so the login link would be "
+            "refused. Pair this browser instead: run `sevn pair --scope owner` on this machine "
+            "and enter the code in the web app."
+        )
+        open_browser = False
     state.runtime.open_browser = open_browser
     import uvicorn
 
@@ -311,11 +319,14 @@ async def _devices_revoke_live(device_id: str) -> DeviceRecord | None:
     """
     import secrets
 
+    from sevn import control
     from sevn.identity.devices import DeviceError, DeviceRecord
-    from sevn.probe import HostRefused
+    from sevn.probe import HostRefused, HostUnreachable
 
     run = Paths.from_env().run
-    if not (run / "token").is_file() or not (run / "bind").is_file():
+    if not (run / "token").is_file():
+        return None
+    if not (run / "bind").is_file() and control.client_path(run) is None:
         return None
     try:
         result = await call_method(
@@ -328,8 +339,12 @@ async def _devices_revoke_live(device_id: str) -> DeviceRecord | None:
         if exc.code == "last_owner":
             raise DeviceError("last_owner", str(exc)) from exc
         raise DeviceError("internal", str(exc)) from exc
-    except ProbeError:
+    except HostUnreachable:
         return None
+    except ProbeError as exc:
+        # A host answered but the call did not go through: never claim success, and never
+        # write offline behind a running host's back.
+        raise DeviceError("internal", f"the running host did not revoke the device: {exc}") from exc
     return DeviceRecord.model_validate(result)
 
 

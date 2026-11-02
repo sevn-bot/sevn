@@ -33,8 +33,10 @@ carries any of these headers: `Forwarded`, `X-Forwarded-For`, `X-Forwarded-Host`
 `X-Forwarded-Proto`, `X-Real-IP`, `Tailscale-User-Login`, `Tailscale-User-Name`,
 `Tailscale-User-Profile-Pic` or `Tailscale-Headers-Info`.
 
-- Anything that arrives through `tailscale serve` or any other proxy is never local. It has to
-  pass the device handshake.
+- Anything that arrives through `tailscale serve`, or through any proxy that adds one of these
+  headers, is not local. It has to pass the device handshake. A proxy that rewrites `Host` to
+  a loopback name and adds none of these headers (an nginx default) cannot be told apart from
+  a local client; such a request still needs the loopback token or cookie.
 - `/auth/login` works only on loopback. Every other request gets `403 login is loopback only`.
 - sevn only checks whether these headers are present. `Tailscale-User-Login` and the other
   identity headers are never used as identity. A tailnet user who has not paired a device gets
@@ -131,6 +133,11 @@ sevn serve --host 10.147.17.5 --port 8787 --allow-remote-bind
 [http]
 allowed_hosts = ["10.147.17.5:8787"]
 ```
+
+On such a bind no TCP connection is loopback, so the login link does not work and
+`sevn serve --open` prints a hint instead: run `sevn pair --scope owner` on the host and enter
+the code in the web app. The local CLI (`sevn probe`, `sevn devices revoke`) reaches the host
+through its unix control socket, `<home>/run/control.sock` (mode 0600).
 
 The browser checks a `ws://` URL before it dials. It accepts loopback, an IP inside the
 profile's private networks, or any `ws://` URL when the owner has turned on **Allow plain ws://

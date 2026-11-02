@@ -14,11 +14,6 @@ def _without_ticket(result: dict[str, object]) -> dict[str, object]:
     return {**result, "ticket": "", "short_code": "", "qr_uri": ""}
 
 
-def is_loopback(ctx: Ctx) -> bool:
-    """Whether the session is a loopback owner session. Unknown means no (fail closed)."""
-    return getattr(ctx, "loopback", False) is True
-
-
 @method(
     "pairing.start",
     params=PairingStartParams,
@@ -28,7 +23,7 @@ def is_loopback(ctx: Ctx) -> bool:
     stored=_without_ticket,
 )
 async def pairing_start(ctx: Ctx, params: PairingStartParams) -> PairingStartResult:
-    if params.scope == "owner" and not is_loopback(ctx):
+    if params.scope == "owner" and not ctx.loopback:
         raise ProtocolError("forbidden", "owner tickets need a loopback owner session")
     ticket = await pairing.start(
         identity=ctx.hub.identity,

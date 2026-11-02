@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from sevn.api.pairing import is_loopback
 from sevn.contracts.methods import (
     DevicesListParams,
     DevicesListResult,
@@ -46,7 +45,7 @@ async def devices_rename(_ctx: Ctx, params: DevicesRenameParams) -> DeviceRecord
 )
 async def devices_revoke(ctx: Ctx, params: DevicesRevokeParams) -> DeviceRecord:
     # Only a loopback owner may revoke the last live owner device (recovery stays local).
-    revoked = await devices.revoke(params.id, allow_last_owner=is_loopback(ctx))
+    revoked = await devices.revoke(params.id, allow_last_owner=ctx.loopback)
     # D2: revoked_at is committed first, then every live session of the device is cut off.
     await ctx.hub.close_device(revoked.id)
     return revoked
@@ -59,7 +58,7 @@ async def devices_revoke(ctx: Ctx, params: DevicesRevokeParams) -> DeviceRecord:
     mutating=False,
 )
 async def devices_self(ctx: Ctx, _params: DevicesSelfParams) -> DeviceRecord:
-    device_id = getattr(ctx, "device_id", None)
-    if not isinstance(device_id, str) or device_id == "":
+    device_id = ctx.device_id
+    if device_id is None or device_id == "":
         raise DeviceError("not_found", "this session has no paired device")
     return await devices.get_device(device_id)
