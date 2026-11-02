@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Protocol
@@ -21,6 +22,7 @@ from sevn.domain.workspace import drop_locks
 from sevn.log import logger
 from sevn.memory.context import capture_after_turn
 from sevn.memory.store import MemoryStore
+from sevn.observability.spans import ToolSpans, cli_tool_spans, turn_result, turn_span
 from sevn.protocol.hub import Hub
 from sevn.runtime.approvals import (
     auto_low,
@@ -74,6 +76,7 @@ class _Job:
     agent_id: str
     text: str
     origin: str = "user"
+    trace_parent: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,6 +174,33 @@ class TurnRunner:
             logger.info("turn finished")
 
     async def _finish(
+        self,
+        turn_id: str,
+        started: datetime,
+        job: _Job,
+        agent: AgentRecord,
+        bot: BotRecord,
+        history: list[object] | None,
+        decisions: tuple[ToolDecision, ...] | None,
+        *,
+        stored: bool,
+    ) -> None:
+        # The turn joins the message's trace through the job row, never through the
+        # context this task inherited, so a restart or another task keeps it (D5).
+        with turn_span(
+            job.trace_parent,
+            turn_id=turn_id,
+            job_id=job.id,
+            agent_id=agent.id,
+            bot_id=bot.id,
+            runtime=agent.runtime,
+            model=bot.model,
+        ):
+            await self._finish_turn(
+                turn_id, started, job, agent, bot, history, decisions, stored=stored
+            )
+
+    async def _finish_turn(
         self,
         turn_id: str,
         started: datetime,
@@ -282,7 +312,7 @@ class TurnRunner:
         finished: RuntimeEvent | None = None
         error_code: str | None = None
         error_usage: dict[str, object] | None = None
-        async for event in self._runtime.run_turn(context):
+        async for event in _traced_tools(agent.runtime, self._runtime.run_turn(context)):
             if event.kind == "text_delta" and event.text:
                 parts.append(event.text)
                 if self._watch is not None:
@@ -478,6 +508,31 @@ class TurnRunner:
                 await self._hub.relay(event)
 
 
+def _traced_tools(runtime: str, events: AsyncIterator[RuntimeEvent]) -> AsyncIterator[RuntimeEvent]:
+    """``events``, with ``tool.<name>`` spans opened from a CLI runtime's tool events.
+
+    Pydantic AI turns and untraced turns get the runtime's stream itself.
+    """
+    tools = cli_tool_spans(runtime)
+    if tools is None:
+        return events
+    return _with_tool_spans(tools, events)
+
+
+async def _with_tool_spans(
+    tools: ToolSpans, events: AsyncIterator[RuntimeEvent]
+) -> AsyncIterator[RuntimeEvent]:
+    try:
+        async for event in events:
+            if event.name and event.kind == "tool_call_started":
+                tools.start(event.name, event.args)
+            elif event.name and event.kind == "tool_call_finished":
+                tools.finish(event.name, ok=event.ok)
+            yield event
+    finally:
+        tools.close()
+
+
 def _user_message(turn_id: str, started: datetime, job: _Job, agent: AgentRecord) -> Message:
     return Message(
         id=new_id("msg_"),
@@ -511,6 +566,7 @@ async def _mark_started(job_id: str, *, agent_id: str | None = None) -> _Job | N
             agent_id=row.agent_id,
             text=row.text,
             origin=row.origin,
+            trace_parent=row.trace_parent,
         )
 
 
@@ -581,6 +637,7 @@ async def _load_resume(turn_id: str) -> _Loaded:
             agent_id=job_row.agent_id,
             text=job_row.text,
             origin=job_row.origin,
+            trace_parent=job_row.trace_parent,
         )
         agent_id = turn.agent_id
         bot_id = job_row.to_bot_id
@@ -620,6 +677,7 @@ async def _bind_turn(
         row.usage = combine_usage(row.usage or {}, usage)
         row.model_messages = model_messages
         row.finished_at = finished_at
+        turn_result(status=status, model=row.model, usage=row.usage)
         return row
     row = TurnRow(
         id=turn_id,
@@ -635,6 +693,7 @@ async def _bind_turn(
     )
     session.add(row)
     await session.flush()
+    turn_result(status=status, model=row.model, usage=row.usage)
     return row
 
 

@@ -19,6 +19,7 @@ from sevn.domain.errors import DomainError
 from sevn.domain.ids import new_id
 from sevn.domain.jobs import page_messages
 from sevn.domain.routing import RoutedMessage, deliver, reroute
+from sevn.observability.spans import job_span
 from sevn.protocol.registry import Ctx, method
 from sevn.runtime.worker import current
 from sevn.store.db import utcnow
@@ -44,10 +45,12 @@ async def messages_send(ctx: Ctx, params: MessagesSendParams) -> MessagesSendRes
         agent_id=params.agent_id,
         bot_id=params.bot_id,
     )
-    try:
-        stored_job, agent_id = await deliver(message, "user", job_id=job_id, hub=ctx.hub)
-    except DomainError as exc:
-        raise_protocol(exc)
+    # The message's trace starts here; the job row carries it to the turn (D5).
+    with job_span("user", job_id=job_id, bot_id=params.bot_id, text=params.text):
+        try:
+            stored_job, agent_id = await deliver(message, "user", job_id=job_id, hub=ctx.hub)
+        except DomainError as exc:
+            raise_protocol(exc)
     return MessagesSendResult(job_id=stored_job, agent_id=agent_id)
 
 

@@ -13,6 +13,7 @@ from sqlalchemy import and_, or_, select
 from sevn.domain.errors import DomainError
 from sevn.domain.ids import new_id
 from sevn.domain.session import open_session
+from sevn.observability.spans import job_traceparent
 from sevn.store.db import utcnow
 from sevn.store.models import Agent as AgentRow
 from sevn.store.models import Bot as BotRow
@@ -101,6 +102,7 @@ class JobService:
                     finished_at=None,
                     routine_id=routine_id,
                     silent=False,
+                    trace_parent=job_traceparent(),
                 )
             )
             await session.commit()
@@ -157,6 +159,10 @@ async def park_job(job_id: str, agent_id: str, *, start_new: bool = False) -> No
             raise DomainError("not_found", "agent not found")
         old_agent_id = job.agent_id
         job.agent_id = agent_id
+        # A reroute opens its own job span; the moved job's next turn joins that trace.
+        moved_in = job_traceparent()
+        if moved_in is not None:
+            job.trace_parent = moved_in
         job.status = "queued"
         job.started_at = None
         job.finished_at = None

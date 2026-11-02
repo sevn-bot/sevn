@@ -3,6 +3,7 @@
 - ``presets``: endpoints and headers per signal, including the Datadog presets.
 - ``setup``: install or skip the exporter at startup; the handle flushes at close.
 - ``redact``: secret scrubbing for every exported span, and content hashing.
+- ``spans``: one trace per message: ``job``, ``route.decide``, ``turn``, ``tool.<name>``.
 
 Submodules are imported directly; this package re-exports nothing so importing it
 stays cheap and ``sevn.observability.setup`` always names the module.
