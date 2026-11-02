@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Paired devices connect from outside the host with a signed handshake. A session that is not loopback gets a host-signed challenge over a fresh nonce and the origin it dialled, and must answer with its device key. It never uses the loopback token or cookie, and it runs with the scope the owner gave the device. A bad signature, an unknown or revoked device, an origin outside the allowed hosts, or a reused nonce closes the session with 4001. Revoking a device closes its live sessions with 4003 within a second, and `pair.complete` works over the socket. A WebSocket counts as loopback only when it comes from a loopback address and carries no proxy header.
+
 - Pair devices with a one-time ticket or 8-character code (`pairing.start`, `sevn pair` prints a terminal QR), list, rename and revoke them (`devices.*`, `sevn devices list|revoke` with no host running), and ship the signed direct-handshake reference with its test vectors. Tickets are stored only as SHA-256, burn after 5 failures, and the host refuses pairing after 20 failures an hour.
 
 - Close shell option-abbreviation approval bypasses, redact tool results before model history, serialize message publication, support confined Git commands in linked worktrees, refresh resolved routing chips and sandbox warnings, coalesce event replay, and retain confirmed sandbox settings after failed updates.

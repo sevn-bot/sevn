@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import hmac
+import ipaddress
 import os
 import secrets
 import webbrowser
@@ -455,8 +456,39 @@ async def _serve_socket(websocket: WebSocket, state: AppState) -> None:
         token=state.token,
         queue_limit=state.settings.protocol.session_queue_limit,
         cookie=cookie,
+        loopback=_loopback_peer(websocket),
+        allowed_hosts=sorted(_allowed_hosts(state.runtime.port)),
     )
     await session.run()
+
+
+# Headers a reverse proxy (``tailscale serve`` among them) adds. Any one of them makes
+# the request non-loopback; none of them is ever read as identity (plan 0055 D4).
+_PROXY_HEADERS = (
+    "forwarded",
+    "x-forwarded-for",
+    "x-forwarded-host",
+    "x-forwarded-proto",
+    "x-real-ip",
+    "tailscale-user-login",
+    "tailscale-user-name",
+    "tailscale-user-profile-pic",
+    "tailscale-headers-info",
+)
+
+
+def _loopback_peer(websocket: WebSocket) -> bool:
+    """Conservative loopback check: a loopback peer address and no proxy header."""
+    client = websocket.client
+    if client is None:
+        return False
+    try:
+        peer = ipaddress.ip_address(client.host)
+    except ValueError:
+        return False
+    if not peer.is_loopback:
+        return False
+    return not any(name in websocket.headers for name in _PROXY_HEADERS)
 
 
 async def _reject_websocket(send: Send, message: str) -> None:

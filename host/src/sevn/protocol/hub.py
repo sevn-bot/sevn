@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from collections.abc import Awaitable, Callable, Coroutine, Mapping
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -14,6 +15,7 @@ from sevn.contracts.frames import Evt, Tick, dump
 from sevn.identity import HostIdentity, load_or_create
 from sevn.log import logger
 from sevn.paths import Paths
+from sevn.protocol.errors import CLOSE_REVOKED, REASON_REVOKED
 from sevn.protocol.ticks import Clock, TickCoalescer
 from sevn.secrets.backends import open_backend
 from sevn.store.models import Event
@@ -23,6 +25,8 @@ from sevn.store.outbox import Outbox
 type OpWork = Callable[[], Awaitable[Mapping[str, object]]]
 
 _OP_SEP = "\x1f"
+# D3: a handshake nonce is never accepted twice within this window.
+_NONCE_WINDOW_S = 600.0
 _active_op: ContextVar[tuple[str, str, asyncio.Task[object] | None] | None] = ContextVar(
     "sevn_active_op", default=None
 )
@@ -36,6 +40,12 @@ class Peer(Protocol):
     def replay(self, frame: str) -> None: ...
 
     def release_live(self, high_water: int) -> None: ...
+
+
+class DevicePeer(Protocol):
+    """A session authenticated as a paired device; the hub can cut it off."""
+
+    async def close(self, code: int, reason: str) -> None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +69,8 @@ class Hub:
         self._lock = asyncio.Lock()
         self._op_locks: dict[str, asyncio.Lock] = {}
         self._peers: dict[int, Peer] = {}
+        self._device_peers: dict[str, dict[int, DevicePeer]] = {}
+        self._nonces: dict[bytes, float] = {}
         self._background: set[asyncio.Task[None]] = set()
         self._ticks = TickCoalescer(self._on_tick, clock)
 
@@ -69,6 +81,45 @@ class Hub:
     async def detach(self, peer: Peer) -> None:
         async with self._lock:
             self._peers.pop(id(peer), None)
+
+    def claim_nonce(self, nonce: bytes) -> bool:
+        """Record a handshake nonce. ``False`` when it was issued in the last 10 minutes."""
+        now = time.monotonic()
+        # Insertion order is issue order, so expired entries sit at the front.
+        while self._nonces:
+            oldest, issued = next(iter(self._nonces.items()))
+            if now - issued < _NONCE_WINDOW_S:
+                break
+            del self._nonces[oldest]
+        if nonce in self._nonces:
+            return False
+        self._nonces[nonce] = now
+        return True
+
+    def bind_device(self, device_id: str, peer: DevicePeer) -> None:
+        self._device_peers.setdefault(device_id, {})[id(peer)] = peer
+
+    def unbind_device(self, device_id: str, peer: DevicePeer) -> None:
+        peers = self._device_peers.get(device_id)
+        if peers is None:
+            return
+        peers.pop(id(peer), None)
+        if not peers:
+            del self._device_peers[device_id]
+
+    async def close_device(self, device_id: str) -> None:
+        """Close every live session of a revoked device with 4003 ``revoked`` (D2)."""
+        peers = self._device_peers.pop(device_id, {})
+        if not peers:
+            return
+        results = await asyncio.gather(
+            *(peer.close(CLOSE_REVOKED, REASON_REVOKED) for peer in peers.values()),
+            return_exceptions=True,
+        )
+        for result in results:
+            if isinstance(result, BaseException):
+                logger.opt(exception=result).error("closing a revoked device session failed")
+        logger.info("closed {} session(s) of revoked device {}", len(peers), device_id)
 
     async def emit(self, type: str, entity: str, payload: Mapping[str, object]) -> Event:
         active = _active_op.get()

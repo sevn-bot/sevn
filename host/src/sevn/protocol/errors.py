@@ -8,10 +8,12 @@ type Scope = Literal["owner", "member", "read_only"]
 
 CLOSE_UNAUTHORIZED = 4001
 CLOSE_VERSION = 4002
+CLOSE_REVOKED = 4003
 CLOSE_SLOW = 4008
 
 REASON_UNAUTHORIZED = "unauthorized"
 REASON_VERSION = "update sevn: host speaks 1..1"
+REASON_REVOKED = "revoked"
 REASON_SLOW = "slow consumer"
 
 _RANK: dict[str, int] = {"read_only": 0, "member": 1, "owner": 2}

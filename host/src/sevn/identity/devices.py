@@ -7,6 +7,7 @@ live sessions is the hub's job.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, cast
 
@@ -15,6 +16,7 @@ from sqlalchemy import CursorResult, func, or_, select, update
 
 from sevn.contracts.errors import ErrorCode, ProtocolError
 from sevn.domain.session import open_session
+from sevn.identity.handshake import unb64u
 from sevn.protocol.errors import Scope
 from sevn.store.db import utcnow
 from sevn.store.models import Device
@@ -106,6 +108,41 @@ async def revoke(device_id: str, *, allow_last_owner: bool) -> DeviceRecord:
         if updated.rowcount != 1 and row.revoked_at is None:
             raise DeviceError("last_owner", "cannot revoke the last owner device")
         return record(row)
+
+
+@dataclass(frozen=True, slots=True)
+class LiveDevice:
+    """What the direct handshake needs about a paired, unrevoked device (D3)."""
+
+    pubkey_ed25519: bytes
+    scope: Scope
+
+
+async def live_device(device_id: str) -> LiveDevice | None:
+    """The device's key and scope, or ``None`` when it is unknown or revoked."""
+    async with open_session() as session:
+        row = await session.get(Device, device_id)
+        if row is None or row.revoked_at is not None:
+            return None
+        try:
+            pubkey = unb64u(row.pubkey_ed25519)
+        except ValueError:
+            return None
+        return LiveDevice(pubkey_ed25519=pubkey, scope=record(row).scope)
+
+
+async def mark_seen(device_id: str) -> bool:
+    """Set ``last_seen`` for an unrevoked device. ``False`` means it was revoked meanwhile."""
+    stmt = (
+        update(Device)
+        .where(Device.id == device_id)
+        .where(Device.revoked_at.is_(None))
+        .values(last_seen=utcnow())
+    )
+    async with open_session() as session:
+        updated = cast("CursorResult[Any]", await session.execute(stmt))
+        await session.commit()
+        return updated.rowcount == 1
 
 
 def record(row: Device) -> DeviceRecord:

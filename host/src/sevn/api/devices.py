@@ -46,7 +46,10 @@ async def devices_rename(_ctx: Ctx, params: DevicesRenameParams) -> DeviceRecord
 )
 async def devices_revoke(ctx: Ctx, params: DevicesRevokeParams) -> DeviceRecord:
     # Only a loopback owner may revoke the last live owner device (recovery stays local).
-    return await devices.revoke(params.id, allow_last_owner=is_loopback(ctx))
+    revoked = await devices.revoke(params.id, allow_last_owner=is_loopback(ctx))
+    # D2: revoked_at is committed first, then every live session of the device is cut off.
+    await ctx.hub.close_device(revoked.id)
+    return revoked
 
 
 @method(
