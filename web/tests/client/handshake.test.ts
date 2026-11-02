@@ -7,7 +7,6 @@ import {
   loadVectors,
   unb64u,
 } from "../support/direct.ts";
-import { red } from "../support/red.ts";
 
 /**
  * Plan 0055 D3: the web signer passes `contracts/vectors/handshake_ws.json`.
@@ -47,9 +46,8 @@ async function loadKeys(): Promise<Keys> {
 }
 
 const vectors = loadVectors();
-const w5 = red("W5");
 
-w5("challenge and auth messages match the vector bytes", async () => {
+test("challenge and auth messages match the vector bytes", async () => {
   const keys = await loadKeys();
   for (const vector of vectors.cases) {
     expect(hex(await keys.challengeMessage(vector.nonce, vector.origin))).toBe(
@@ -67,7 +65,7 @@ w5("challenge and auth messages match the vector bytes", async () => {
   }
 });
 
-w5("the device signature matches the vectors byte for byte", async () => {
+test("the device signature matches the vectors byte for byte", async () => {
   const keys = await loadKeys();
   const device = await importSeed(
     vectors.device.seed_hex,
@@ -86,43 +84,40 @@ w5("the device signature matches the vectors byte for byte", async () => {
   }
 });
 
-w5(
-  "vector host signatures verify; a changed origin or nonce does not",
-  async () => {
-    const keys = await loadKeys();
-    for (const vector of vectors.cases) {
-      const host = vectors.host.pubkey;
-      expect(
-        await keys.verifyChallenge(
-          host,
-          vector.nonce,
-          vector.origin,
-          vector.host_sig,
-        ),
-      ).toBe(true);
-      expect(
-        await keys.verifyChallenge(
-          host,
-          vector.nonce,
-          "wss://evil.example",
-          vector.host_sig,
-        ),
-      ).toBe(false);
-      const nonce = unb64u(vector.nonce);
-      nonce[0] = (nonce[0] ?? 0) ^ 1;
-      expect(
-        await keys.verifyChallenge(
-          host,
-          b64u(nonce),
-          vector.origin,
-          vector.host_sig,
-        ),
-      ).toBe(false);
-    }
-  },
-);
+test("vector host signatures verify; a changed origin or nonce does not", async () => {
+  const keys = await loadKeys();
+  for (const vector of vectors.cases) {
+    const host = vectors.host.pubkey;
+    expect(
+      await keys.verifyChallenge(
+        host,
+        vector.nonce,
+        vector.origin,
+        vector.host_sig,
+      ),
+    ).toBe(true);
+    expect(
+      await keys.verifyChallenge(
+        host,
+        vector.nonce,
+        "wss://evil.example",
+        vector.host_sig,
+      ),
+    ).toBe(false);
+    const nonce = unb64u(vector.nonce);
+    nonce[0] = (nonce[0] ?? 0) ^ 1;
+    expect(
+      await keys.verifyChallenge(
+        host,
+        b64u(nonce),
+        vector.origin,
+        vector.host_sig,
+      ),
+    ).toBe(false);
+  }
+});
 
-w5("a signature from another host key does not verify", async () => {
+test("a signature from another host key does not verify", async () => {
   const keys = await loadKeys();
   const vector = vectors.cases[0];
   if (vector === undefined) {
@@ -147,7 +142,7 @@ w5("a signature from another host key does not verify", async () => {
   ).toBe(false);
 });
 
-w5("the host fingerprint matches the vectors", async () => {
+test("the host fingerprint matches the vectors", async () => {
   const keys = await loadKeys();
   expect(await keys.fingerprint(vectors.host.pubkey)).toBe(
     vectors.host.pubkey_fp,

@@ -1,4 +1,4 @@
-import { afterEach, expect, vi } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import {
   directHost,
   type HostProfile,
@@ -6,7 +6,6 @@ import {
   newHostKey,
   stubSockets,
 } from "../support/direct.ts";
-import { red } from "../support/red.ts";
 
 /**
  * Plan 0055 D6: host profiles, device keys and the pinned host key.
@@ -61,13 +60,12 @@ const profilesPath = "../../src/client/profiles.ts";
 const keysPath = "../../src/client/keys.ts";
 const clientPath = "../../src/client/index.ts";
 const errorsPath = "../../src/client/errors.ts";
-const w5 = red("W5");
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-w5("profiles store and load with every D6 field", async () => {
+test("profiles store and load with every D6 field", async () => {
   const profiles = await load<Profiles>(profilesPath);
   const store = profiles.memoryProfileStore();
   const { profile: mac } = await makeProfile({
@@ -95,7 +93,7 @@ w5("profiles store and load with every D6 field", async () => {
   expect(await profiles.loadProfile(store, "host_missing")).toBeUndefined();
 });
 
-w5("device keys are Ed25519 and the private key never exports", async () => {
+test("device keys are Ed25519 and the private key never exports", async () => {
   const keys = await load<Keys>(keysPath);
   const pair = await keys.generateDeviceKey();
   expect(pair.privateKey.algorithm.name).toBe("Ed25519");
@@ -121,7 +119,7 @@ w5("device keys are Ed25519 and the private key never exports", async () => {
   ).not.toEqual(raw);
 });
 
-w5("a profile with an extractable device key is refused", async () => {
+test("a profile with an extractable device key is refused", async () => {
   const profiles = await load<Profiles>(profilesPath);
   const store = profiles.memoryProfileStore();
   const extractable = (await crypto.subtle.generateKey(
@@ -140,99 +138,93 @@ w5("a profile with an extractable device key is refused", async () => {
   expect(await store.list()).toEqual([]);
 });
 
-w5(
-  "a challenge signed by another host key is a hard error with no auth sent",
-  async () => {
-    const mock = await stubSockets();
-    const { connect } = await load<{ connect: Connect }>(clientPath);
-    const { HostIdentityChanged } = await load<{
-      HostIdentityChanged: new () => Error;
-    }>(errorsPath);
-    const pinned = await newHostKey();
-    const impostor = await newHostKey();
-    const url = "ws://100.101.102.103:8787/ws";
-    const { profile, devicePubkey } = await makeProfile(
-      { host_id: "host_linux", direct_url: url },
-      pinned,
-    );
-    const host = await directHost(mock, {
+test("a challenge signed by another host key is a hard error with no auth sent", async () => {
+  const mock = await stubSockets();
+  const { connect } = await load<{ connect: Connect }>(clientPath);
+  const { HostIdentityChanged } = await load<{
+    HostIdentityChanged: new () => Error;
+  }>(errorsPath);
+  const pinned = await newHostKey();
+  const impostor = await newHostKey();
+  const url = "ws://100.101.102.103:8787/ws";
+  const { profile, devicePubkey } = await makeProfile(
+    { host_id: "host_linux", direct_url: url },
+    pinned,
+  );
+  const host = await directHost(mock, {
+    url,
+    hostId: "host_linux",
+    key: pinned,
+    devicePubkey,
+    signWith: impostor.pair.privateKey,
+  });
+  try {
+    const attempt = connect({
       url,
-      hostId: "host_linux",
-      key: pinned,
-      devicePubkey,
-      signWith: impostor.pair.privateKey,
+      device: {
+        id: profile.device_id,
+        key: profile.device_key,
+        hostPubkey: profile.host_pubkey,
+        hostFp: profile.host_pubkey_fp,
+      },
     });
-    try {
-      const attempt = connect({
-        url,
-        device: {
-          id: profile.device_id,
-          key: profile.device_key,
-          hostPubkey: profile.host_pubkey,
-          hostFp: profile.host_pubkey_fp,
-        },
-      });
-      const error = await attempt.then(
-        () => null,
-        (reason: unknown) => reason,
-      );
-      expect(error).toBeInstanceOf(HostIdentityChanged);
-      expect((error as Error).message).toBe(
-        "Host identity changed — re-pair to continue",
-      );
-      const sent = host.connections.flat();
-      expect(sent.some((frame) => frame.t === "auth")).toBe(false);
-      await new Promise((resolve) => setTimeout(resolve, 1200));
-      // A hard error: no silent re-pin and no reconnect loop.
-      expect(host.connections.length).toBe(1);
-    } finally {
-      host.stop();
-    }
-  },
-);
-
-w5(
-  "connect answers the challenge with the device key and the dialled origin",
-  async () => {
-    const mock = await stubSockets();
-    const { connect } = await load<{ connect: Connect }>(clientPath);
-    const key = await newHostKey();
-    const url = "ws://100.101.102.103:8787/ws";
-    const { profile, devicePubkey } = await makeProfile(
-      { host_id: "host_linux", direct_url: url },
-      key,
+    const error = await attempt.then(
+      () => null,
+      (reason: unknown) => reason,
     );
-    const host = await directHost(mock, {
-      url,
-      hostId: "host_linux",
-      key,
-      devicePubkey,
-    });
-    try {
-      const connection = await connect({
-        url,
-        device: {
-          id: profile.device_id,
-          key: profile.device_key,
-          hostPubkey: profile.host_pubkey,
-          hostFp: profile.host_pubkey_fp,
-        },
-      });
-      const frames = host.connections[0] ?? [];
-      const hello = frames.find((frame) => frame.t === "hello");
-      expect(hello?.device).toBe(profile.device_id);
-      expect(hello?.origin).toBe("ws://100.101.102.103:8787");
-      const auth = frames.find((frame) => frame.t === "auth");
-      expect(typeof auth?.device_sig).toBe("string");
-      expect(auth && "token" in auth).toBe(false);
-      connection.close();
-    } finally {
-      host.stop();
-    }
-  },
-);
+    expect(error).toBeInstanceOf(HostIdentityChanged);
+    expect((error as Error).message).toBe(
+      "Host identity changed — re-pair to continue",
+    );
+    const sent = host.connections.flat();
+    expect(sent.some((frame) => frame.t === "auth")).toBe(false);
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    // A hard error: no silent re-pin and no reconnect loop.
+    expect(host.connections.length).toBe(1);
+  } finally {
+    host.stop();
+  }
+});
 
-w5("deleting a profile revokes the device on that host first", async () => {
+test("connect answers the challenge with the device key and the dialled origin", async () => {
+  const mock = await stubSockets();
+  const { connect } = await load<{ connect: Connect }>(clientPath);
+  const key = await newHostKey();
+  const url = "ws://100.101.102.103:8787/ws";
+  const { profile, devicePubkey } = await makeProfile(
+    { host_id: "host_linux", direct_url: url },
+    key,
+  );
+  const host = await directHost(mock, {
+    url,
+    hostId: "host_linux",
+    key,
+    devicePubkey,
+  });
+  try {
+    const connection = await connect({
+      url,
+      device: {
+        id: profile.device_id,
+        key: profile.device_key,
+        hostPubkey: profile.host_pubkey,
+        hostFp: profile.host_pubkey_fp,
+      },
+    });
+    const frames = host.connections[0] ?? [];
+    const hello = frames.find((frame) => frame.t === "hello");
+    expect(hello?.device).toBe(profile.device_id);
+    expect(hello?.origin).toBe("ws://100.101.102.103:8787");
+    const auth = frames.find((frame) => frame.t === "auth");
+    expect(typeof auth?.device_sig).toBe("string");
+    expect(auth && "token" in auth).toBe(false);
+    connection.close();
+  } finally {
+    host.stop();
+  }
+});
+
+test("deleting a profile revokes the device on that host first", async () => {
   const profiles = await load<Profiles>(profilesPath);
   const store = profiles.memoryProfileStore();
   const { profile } = await makeProfile({
@@ -252,7 +244,7 @@ w5("deleting a profile revokes the device on that host first", async () => {
   expect(await store.get("host_linux")).toBeUndefined();
 });
 
-w5("deleting a profile of an unreachable host still deletes it", async () => {
+test("deleting a profile of an unreachable host still deletes it", async () => {
   const profiles = await load<Profiles>(profilesPath);
   const store = profiles.memoryProfileStore();
   const { profile } = await makeProfile({

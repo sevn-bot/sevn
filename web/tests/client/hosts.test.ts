@@ -1,4 +1,4 @@
-import { afterEach, expect, vi } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import {
   type DirectHost,
   directHost,
@@ -8,7 +8,6 @@ import {
   stubSockets,
   until,
 } from "../support/direct.ts";
-import { red } from "../support/red.ts";
 
 /**
  * Plan 0055 D6: one connection per profile, events ordered per host by `seq`.
@@ -39,7 +38,6 @@ async function loadHosts(): Promise<{
   return import(specifier);
 }
 
-const w5 = red("W5");
 const running: DirectHost[] = [];
 
 afterEach(() => {
@@ -74,7 +72,7 @@ async function twoHosts(mock: Awaited<ReturnType<typeof stubSockets>>) {
   return { a: a.profile, b: b.profile, hostA, hostB };
 }
 
-w5("events are ordered per host and never merged across hosts", async () => {
+test("events are ordered per host and never merged across hosts", async () => {
   const mock = await stubSockets();
   const { a, b, hostA, hostB } = await twoHosts(mock);
   const { createHosts } = await loadHosts();
@@ -98,7 +96,10 @@ w5("events are ordered per host and never merged across hosts", async () => {
     expect(seen).toEqual({ host_a: [7, 8], host_b: [1, 2] });
     // B reconnects from B's own cursor, not A's.
     hostB.drop();
-    await until(() => hostB.connections.length === 2, 4000);
+    await until(
+      () => hostB.connections[1]?.some((frame) => frame.t === "hello") === true,
+      4000,
+    );
     const hello = hostB.connections[1]?.find((frame) => frame.t === "hello");
     expect(hello?.last_seq).toBe(2);
     const helloA = hostA.connections[0]?.find((frame) => frame.t === "hello");
@@ -108,7 +109,7 @@ w5("events are ordered per host and never merged across hosts", async () => {
   }
 });
 
-w5("a request goes to the host it names", async () => {
+test("a request goes to the host it names", async () => {
   const mock = await stubSockets();
   const { a, b, hostA, hostB } = await twoHosts(mock);
   const { createHosts } = await loadHosts();
@@ -126,53 +127,50 @@ w5("a request goes to the host it names", async () => {
   }
 });
 
-w5(
-  "one host down does not stop the others; a refused URL never dials",
-  async () => {
-    const mock = await stubSockets();
-    const dialled: string[] = [];
-    const Base = mock.WebSocket as new (url: string) => object;
-    class Recording extends Base {
-      constructor(url: string) {
-        super(url);
-        dialled.push(url);
-      }
+test("one host down does not stop the others; a refused URL never dials", async () => {
+  const mock = await stubSockets();
+  const dialled: string[] = [];
+  const Base = mock.WebSocket as new (url: string) => object;
+  class Recording extends Base {
+    constructor(url: string) {
+      super(url);
+      dialled.push(url);
     }
-    vi.stubGlobal("WebSocket", Recording);
-    const { a, b, hostA, hostB } = await twoHosts(mock);
-    const down = await makeProfile({
-      host_id: "host_down",
-      direct_url: "ws://100.101.102.9:8787/ws",
-    });
-    const lan = await makeProfile({
-      host_id: "host_lan",
-      direct_url: "ws://192.168.1.20:8787/ws",
-    });
-    const { createHosts } = await loadHosts();
-    const hosts = createHosts({
-      profiles: [down.profile, a, lan.profile, b],
-    });
-    const seen: string[] = [];
-    hosts.onEvent((hostId, event) => {
-      seen.push(`${hostId}:${event.s}`);
-    });
-    hosts.start();
-    try {
-      await until(
-        () =>
-          hosts.status("host_a") === "connected" &&
-          hosts.status("host_b") === "connected",
-      );
-      hostA.event(7, "system.ping");
-      hostB.event(1, "system.ping");
-      await until(() => seen.length === 2);
-      expect(seen.sort()).toEqual(["host_a:7", "host_b:1"]);
-      expect(hosts.status("host_down")).not.toBe("connected");
-      expect(hosts.status("host_lan")).not.toBe("connected");
-      expect(dialled).not.toContain("ws://192.168.1.20:8787/ws");
-      expect(dialled).toContain("ws://100.101.102.9:8787/ws");
-    } finally {
-      hosts.stop();
-    }
-  },
-);
+  }
+  const { a, b, hostA, hostB } = await twoHosts(mock);
+  vi.stubGlobal("WebSocket", Recording);
+  const down = await makeProfile({
+    host_id: "host_down",
+    direct_url: "ws://100.101.102.9:8787/ws",
+  });
+  const lan = await makeProfile({
+    host_id: "host_lan",
+    direct_url: "ws://192.168.1.20:8787/ws",
+  });
+  const { createHosts } = await loadHosts();
+  const hosts = createHosts({
+    profiles: [down.profile, a, lan.profile, b],
+  });
+  const seen: string[] = [];
+  hosts.onEvent((hostId, event) => {
+    seen.push(`${hostId}:${event.s}`);
+  });
+  hosts.start();
+  try {
+    await until(
+      () =>
+        hosts.status("host_a") === "connected" &&
+        hosts.status("host_b") === "connected",
+    );
+    hostA.event(7, "system.ping");
+    hostB.event(1, "system.ping");
+    await until(() => seen.length === 2);
+    expect(seen.sort()).toEqual(["host_a:7", "host_b:1"]);
+    expect(hosts.status("host_down")).not.toBe("connected");
+    expect(hosts.status("host_lan")).not.toBe("connected");
+    expect(dialled).not.toContain("ws://192.168.1.20:8787/ws");
+    expect(dialled).toContain("ws://100.101.102.9:8787/ws");
+  } finally {
+    hosts.stop();
+  }
+});

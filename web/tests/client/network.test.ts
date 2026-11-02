@@ -1,5 +1,4 @@
-import { expect } from "vitest";
-import { red } from "../support/red.ts";
+import { expect, test } from "vitest";
 
 /**
  * Plan 0055 D7: the client-side private-network check, before any socket opens.
@@ -22,8 +21,6 @@ async function loadProfiles(): Promise<Profiles> {
   const specifier = "../../src/client/profiles.ts";
   return (await import(specifier)) as Profiles;
 }
-
-const w5 = red("W5");
 
 type Row = {
   url: string;
@@ -93,33 +90,54 @@ const matrix: Row[] = [
   },
 ];
 
-w5(
-  "the D7 matrix: wss, loopback, tailnet v4/v6, LAN, hostnames, opt-in",
-  async () => {
-    const { checkDirectUrl } = await loadProfiles();
-    for (const row of matrix) {
-      const result = checkDirectUrl(row.url, row.options ?? {});
-      expect({ url: row.url, ok: result.ok }).toEqual({
+test("the D7 matrix: wss, loopback, tailnet v4/v6, LAN, hostnames, opt-in", async () => {
+  const { checkDirectUrl } = await loadProfiles();
+  for (const row of matrix) {
+    const result = checkDirectUrl(row.url, row.options ?? {});
+    expect({ url: row.url, ok: result.ok }).toEqual({
+      url: row.url,
+      ok: row.ok,
+    });
+    if (!row.ok && !result.ok) {
+      expect({ url: row.url, reason: result.reason }).toEqual({
         url: row.url,
-        ok: row.ok,
+        reason: row.reason,
       });
-      if (!row.ok && !result.ok) {
-        expect({ url: row.url, reason: result.reason }).toEqual({
-          url: row.url,
-          reason: row.reason,
-        });
-      }
     }
-  },
-);
+  }
+});
 
-w5(
-  "the default private networks are the Tailscale and Headscale ranges",
-  async () => {
-    const { DEFAULT_PRIVATE_NETWORKS } = await loadProfiles();
-    expect([...DEFAULT_PRIVATE_NETWORKS]).toEqual([
-      "100.64.0.0/10",
-      "fd7a:115c:a1e0::/48",
-    ]);
-  },
-);
+test("the default private networks are the Tailscale and Headscale ranges", async () => {
+  const { DEFAULT_PRIVATE_NETWORKS } = await loadProfiles();
+  expect([...DEFAULT_PRIVATE_NETWORKS]).toEqual([
+    "100.64.0.0/10",
+    "fd7a:115c:a1e0::/48",
+  ]);
+});
+
+test("ws://localhost counts as loopback; a localhost lookalike is a hostname", async () => {
+  // Browsers hard-wire `localhost` to the loopback interface, so it is not a name the
+  // browser resolves over the network (D7's reason to refuse ws:// hostnames).
+  const { checkDirectUrl } = await loadProfiles();
+  expect(checkDirectUrl("ws://localhost:8787/ws", {}).ok).toBe(true);
+  const lookalike = checkDirectUrl("ws://localhost.evil.example:8787/ws", {});
+  expect(lookalike).toEqual({ ok: false, reason: "hostname_over_ws" });
+});
+
+test("a profile's private_networks replaces the default list", async () => {
+  // The setting defaults to the Tailscale and Headscale ranges; an owner-edited list is
+  // taken as written, so an owner who wants both keeps the defaults in it.
+  const { checkDirectUrl, DEFAULT_PRIVATE_NETWORKS } = await loadProfiles();
+  const own = { private_networks: ["10.147.17.0/24"] };
+  expect(checkDirectUrl("ws://10.147.17.5:8787/ws", own).ok).toBe(true);
+  expect(checkDirectUrl("ws://100.101.102.103:8787/ws", own)).toEqual({
+    ok: false,
+    reason: "not_private",
+  });
+  const both = {
+    private_networks: [...DEFAULT_PRIVATE_NETWORKS, "10.147.17.0/24"],
+  };
+  expect(checkDirectUrl("ws://100.101.102.103:8787/ws", both).ok).toBe(true);
+  expect(checkDirectUrl("ws://10.147.17.5:8787/ws", both).ok).toBe(true);
+  expect(checkDirectUrl("ws://[fd7a:115c:a1e0::1]:8787/ws", {}).ok).toBe(true);
+});
