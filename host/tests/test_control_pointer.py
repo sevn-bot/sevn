@@ -23,8 +23,6 @@ from pathlib import Path
 import pytest
 from support.serve import env, sevn, short_root
 
-F4 = pytest.mark.xfail(strict=False, reason="green after WV fix: control pointer ownership")
-
 
 class _Listener:
     """A stand-in unix listener that records every byte any client sends it."""
@@ -98,7 +96,6 @@ def _client_path(home: Path) -> Path | None:
 # --- client_path ------------------------------------------------------------------------------
 
 
-@F4
 @pytest.mark.parametrize("dir_mode", [0o777, 0o755, 0o750, 0o701], ids=oct)
 def test_pointer_into_a_shared_directory_is_ignored(dir_mode: int) -> None:
     with _pointed_home(dir_mode) as (home, target):
@@ -109,7 +106,6 @@ def test_pointer_into_a_shared_directory_is_ignored(dir_mode: int) -> None:
             listener.close()
 
 
-@F4
 @pytest.mark.parametrize("dir_mode", [0o777, 0o755], ids=oct)
 def test_default_socket_in_a_shared_run_directory_is_ignored(dir_mode: int) -> None:
     with _pointed_home(dir_mode, pointer=False) as (home, target):
@@ -122,7 +118,7 @@ def test_default_socket_in_a_shared_run_directory_is_ignored(dir_mode: int) -> N
 
 @pytest.mark.parametrize("pointer", [True, False], ids=["pointer", "default"])
 def test_socket_in_a_private_own_directory_is_accepted(pointer: bool) -> None:
-    """Control (passes before and after the fix): a 0700 own directory is trusted."""
+    """Control: a 0700 own directory is trusted."""
     with _pointed_home(0o700, pointer=pointer) as (home, target):
         listener = _Listener(target)
         try:
@@ -131,7 +127,6 @@ def test_socket_in_a_private_own_directory_is_accepted(pointer: bool) -> None:
             listener.close()
 
 
-@F4
 @pytest.mark.parametrize("pointer", [True, False], ids=["pointer", "default"])
 def test_socket_owned_by_another_user_is_ignored(
     pointer: bool, monkeypatch: pytest.MonkeyPatch
@@ -151,7 +146,6 @@ def test_socket_owned_by_another_user_is_ignored(
 # --- the CLI sends nothing to an untrusted socket ---------------------------------------------
 
 
-@F4
 @pytest.mark.parametrize("dir_mode", [0o777, 0o755], ids=oct)
 @pytest.mark.parametrize(
     "command",
