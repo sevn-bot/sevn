@@ -1,0 +1,54 @@
+{
+  "cases": [
+    {
+      "auth_message_hex": "7365766e2d76317c617574687c77737c7365766e2d746573742d766563746f722d6e6f6e63652d303030303030303031c8e45dac16485a7ddc74e7ef91b4a19ca4923ed9c6c0b49adc1affd2e42e5a3e385a47447237574d4576444d395a7276323564564277",
+      "challenge_message_hex": "7365766e2d76317c6368616c7c77737c7365766e2d746573742d766563746f722d6e6f6e63652d303030303030303031c8e45dac16485a7ddc74e7ef91b4a19ca4923ed9c6c0b49adc1affd2e42e5a3e",
+      "device_sig": "Ac6l9cyNhJv0IUAZllcZEWsNiPBf3sLso3RRq_xLkb7nHxijVsvnMKPnab3Z3Y2JIms6Ezefw5sRIQPEUFvRCQ",
+      "host_sig": "NJV1kJgdE1Yc22YnMbBkXMyTg7-MPIRy077jGRsJ5NUHCVaUbeI6TKPJX09kMKJKjLlk8x6MuGuTIrHCVKdgDg",
+      "name": "tailscale_serve_https",
+      "nonce": "c2V2bi10ZXN0LXZlY3Rvci1ub25jZS0wMDAwMDAwMDE",
+      "origin": "wss://mac.tailnet.ts.net",
+      "origin_sha256_hex": "c8e45dac16485a7ddc74e7ef91b4a19ca4923ed9c6c0b49adc1affd2e42e5a3e"
+    },
+    {
+      "auth_message_hex": "7365766e2d76317c617574687c77737c7365766e2d746573742d766563746f722d6e6f6e63652d303030303030303032adc492c0b5b11520c52ba8126acac8518a4a00bea9150db51887226dde7d5d02385a47447237574d4576444d395a7276323564564277",
+      "challenge_message_hex": "7365766e2d76317c6368616c7c77737c7365766e2d746573742d766563746f722d6e6f6e63652d303030303030303032adc492c0b5b11520c52ba8126acac8518a4a00bea9150db51887226dde7d5d02",
+      "device_sig": "d7aWQ-DH4iuq_HzchWNkGri0BkwnCFdbgVwUX6-nQWyQAT15io-_oq-wQaWit73wy0hTfiqdp4syepRgLauIAA",
+      "host_sig": "P9BuP3xCiHrEZl2nDZMtHMooKEYt1gcy7cdmgQiaBmMYkYxmO3solnlzKqAccH7w3vpBDYYW5kbegf6f7rreBQ",
+      "name": "overlay_ipv4_plain_ws",
+      "nonce": "c2V2bi10ZXN0LXZlY3Rvci1ub25jZS0wMDAwMDAwMDI",
+      "origin": "ws://100.101.102.103:8787",
+      "origin_sha256_hex": "adc492c0b5b11520c52ba8126acac8518a4a00bea9150db51887226dde7d5d02"
+    },
+    {
+      "auth_message_hex": "7365766e2d76317c617574687c77737c7365766e2d746573742d766563746f722d6e6f6e63652d3030303030303030338ff8525a327c9d687b8f5a8030b2b55dc0fc3cea7f397188ada80f00d103a281385a47447237574d4576444d395a7276323564564277",
+      "challenge_message_hex": "7365766e2d76317c6368616c7c77737c7365766e2d746573742d766563746f722d6e6f6e63652d3030303030303030338ff8525a327c9d687b8f5a8030b2b55dc0fc3cea7f397188ada80f00d103a281",
+      "device_sig": "lYnGIk4BbRRG3Q3yzkUWvn1a4iiMCik-gBASYUqgRYm4R2Me0j4XMU9J-Cx3LHpw3qPL-0kH6whAN2nhwEojCA",
+      "host_sig": "xlnlXNP9cQjEzqRHnASpo-3M5MlexHgYph1cfm_OQZsMxnS6rXNU1RlhNVTUa4nJn1xcH_FTk5eTlXu-jTgcDg",
+      "name": "overlay_ipv6_port",
+      "nonce": "c2V2bi10ZXN0LXZlY3Rvci1ub25jZS0wMDAwMDAwMDM",
+      "origin": "wss://[fd7a:115c:a1e0::1]:8443",
+      "origin_sha256_hex": "8ff8525a327c9d687b8f5a8030b2b55dc0fc3cea7f397188ada80f00d103a281"
+    }
+  ],
+  "description": "D3 direct-transport handshake vectors (plan 0055). Test-only keys: never use these seeds anywhere else.",
+  "device": {
+    "pubkey": "51Z8ZslA0sfJFW7MrEBTt1XSvcizQZX3HIBB3nFOqpU",
+    "seed_hex": "7365766e2d746573742d766563746f722d6465766963652d736565642d303031"
+  },
+  "host": {
+    "host_id": "host_6giyhl5vrqjpbthvtlx5xf2va4",
+    "pubkey": "G20Z7fcRq1CnvMq0m5JbVKdBQ2e629JF9FmjmfSZSUA",
+    "pubkey_fp": "8ZGDr7WMEvDM9Zrv25dVBw",
+    "seed_hex": "7365766e2d746573742d766563746f722d686f73742d736565642d3030303031"
+  },
+  "layout": {
+    "auth_message": "utf8('sevn-v1|auth|ws|') || nonce(32 raw bytes) || sha256(utf8(origin)) || utf8(host_pubkey_fp)",
+    "challenge_message": "utf8('sevn-v1|chal|ws|') || nonce(32 raw bytes) || sha256(utf8(origin))",
+    "encoding": "nonce, public keys and signatures are base64url without padding; seeds and messages are lowercase hex",
+    "host_id": "'host_' + lowercase(base32-nopad(sha256(host_pubkey)))[:26]",
+    "host_pubkey_fp": "base64url-nopad(sha256(host_pubkey)[:16])",
+    "signature": "Ed25519 (RFC 8032), 64 bytes"
+  },
+  "version": 1
+}

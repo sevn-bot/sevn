@@ -36,11 +36,43 @@ class MemoryHost:
     clients: list[Any] = field(default_factory=list)
 
     def open(self) -> tuple[Any, Any]:
+        """A loopback session, as the memory transport always was (plan 0055 D4)."""
         from sevn.protocol.session import Session
         from sevn.transports.memory import pair
 
         client, server = pair()
-        session = Session(server, self.hub, token=self.token, queue_limit=self.queue_limit)
+        extra: dict[str, Any] = {}
+        if "loopback" in inspect.signature(Session).parameters:
+            # Plan 0055 W3 adds the keyword; its default may be fail-closed.
+            extra["loopback"] = True
+        session = Session(server, self.hub, token=self.token, queue_limit=self.queue_limit, **extra)
+        self.tasks.append(asyncio.create_task(session.run()))
+        self.clients.append(client)
+        return client, session
+
+    def open_remote(
+        self,
+        *,
+        allowed_hosts: tuple[str, ...] = ("mac.tailnet.ts.net",),
+        cookie: str | None = None,
+    ) -> tuple[Any, Any]:
+        """A non-loopback session (plan 0055 D3/D4): it must pass the device handshake.
+
+        Pinned for W3: ``Session(..., loopback=False, allowed_hosts=[...])``.
+        """
+        from sevn.protocol.session import Session
+        from sevn.transports.memory import pair
+
+        client, server = pair()
+        session = Session(
+            server,
+            self.hub,
+            token=self.token,
+            queue_limit=self.queue_limit,
+            cookie=cookie,
+            loopback=False,
+            allowed_hosts=list(allowed_hosts),
+        )
         self.tasks.append(asyncio.create_task(session.run()))
         self.clients.append(client)
         return client, session
@@ -53,12 +85,14 @@ async def memory_host(
     *,
     queue_limit: int = 1000,
     clock: ManualClock | None = None,
+    config_extra: str = "",
 ) -> AsyncIterator[MemoryHost]:
     monkeypatch.setenv("SEVN_HOME", str(tmp_path))
     monkeypatch.setenv("SEVN_SECRETS__BACKEND", "age-file")
     monkeypatch.delenv("SEVN_DEV", raising=False)
     (tmp_path / "config.toml").write_text(
-        f'[protocol]\nsession_queue_limit = {queue_limit}\n\n[secrets]\nbackend = "age-file"\n',
+        f'[protocol]\nsession_queue_limit = {queue_limit}\n\n[secrets]\nbackend = "age-file"\n'
+        + config_extra,
         encoding="utf-8",
     )
 

@@ -123,8 +123,10 @@ def test_dev_proxy_host_allowed_when_sevn_dev(
             "/auth/login?token=not-the-token",
             headers={"host": "localhost:5173", "origin": "http://localhost:5173"},
         )
-        assert response.status_code == 401
-        assert response.text.strip() == "unauthorized"
+        # Plan 0055 D4: the Host guard lets it through; the port is not the bound one, so
+        # the request is not loopback and login may refuse it (401 today, 403 after W4).
+        assert response.status_code in {401, 403}
+        assert response.text.strip() not in {"forbidden host", "forbidden origin"}
 
 
 def test_allowed_hosts_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -143,7 +145,10 @@ def test_allowed_hosts_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
         base_url="http://sevn.internal:8787",
     ) as (_app, _token, client):
         allowed = client.get("/auth/login?token=not-the-token")  # type: ignore[attr-defined]
-        assert allowed.status_code == 401
+        # Plan 0055 D4: past the Host guard, but a non-loopback Host is refused by login
+        # itself (401 today, 403 "login is loopback only" after W4).
+        assert allowed.status_code in {401, 403}
+        assert allowed.text.strip() != "forbidden host"
 
 
 def test_https_origin_is_allowed_for_an_allowed_host(monkeypatch: pytest.MonkeyPatch) -> None:
