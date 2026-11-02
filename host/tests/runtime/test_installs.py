@@ -28,8 +28,6 @@ from support.archives import cursor_tree, script, sha256, tar_gz, zip_bytes
 from support.fileserver import FileServer, serve_files
 from support.repo import repo_root
 
-pytestmark = pytest.mark.xfail(strict=False, reason="green after W4")
-
 _RUNTIMES = ("claude", "opencode", "codex", "cursor-agent")
 _PLATFORMS = ("linux-x64", "linux-arm64", "darwin-arm64", "darwin-x64")
 _MANIFEST = repo_root() / "host" / "src" / "sevn" / "runtime" / "manifest.toml"
@@ -424,9 +422,16 @@ def test_install_switches_current_atomically(
     stop = threading.Event()
 
     def watch() -> None:
+        # Only ENOENT is a real absence. On APFS, stat through a symlink that a
+        # rename is replacing can raise EINVAL for an instant; the link is
+        # still there, so count it as present and keep watching.
         while not stop.is_set():
-            if not current.exists():
+            try:
+                os.stat(current)
+            except FileNotFoundError:
                 missing.append(1)
+            except OSError:
+                continue
 
     watcher = threading.Thread(target=watch, daemon=True)
     watcher.start()
