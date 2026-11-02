@@ -1,0 +1,121 @@
+# Pinned CLI runtimes for `sevn runtimes install` (plan 0025 D5).
+#
+# One version per runtime, one entry per platform. `sha256` is the digest of the file
+# at `url`; it is checked before anything is extracted. `format` is the download
+# shape (raw | tar.gz | zip), `binary` the entrypoint after extraction, and
+# `strip_components` drops leading archive directories. A sevn release updates these
+# pins; there is no "latest".
+
+[runtimes."claude"]
+version = "2.1.309"
+
+[runtimes."claude".platforms."linux-x64"]
+url = "https://downloads.claude.ai/claude-code-releases/2.1.309/linux-x64/claude"
+sha256 = "4d704a8aecbe038affa3000f498ae17c1b4f753add8facb8764120affc99b658"
+binary = "claude"
+format = "raw"
+
+[runtimes."claude".platforms."linux-arm64"]
+url = "https://downloads.claude.ai/claude-code-releases/2.1.309/linux-arm64/claude"
+sha256 = "9796dd26899337f687739a0b39a7353b639f062a3436a7b941fcf19a1b757a9b"
+binary = "claude"
+format = "raw"
+
+[runtimes."claude".platforms."darwin-arm64"]
+url = "https://downloads.claude.ai/claude-code-releases/2.1.309/darwin-arm64/claude"
+sha256 = "5eadc0009cdcdbc0d06e58110d7b2baf88ced6088b1c33a60a21217fe410619c"
+binary = "claude"
+format = "raw"
+
+[runtimes."claude".platforms."darwin-x64"]
+url = "https://downloads.claude.ai/claude-code-releases/2.1.309/darwin-x64/claude"
+sha256 = "200e0d775ae55c040db3bb8db8de3e22efcddbd7e0abff5ab50dd10f6853425d"
+binary = "claude"
+format = "raw"
+
+[runtimes."opencode"]
+version = "1.19.5"
+
+[runtimes."opencode".platforms."linux-x64"]
+url = "https://github.com/anomalyco/opencode/releases/download/v1.19.5/opencode-linux-x64.tar.gz"
+sha256 = "588310a336fa3b9df36b3f0225b26f679d453efaad0cf3d66c3651ef3ec1647a"
+binary = "opencode"
+format = "tar.gz"
+
+[runtimes."opencode".platforms."linux-arm64"]
+url = "https://github.com/anomalyco/opencode/releases/download/v1.19.5/opencode-linux-arm64.tar.gz"
+sha256 = "fae5be262d693b7c5e562856cc473e59e741772936db0c0600ac0d5ed5bd088b"
+binary = "opencode"
+format = "tar.gz"
+
+[runtimes."opencode".platforms."darwin-arm64"]
+url = "https://github.com/anomalyco/opencode/releases/download/v1.19.5/opencode-darwin-arm64.zip"
+sha256 = "c1c9e62521192192ef4c3ed1355ada2144055bddb61682217e997b03c55203c1"
+binary = "opencode"
+format = "zip"
+
+[runtimes."opencode".platforms."darwin-x64"]
+url = "https://github.com/anomalyco/opencode/releases/download/v1.19.5/opencode-darwin-x64.zip"
+sha256 = "b0212efa6db347187225a17fa3a31c6b261bf4c9f1589a290b0ca902d720d250"
+binary = "opencode"
+format = "zip"
+
+[runtimes."codex"]
+version = "0.166.0"
+
+[runtimes."codex".platforms."linux-x64"]
+url = "https://github.com/openai/codex/releases/download/rust-v0.166.0/codex-x86_64-unknown-linux-musl.tar.gz"
+sha256 = "a0bf572d2f93f056c6712a6da348e96078dc84f3885fd7be67807ef389cb3978"
+binary = "codex-x86_64-unknown-linux-musl"
+format = "tar.gz"
+
+[runtimes."codex".platforms."linux-arm64"]
+url = "https://github.com/openai/codex/releases/download/rust-v0.166.0/codex-aarch64-unknown-linux-musl.tar.gz"
+sha256 = "94eb707605ec2646b2e05b7edf7c4e7b3ccf02b16237c34ae9beb8cfb7f810a9"
+binary = "codex-aarch64-unknown-linux-musl"
+format = "tar.gz"
+
+[runtimes."codex".platforms."darwin-arm64"]
+url = "https://github.com/openai/codex/releases/download/rust-v0.166.0/codex-aarch64-apple-darwin.tar.gz"
+sha256 = "c48824462fc57681eafb0925d97b11b589010475613904f570b42fea53e240d5"
+binary = "codex-aarch64-apple-darwin"
+format = "tar.gz"
+
+[runtimes."codex".platforms."darwin-x64"]
+url = "https://github.com/openai/codex/releases/download/rust-v0.166.0/codex-x86_64-apple-darwin.tar.gz"
+sha256 = "db0c38713c36199b12e7c8d1629386c35a4ce8f99e1c9ce72f1725a74df67b57"
+binary = "codex-x86_64-apple-darwin"
+format = "tar.gz"
+
+# cursor-agent ships a whole tree under `dist-package/`: a bash wrapper that runs the
+# bundled `node` beside it. The tree is kept as is, with the top directory stripped.
+[runtimes."cursor-agent"]
+version = "2026.10.22-27dcf5f"
+
+[runtimes."cursor-agent".platforms."linux-x64"]
+url = "https://downloads.cursor.com/lab/2026.10.22-27dcf5f/linux/x64/agent-cli-package.tar.gz"
+sha256 = "85296944e4600a83c4b764f578d1502bf9c416db200d33a593e8f3ecabfdc294"
+binary = "cursor-agent"
+format = "tar.gz"
+strip_components = 1
+
+[runtimes."cursor-agent".platforms."linux-arm64"]
+url = "https://downloads.cursor.com/lab/2026.10.22-27dcf5f/linux/arm64/agent-cli-package.tar.gz"
+sha256 = "22a36df9720830668ccd4d707e5190204ab9c8a0efb2f068cc914895f804d3ec"
+binary = "cursor-agent"
+format = "tar.gz"
+strip_components = 1
+
+[runtimes."cursor-agent".platforms."darwin-arm64"]
+url = "https://downloads.cursor.com/lab/2026.10.22-27dcf5f/darwin/arm64/agent-cli-package.tar.gz"
+sha256 = "2f5b0a3dd5fb951cecffac813867d8a08d810e59837d59fd5f12d69b922398d7"
+binary = "cursor-agent"
+format = "tar.gz"
+strip_components = 1
+
+[runtimes."cursor-agent".platforms."darwin-x64"]
+url = "https://downloads.cursor.com/lab/2026.10.22-27dcf5f/darwin/x64/agent-cli-package.tar.gz"
+sha256 = "7a3cfbf0fcfb979b6213feb5f9fd10fbc7cd4e51ab28c3b572bb935e0b114961"
+binary = "cursor-agent"
+format = "tar.gz"
+strip_components = 1

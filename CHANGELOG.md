@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Add `sevn runtimes install <name>|--all`, `list` and `remove`: pinned, SHA-256-verified copies of the Claude, OpenCode, Codex and Cursor CLIs under `$SEVN_HOME/runtimes/<name>/<version>/` (or `SEVN_RUNTIMES_DIR` / `[runtimes] dir`), checked before extraction and switched in with an atomic `current` link. A version outside the manifest needs `--sha256`, and removing the version in use is refused while one of its turns runs. The host runs the managed copy first, then the one on `PATH` unless `[runtimes.<name>] use_system = false`, then for Claude the CLI bundled with the SDK.
+
 - Add a Secret Service backend for Linux desktops (`secrets.backend = "secret-service"`), picked when no backend is configured, a session bus answers and the collection is unlocked, while hosts with an existing `secrets.age` keep it. `sevn serve` refuses to start with `secrets_locked` or `secrets_unavailable` instead of falling back, and `sevn secret migrate --to secret-service|age-file` copies and verifies every secret before switching. `sevn doctor` adds `platform`, `service`, `bubblewrap`, `display`, `portals`, `linger` and `runtimes`, each bounded at 2 seconds.
 
 - Add `sevn service install|uninstall|status|logs|restart`: a launchd agent on macOS and a systemd `--user` unit on Linux, idempotent installs that replace a different unit only with `--force`, `status --json` states, and a `loginctl enable-linger` hint that sevn never runs itself.

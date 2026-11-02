@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import tomllib
+from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -78,6 +79,44 @@ class DecisionsSettings(BaseModel):
     thresholds: DecisionThresholds = Field(default_factory=DecisionThresholds)
 
 
+class RuntimeInstallSettings(BaseModel):
+    """One CLI runtime's resolution policy (plan 0025 D6)."""
+
+    use_system: bool = True
+
+
+class RuntimesSettings(BaseModel):
+    """Managed CLI runtime installs (plan 0025 D6).
+
+    ``dir`` overrides ``$SEVN_HOME/runtimes`` (``SEVN_RUNTIMES_DIR`` overrides both). Each
+    runtime's ``use_system`` lets resolution fall back to the copy on ``PATH``.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    dir: Path | None = None
+    claude: RuntimeInstallSettings = Field(default_factory=RuntimeInstallSettings)
+    opencode: RuntimeInstallSettings = Field(default_factory=RuntimeInstallSettings)
+    codex: RuntimeInstallSettings = Field(default_factory=RuntimeInstallSettings)
+    cursor_agent: RuntimeInstallSettings = Field(
+        default_factory=RuntimeInstallSettings, alias="cursor-agent"
+    )
+
+    def for_runtime(self, name: str) -> RuntimeInstallSettings:
+        """The policy for ``name``; a runtime without a section keeps the defaults."""
+        match name:
+            case "claude":
+                return self.claude
+            case "opencode":
+                return self.opencode
+            case "codex":
+                return self.codex
+            case "cursor-agent":
+                return self.cursor_agent
+            case _:
+                return RuntimeInstallSettings()
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="SEVN_",
@@ -93,6 +132,7 @@ class Settings(BaseSettings):
     memory: MemorySettings = Field(default_factory=MemorySettings)
     decisions: DecisionsSettings = Field(default_factory=DecisionsSettings)
     budgets: BudgetsSettings = Field(default_factory=BudgetsSettings)
+    runtimes: RuntimesSettings = Field(default_factory=RuntimesSettings)
 
     @classmethod
     def settings_customise_sources(

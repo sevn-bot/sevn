@@ -34,11 +34,13 @@ contracts_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False
 secret_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 evals_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 service_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
+runtimes_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 app.add_typer(probe_app, name="probe")
 app.add_typer(contracts_app, name="contracts")
 app.add_typer(secret_app, name="secret")
 app.add_typer(evals_app, name="evals")
 app.add_typer(service_app, name="service", help="Run the host as a launchd or systemd service.")
+app.add_typer(runtimes_app, name="runtimes", help="Install pinned copies of the CLI runtimes.")
 
 _LOOPBACK = frozenset({"127.0.0.1", "localhost", "::1", "[::1]"})
 
@@ -311,6 +313,85 @@ def service_restart() -> None:
     except ServiceError as exc:
         _service_fail(exc)
     typer.echo("restarted")
+
+
+@runtimes_app.command("install")
+def runtimes_install(
+    name: Annotated[str | None, typer.Argument()] = None,
+    install_all: Annotated[bool, typer.Option("--all")] = False,
+    version: Annotated[str | None, typer.Option("--version")] = None,
+    sha256: Annotated[str | None, typer.Option("--sha256")] = None,
+) -> None:
+    """Download, verify and install a pinned CLI runtime, then make it current.
+
+    A version outside the manifest needs ``--sha256``.
+    """
+    installs = sevn.runtime.installs
+    if (name is None) == (not install_all):
+        typer.echo("pass a runtime name or --all", err=True)
+        raise typer.Exit(code=2)
+    if install_all and (version is not None or sha256 is not None):
+        typer.echo("--version and --sha256 need a runtime name, not --all", err=True)
+        raise typer.Exit(code=2)
+    try:
+        names = list(installs.load_manifest().runtimes) if name is None else [name]
+        for runtime in names:
+            typer.echo(f"installing {runtime}…")
+            path = installs.install(runtime, version=version, sha256=sha256)
+            typer.echo(f"installed {runtime} {path.name} in {path}")
+    except (installs.InstallError, ConfigError) as exc:
+        _runtimes_fail(exc)
+
+
+@runtimes_app.command("list")
+def runtimes_list(as_json: Annotated[bool, typer.Option("--json")] = False) -> None:
+    """Show the managed versions, the system copy and which one the host uses."""
+    installs = sevn.runtime.installs
+    report: dict[str, dict[str, object]] = {}
+    try:
+        for runtime in installs.load_manifest().runtimes:
+            found = installs.installed(runtime)
+            system = shutil.which(runtime)
+            used = installs.resolve(runtime)
+            report[runtime] = {
+                "managed": list(found.versions),
+                "current": found.current,
+                "system": system if system is not None and Path(system).is_absolute() else None,
+                "used": "none" if used is None else used.source,
+            }
+    except (installs.InstallError, ConfigError) as exc:
+        _runtimes_fail(exc)
+    if as_json:
+        typer.echo(json.dumps(report))
+        return
+    for runtime, entry in report.items():
+        versions = cast("list[str]", entry["managed"])
+        typer.echo(
+            f"{runtime}: uses {entry['used']}; current {entry['current'] or '-'}; "
+            f"managed {', '.join(versions) or '-'}; system {entry['system'] or '-'}"
+        )
+
+
+@runtimes_app.command("remove")
+def runtimes_remove(
+    name: str,
+    version: Annotated[str | None, typer.Option("--version")] = None,
+) -> None:
+    """Remove a managed version, or every managed version of a runtime.
+
+    Refused while a turn of that runtime is running and ``current`` would go.
+    """
+    installs = sevn.runtime.installs
+    try:
+        installs.remove(name, version=version)
+    except (installs.InstallError, ConfigError) as exc:
+        _runtimes_fail(exc)
+    typer.echo(f"removed {name}" if version is None else f"removed {name} {version}")
+
+
+def _runtimes_fail(exc: Exception) -> NoReturn:
+    typer.echo(str(exc), err=True)
+    raise typer.Exit(code=1) from exc
 
 
 def _service_manager() -> ServiceManager:
