@@ -18,9 +18,24 @@ REASON_SLOW = "slow consumer"
 
 _RANK: dict[str, int] = {"read_only": 0, "member": 1, "owner": 2}
 
+# Plan 0055 D12 (operator, 2026-11-02): ``member`` = ``owner`` for now. This mapping is the
+# only place that says so; to narrow ``member`` later, drop its entry here. Stored scopes are
+# untouched: devices, ``session.scope`` and ``devices.self`` still say ``member``, and the D1
+# owner-ticket and D2 last-owner rules read the stored value, not this mapping.
+_EFFECTIVE: dict[str, str] = {"member": "owner"}
+
+
+def effective_scope(have: str) -> str:
+    """The scope a session's method checks run with (D12)."""
+    return _EFFECTIVE.get(have, have)
+
 
 def scope_allows(have: str, need: Scope | None) -> bool:
-    """Owner-only methods refuse member and read_only sessions."""
+    """Whether a session with scope ``have`` may call a method declared ``need``.
+
+    ``read_only`` is refused every owner- and member-scoped method; an unknown scope is
+    refused every scoped method; ``member`` currently passes as ``owner`` (D12).
+    """
     if need is None:
         return True
-    return _RANK.get(have, -1) >= _RANK[need]
+    return _RANK.get(effective_scope(have), -1) >= _RANK[need]
