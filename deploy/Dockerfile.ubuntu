@@ -1,0 +1,101 @@
+# Ubuntu 24.04 variant of deploy/Dockerfile (plan 0025 D9), tagged
+# sevn:<version>-ubuntu by `make image-ubuntu`. Same stages, user (uid 10001),
+# /data volume, healthcheck, command and CLI runtimes as the Debian image; the
+# only difference is the final base, with Python 3.13 installed by uv at build
+# time under /opt/uv/python.
+#
+# SEVN_ALLOWED_HOSTS: comma-separated Host values the Origin/Host guard accepts
+# in addition to 127.0.0.1:<port>, localhost:<port>, and [::1]:<port>. See
+# deploy/Dockerfile.
+#
+# CLI runtimes: the pinned binaries live under /opt/sevn/runtimes, owned by
+# root and read-only to sevn. Log in inside the container, for example
+# `docker exec -it sevn claude login`; the login lands in /home/sevn.
+
+FROM node:22 AS web
+
+WORKDIR /src/web
+
+RUN npm install -g pnpm@11.8.0
+
+COPY web/package.json web/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+
+COPY web/tsconfig.json web/tsconfig.app.json web/tsconfig.node.json web/vite.config.ts web/index.html ./
+COPY web/src ./src
+RUN pnpm run build
+
+# Identical to the runtimes stage of deploy/Dockerfile: it only produces files
+# (glibc binaries), and keeping it identical lets the two builds share its cache.
+FROM python:3.13-slim AS runtimes
+
+COPY --from=ghcr.io/astral-sh/uv:0.13.1 /uv /uvx /bin/
+
+WORKDIR /src
+
+ENV UV_COMPILE_BYTECODE=0 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=0
+
+COPY pyproject.toml uv.lock ./
+COPY host/pyproject.toml host/pyproject.toml
+RUN uv sync --frozen --no-dev --no-install-project --package sevn
+
+COPY host/src host/src
+RUN uv sync --frozen --no-dev --package sevn \
+    && SEVN_HOME=/tmp/sevn-home SEVN_RUNTIMES_DIR=/opt/sevn/runtimes \
+       /src/.venv/bin/sevn runtimes install --all \
+    && rm -rf /opt/sevn/runtimes/.tmp /tmp/sevn-home \
+    && chmod -R a+rX,go-w /opt/sevn
+
+FROM ubuntu:24.04
+
+COPY --from=ghcr.io/astral-sh/uv:0.13.1 /uv /uvx /bin/
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends bubblewrap ca-certificates curl git \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 10001 sevn \
+    && useradd --uid 10001 --gid 10001 --create-home --home-dir /home/sevn sevn \
+    && mkdir -p /data \
+    && chown sevn:sevn /data
+
+ENV UV_PYTHON_INSTALL_DIR=/opt/uv/python \
+    UV_PYTHON_PREFERENCE=only-managed \
+    UV_PYTHON=3.13
+RUN UV_PYTHON_DOWNLOADS=automatic uv python install 3.13 \
+    && chmod -R a+rX,go-w /opt/uv
+
+COPY --from=runtimes /opt/sevn/runtimes /opt/sevn/runtimes
+ENV SEVN_RUNTIMES_DIR=/opt/sevn/runtimes
+RUN for name in claude opencode codex cursor-agent; do \
+        ln -s "/opt/sevn/runtimes/$name/current/$name" "/usr/local/bin/$name"; \
+    done
+
+WORKDIR /app
+
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=0
+ENV PATH="/app/.venv/bin:${PATH}"
+ENV SEVN_HOME=/data
+
+COPY pyproject.toml uv.lock ./
+COPY host/pyproject.toml host/pyproject.toml
+RUN uv sync --frozen --no-dev --no-install-project --package sevn
+
+COPY host/alembic.ini host/alembic.ini
+COPY host/src host/src
+COPY --from=web /src/web/dist host/src/sevn/_web
+RUN uv sync --frozen --no-dev --package sevn \
+    && chown -R sevn:sevn /app
+
+VOLUME /data
+EXPOSE 8787
+
+USER sevn
+
+HEALTHCHECK --interval=10s --timeout=3s --start-period=20s --retries=3 \
+    CMD curl -fsS http://127.0.0.1:8787/health || exit 1
+
+CMD ["sevn", "serve", "--host", "0.0.0.0", "--port", "8787", "--allow-remote-bind"]

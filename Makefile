@@ -105,3 +105,14 @@ build: build-web
 
 # Full pre-merge gate: ci-fast, unit tests, e2e, and the web build.
 ci: ci-fast test e2e build
+
+# Container images (plan 0025 D8, D9). IMAGE_VERSION defaults to the host package version.
+IMAGE_VERSION ?= $(shell sed -n 's/^version = "\(.*\)"/\1/p' host/pyproject.toml | head -n 1)
+
+.PHONY: image image-ubuntu
+
+image:
+	docker build -f deploy/Dockerfile -t sevn:$(IMAGE_VERSION) .
+
+image-ubuntu:
+	docker build -f deploy/Dockerfile.ubuntu -t sevn:$(IMAGE_VERSION)-ubuntu .

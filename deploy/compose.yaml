@@ -1,0 +1,88 @@
+# sevn on Docker (plan 0025 D10). Run from the repository root:
+#
+#   docker compose -f deploy/compose.yaml up -d          # loopback only, port 8787
+#   docker exec -it sevn claude login                    # logins land in sevn-home
+#
+# SEVN_ALLOWED_HOSTS is read from deploy/.env (gitignored) or the shell, for
+# example SEVN_ALLOWED_HOSTS=sevn.example-tailnet.ts.net.
+#
+# Tailnet variant (profile `tailscale`): a tailscale/tailscale sidecar serves
+# https://<TS_HOSTNAME>.<tailnet>.ts.net and proxies it to the host on
+# 127.0.0.1:8787 inside the shared network namespace (deploy/tailscale/serve.json).
+# The auth key comes from the TS_AUTHKEY variable of the shell running compose
+# and reaches the sidecar only as the compose secret file /run/secrets/ts_authkey:
+#
+#   docker compose -f deploy/compose.yaml down                       # stop the loopback sevn first
+#   TS_AUTHKEY=... docker compose -f deploy/compose.yaml up -d sevn-tailnet
+#
+# Start the tailnet variant by naming `sevn-tailnet`, never with a bare
+# `docker compose --profile tailscale up`: `sevn` and `sevn-tailnet` share the
+# container name `sevn` and both data volumes, so compose refuses to run them
+# together ("container name "sevn" is already in use") instead of starting two
+# hosts on one database.
+
+x-sevn: &sevn
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile
+  image: sevn:compose
+  container_name: sevn
+  restart: unless-stopped
+  volumes:
+    - sevn-data:/data
+    - sevn-home:/home/sevn
+  # Sandbox (plan 0025 D11): Docker's default seccomp profile blocks the user
+  # namespaces bubblewrap needs, so the `workspace` level cannot start here and
+  # `sevn doctor` reports it. Prefer giving container bots the `full` level,
+  # whose boundary is the container. To run `workspace` instead, opt in to both
+  # options below; `systempaths=unconfined` unmasks /proc/kcore and similar
+  # paths inside the container, and an AppArmor host may also need
+  # `apparmor=unconfined`. See docs/linux.md.
+  # security_opt:
+  #   - seccomp=unconfined
+  #   - systempaths=unconfined
+
+services:
+  sevn:
+    <<: *sevn
+    ports:
+      - "127.0.0.1:8787:8787"
+    environment:
+      SEVN_ALLOWED_HOSTS: ${SEVN_ALLOWED_HOSTS:-}
+
+  tailscale:
+    image: tailscale/tailscale:v1.104.4
+    profiles: [tailscale]
+    hostname: ${TS_HOSTNAME:-sevn}
+    restart: unless-stopped
+    environment:
+      TS_AUTHKEY: file:/run/secrets/ts_authkey
+      TS_HOSTNAME: ${TS_HOSTNAME:-sevn}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SERVE_CONFIG: /config/serve.json
+      TS_USERSPACE: "true"
+    secrets:
+      - ts_authkey
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+      - ./tailscale:/config:ro
+
+  sevn-tailnet:
+    <<: *sevn
+    profiles: [tailscale]
+    network_mode: service:tailscale
+    depends_on:
+      - tailscale
+    # Only tailscale serve reaches the host: it listens on the namespace's loopback.
+    command: ["sevn", "serve", "--host", "127.0.0.1", "--port", "8787"]
+    environment:
+      SEVN_ALLOWED_HOSTS: ${SEVN_ALLOWED_HOSTS:-}
+
+volumes:
+  sevn-data:
+  sevn-home:
+  tailscale-state:
+
+secrets:
+  ts_authkey:
+    environment: TS_AUTHKEY
