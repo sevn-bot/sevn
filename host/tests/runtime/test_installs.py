@@ -1044,3 +1044,86 @@ def test_install_never_touches_credential_dirs(
         for path in _files_under(env.root):
             if path.is_file() and not path.is_symlink():
                 assert token.encode() not in path.read_bytes()
+
+
+# --- WV F4: a read-only runtimes root fails typed (D13) -----------------------
+
+_WV_R = pytest.mark.xfail(strict=False, reason="green after WV-R")
+_needs_non_root = pytest.mark.skipif(
+    hasattr(os, "geteuid") and os.geteuid() == 0, reason="root ignores directory permissions"
+)
+
+
+@pytest.fixture
+def freeze() -> Iterator[Any]:
+    """Make a tree read-only (like the image's root-owned /opt/sevn/runtimes); undo after."""
+    frozen: list[Path] = []
+
+    def apply(root: Path) -> None:
+        for path in [root, *root.rglob("*")]:
+            if path.is_dir() and not path.is_symlink():
+                path.chmod(0o555)
+                frozen.append(path)
+
+    try:
+        yield apply
+    finally:
+        for path in reversed(frozen):
+            path.chmod(0o755)
+
+
+@_WV_R
+@_needs_non_root
+def test_install_into_a_read_only_root_fails_typed(
+    env: Env, server: FileServer, use_manifest: Any, freeze: Any
+) -> None:
+    from sevn.runtime.installs import InstallError, install
+
+    use_manifest(_publish_all(server))
+    env.root.mkdir(parents=True)
+    freeze(env.root)
+    server.requests.clear()
+    with pytest.raises(InstallError) as caught:
+        install("opencode")
+    assert caught.value.code == "read_only_root"
+    assert str(env.root) in str(caught.value)
+    assert server.requests == [], "the root is checked before downloading"
+    assert list(env.root.iterdir()) == []
+
+
+@_WV_R
+@_needs_non_root
+def test_remove_from_a_read_only_root_fails_typed(
+    env: Env, server: FileServer, use_manifest: Any, freeze: Any
+) -> None:
+    from sevn.runtime.installs import InstallError, install, remove
+
+    use_manifest(_publish_all(server))
+    install("opencode")
+    freeze(env.root)
+    with pytest.raises(InstallError) as caught:
+        remove("opencode")
+    assert caught.value.code == "read_only_root"
+    assert str(env.root) in str(caught.value)
+    assert (env.root / "opencode" / "1.0.0" / "opencode").is_file()
+
+
+@_WV_R
+@_needs_non_root
+@pytest.mark.parametrize("command", ["install", "remove"])
+def test_cli_reports_a_read_only_root(
+    env: Env, server: FileServer, use_manifest: Any, freeze: Any, command: str
+) -> None:
+    from sevn.runtime.installs import install
+
+    use_manifest(_publish_all(server))
+    if command == "remove":
+        install("opencode")
+    else:
+        env.root.mkdir(parents=True)
+    freeze(env.root)
+    result = _invoke(["runtimes", command, "opencode"])
+    assert result.exit_code == 1, _out(result)
+    assert str(env.root) in _out(result)
+    assert "Traceback" not in _out(result)
+    assert "PermissionError" not in _out(result)

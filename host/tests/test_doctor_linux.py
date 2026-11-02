@@ -519,3 +519,41 @@ def test_probe_service_reports_the_d1_state(
         stdout="LoadState=loaded\nActiveState=active\nExecMainStatus=0\n",
     )
     assert probe_service() == "running"
+
+
+# --- WV F3: unknown IDs fall back to the first known ID_LIKE (D13) ------------
+
+_OMARCHY = 'NAME="Omarchy"\nID=omarchy\nID_LIKE=arch\nBUILD_ID=rolling\n'
+_ENDEAVOUR = 'NAME="EndeavourOS"\nID="endeavouros"\nID_LIKE="arch"\n'
+_POP = 'NAME="Pop!_OS"\nVERSION_ID="22.04"\nID=pop\nID_LIKE="ubuntu debian"\n'
+_KALI = 'NAME="Kali GNU/Linux"\nVERSION_ID="2025.1"\nID=kali\nID_LIKE=debian\n'
+_ROCKY = 'NAME="Rocky Linux"\nVERSION_ID="9.4"\nID="rocky"\nID_LIKE="rhel centos fedora"\n'
+
+
+@pytest.mark.xfail(strict=False, reason="green after WV-R")
+@pytest.mark.parametrize(
+    ("os_release", "expected"),
+    [
+        (_OMARCHY, "arch"),
+        (_ENDEAVOUR, "arch"),
+        (_POP, "ubuntu"),
+        (_KALI, "debian"),
+    ],
+    ids=["omarchy", "endeavouros", "pop-ubuntu-first", "kali"],
+)
+def test_classify_platform_falls_back_to_a_known_id_like(os_release: str, expected: str) -> None:
+    from sevn.system import classify_platform
+
+    assert classify_platform(os_release, in_container=False) == expected
+    assert classify_platform(os_release, in_container=True) == "container"
+
+
+@pytest.mark.parametrize(
+    ("os_release", "expected"),
+    [(_ROCKY, "rocky"), (_FEDORA, "fedora"), (_UBUNTU, "ubuntu 24.04"), (_ARCH, "arch")],
+    ids=["unknown-id-like", "no-id-like", "known-id-wins", "arch"],
+)
+def test_classify_platform_keeps_ids_without_a_known_family(os_release: str, expected: str) -> None:
+    from sevn.system import classify_platform
+
+    assert classify_platform(os_release, in_container=False) == expected

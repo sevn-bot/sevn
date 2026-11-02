@@ -15,6 +15,8 @@ from dataclasses import dataclass, field
 class FakeKeyring:
     store: dict[tuple[str, str], str] = field(default_factory=dict[tuple[str, str], str])
     locked: bool = False
+    # No Secret Service answers: every call raises ``keyring.errors.InitError``.
+    unavailable: bool = False
     # A username containing one of these names fails to store.
     fail_set: set[str] = field(default_factory=set[str])
     # A username containing one of these names reads back a different value.
@@ -51,9 +53,14 @@ class FakeKeyring:
         return list(self.store.values())
 
     def _check_locked(self) -> None:
-        if self.locked:
-            import keyring.errors
+        import keyring.errors
 
+        if self.unavailable:
+            raise keyring.errors.InitError(
+                "Failed to create the collection: The name org.freedesktop.secrets was not "
+                "provided by any .service files"
+            )
+        if self.locked:
             raise keyring.errors.KeyringLocked("Failed to unlock the collection!")
 
 

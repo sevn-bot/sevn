@@ -330,3 +330,40 @@ def test_unsupported_platform_is_refused(
     assert "sevn service supports macOS and Linux" in combined(result)
     assert linux_host.runner.calls == []
     assert not os.path.lexists(linux_host.unit_path)
+
+
+# --- WV F2: an unchanged reinstall restarts a running service (D13) ----------
+
+_WV_R = pytest.mark.xfail(strict=False, reason="green after WV-R")
+_SHOW = "LoadState=loaded\nActiveState={active}\nSubState={sub}\nExecMainStatus=0\n"
+
+
+@pytest.mark.parametrize(
+    ("active", "sub", "restarted"),
+    [
+        pytest.param("active", "running", True, marks=_WV_R),
+        ("inactive", "dead", False),
+        ("failed", "failed", False),
+    ],
+    ids=["running", "stopped", "failed"],
+)
+def test_unchanged_install_restarts_only_a_running_service(
+    linux_host: LinuxHost, active: str, sub: str, restarted: bool
+) -> None:
+    first = invoke(["service", "install"])
+    assert first.exit_code == 0, combined(first)
+    linux_host.runner.on(
+        "systemctl", "--user", "show", _UNIT, stdout=_SHOW.format(active=active, sub=sub)
+    )
+    linux_host.runner.calls.clear()
+
+    second = invoke(["service", "install"])
+    assert second.exit_code == 0, combined(second)
+    assert "unchanged" in combined(second)
+    restarts = linux_host.runner.find("systemctl", "--user", "restart", _UNIT)
+    restarts += linux_host.runner.find("systemctl", "--user", "try-restart", _UNIT)
+    assert bool(restarts) is restarted, linux_host.runner.argvs()
+    # A stopped service is never started by a plain restart.
+    if not restarted:
+        assert linux_host.runner.find("systemctl", "--user", "restart") == []
+        assert linux_host.runner.find("systemctl", "--user", "start") == []

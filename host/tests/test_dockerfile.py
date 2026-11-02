@@ -236,4 +236,4 @@ def test_live_image_builds_and_serves_health(name: str) -> None:
         for runtime in ("claude", "opencode", "codex", "cursor-agent"):
             assert body[runtime]["used"] == "managed", runtime
     finally:
-        subprocess.run(["docker", "rm", "-f", container], check=False)  # noqa: S603, S607
+        subprocess.run(["docker", "rm", "-f", "-v", container], check=False)  # noqa: S603, S607

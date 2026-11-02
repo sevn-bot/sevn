@@ -255,3 +255,39 @@ def test_logs_without_a_log_names_the_path(mac_host: MacHost) -> None:
     result = invoke(["service", "logs"])
     assert result.exit_code == 1, combined(result)
     assert str(mac_host.data_home.resolve() / "logs" / "service.log") in combined(result)
+
+
+# --- WV F2: an unchanged reinstall restarts a running service (D13) ----------
+
+_WV_R = pytest.mark.xfail(strict=False, reason="green after WV-R")
+
+
+@pytest.mark.parametrize(
+    ("state", "code", "restarted"),
+    [
+        pytest.param("running", "(never exited)", True, marks=_WV_R),
+        ("not running", "0", False),
+        ("not running", "3", False),
+    ],
+    ids=["running", "stopped", "failed"],
+)
+def test_unchanged_install_restarts_only_a_running_service(
+    mac_host: MacHost, state: str, code: str, restarted: bool
+) -> None:
+    first = invoke(["service", "install"])
+    assert first.exit_code == 0, combined(first)
+    mac_host.runner.on(
+        "launchctl",
+        "print",
+        f"{mac_host.domain}/{_LABEL}",
+        stdout=_PRINT.format(domain=mac_host.domain, state=state, code=code),
+    )
+    mac_host.runner.calls.clear()
+
+    second = invoke(["service", "install"])
+    assert second.exit_code == 0, combined(second)
+    assert "unchanged" in combined(second)
+    kicks = mac_host.runner.find("launchctl", "kickstart", "-k", f"{mac_host.domain}/{_LABEL}")
+    assert bool(kicks) is restarted, mac_host.runner.argvs()
+    if not restarted:
+        assert mac_host.runner.find("launchctl", "kickstart") == []
