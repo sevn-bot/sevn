@@ -14,6 +14,7 @@ import asyncio
 import enum
 import hmac
 import json
+import secrets
 from collections import deque
 from collections.abc import Coroutine, Iterable
 from contextlib import suppress
@@ -52,6 +53,7 @@ from sevn.transports.base import Connection, ConnectionClosed
 _HANDSHAKE_DEADLINE_S = 10.0
 _ORIGIN_SCHEMES = frozenset({"ws", "wss"})
 _REASON_PAIRED = "paired"
+_SIGNATURE_BYTES = 64  # an Ed25519 signature
 
 
 class _Phase(enum.Enum):
@@ -98,6 +100,8 @@ class Session:
         self._claimed_device = ""
         self._origin = ""
         self._nonce = b""
+        # Set when ``hello.origin`` is missing or not allowed: every answer is refused.
+        self._origin_refused = False
         self._cookie_ok = False
         self._cookie_rejected = False
         # A non-loopback session never looks at the cookie (D4).
@@ -285,7 +289,18 @@ class Session:
         """D3: sign a fresh nonce and the dialled origin; the device answers next."""
         origin = hello.origin
         if origin is None or not _origin_allowed(origin, self._allowed_hosts):
-            await self.close(CLOSE_UNAUTHORIZED, REASON_UNAUTHORIZED)
+            # Every non-loopback session gets a challenge (plan 0055 D4), but the host signs
+            # nothing for an origin it does not serve: the signature is random bytes, and the
+            # answer, whatever it is, closes with 4001.
+            self._origin_refused = True
+            self._phase = _Phase.AUTH
+            decoy = Challenge(
+                t="challenge",
+                nonce=handshake.b64u(secrets.token_bytes(handshake.NONCE_BYTES)),
+                host=self.hub.identity.host_id,
+                host_sig=handshake.b64u(secrets.token_bytes(_SIGNATURE_BYTES)),
+            )
+            self.enqueue(dump(decoy))
             return
         nonce = handshake.new_nonce()
         if len(nonce) != handshake.NONCE_BYTES or not self.hub.claim_nonce(nonce):
@@ -306,6 +321,9 @@ class Session:
         self.enqueue(dump(challenge))
 
     async def _on_device_auth(self, device_sig: str) -> None:
+        if self._origin_refused:
+            await self.close(CLOSE_UNAUTHORIZED, REASON_UNAUTHORIZED)
+            return
         device_id = self._claimed_device
         device = await devices.live_device(device_id) if device_id else None
         if device is None:
@@ -334,6 +352,9 @@ class Session:
 
     async def _on_pair_complete(self, frame: PairComplete) -> None:
         """D1: store the device, send ``paired``, close; the device reconnects."""
+        if self._origin_refused:
+            await self.close(CLOSE_UNAUTHORIZED, REASON_UNAUTHORIZED)
+            return
         try:
             paired = await pairing.complete(frame, identity=self.hub.identity)
         except (ProtocolError, ValueError):

@@ -15,7 +15,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import cast
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from starlette.datastructures import Headers
 from starlette.exceptions import HTTPException
 from starlette.responses import JSONResponse, PlainTextResponse, RedirectResponse, Response
@@ -37,7 +37,7 @@ import sevn.api.shares as share_api
 import sevn.sandbox.policy as sandbox_policy
 import sevn.system as system
 from sevn import __version__
-from sevn.config import Settings
+from sevn.config import HttpSettings, Settings
 from sevn.domain.agents import expire_agents
 from sevn.domain.errors import DomainError
 from sevn.domain.routines import run_due
@@ -105,6 +105,7 @@ CSP = (
 )
 _FORBIDDEN_ORIGIN = "forbidden origin"
 _FORBIDDEN_HOST = "forbidden host"
+_LOGIN_LOOPBACK_ONLY = "login is loopback only"
 _DEV_ORIGIN = "http://localhost:5173"
 _DEV_HOST = "localhost:5173"
 
@@ -171,7 +172,12 @@ def create_app(settings: Settings) -> ASGIApp:
         return {"status": "ok", "version": __version__, "host_id": hub.identity.host_id}
 
     @app.get("/auth/login")
-    async def login(token: str = "") -> Response:
+    async def login(request: Request, token: str = "") -> Response:
+        # Plan 0055 D4: only a loopback request may trade the token for a cookie. This runs
+        # after the Host and Origin guard and before the token is looked at.
+        peer = request.client.host if request.client is not None else None
+        if not is_loopback(request.headers, peer, state.runtime.port):
+            return PlainTextResponse(_LOGIN_LOOPBACK_ONLY, status_code=403)
         if not check_credentials(token, state.token):
             return PlainTextResponse("unauthorized", status_code=401)
         response = RedirectResponse(url="/", status_code=303)
@@ -199,7 +205,7 @@ def create_app(settings: Settings) -> ASGIApp:
 
     dist = web_dist_path()
     if dist.is_dir():
-        app.mount("/", _Spa(directory=str(dist)), name="spa")
+        app.mount("/", _Spa(directory=str(dist), http=settings.http), name="spa")
     return app
 
 
@@ -312,6 +318,7 @@ class OriginGuard:
             Headers(scope=scope),
             self._state.runtime.port,
             server=scope.get("server"),
+            http=self._state.settings.http,
         )
         if message is None:
             await self._app(scope, receive, send)
@@ -324,8 +331,9 @@ class OriginGuard:
 
 
 class _Spa(StaticFiles):
-    def __init__(self, directory: str) -> None:
+    def __init__(self, directory: str, http: HttpSettings) -> None:
         super().__init__(directory=directory, html=True)
+        self._http = http
 
     async def get_response(self, path: str, scope: Scope) -> Response:
         try:
@@ -337,7 +345,7 @@ class _Spa(StaticFiles):
             response = await super().get_response("index.html", scope)
         if response.status_code == 404 and _client_route(path):
             response = await super().get_response("index.html", scope)
-        response.headers["Content-Security-Policy"] = CSP
+        response.headers["Content-Security-Policy"] = content_security_policy(self._http)
         # A share link carries its secret in the path; keep it out of Referer.
         response.headers["Referrer-Policy"] = "no-referrer"
         return response
@@ -349,21 +357,30 @@ def _client_route(path: str) -> bool:
     return "." not in name
 
 
-def refusal(headers: Headers, port: int, *, server: object = None) -> str | None:
+def refusal(
+    headers: Headers,
+    port: int,
+    *,
+    server: object = None,
+    http: HttpSettings | None = None,
+) -> str | None:
     """Return a 403 body, or ``None`` when the request may proceed.
 
-    Host is checked first. This function does not read tokens or cookies.
+    Host is checked first, then Origin (same-origin, or an exact ``http.allowed_origins``
+    entry). This function does not read tokens or cookies.
     """
+    settings = http if http is not None else HttpSettings()
+    names = _allowed_hosts(port, settings)
     host = headers.get("host")
-    presented = host.strip() if host is not None else ""
-    if presented not in _allowed_hosts(port) and not _testclient_socket(presented, server):
+    presented = host.strip().lower() if host is not None else ""
+    if presented not in names and not _testclient_socket(presented, server):
         return _FORBIDDEN_HOST
     origin = headers.get("origin")
     if origin is None or origin.strip() == "":
         return None
     origin = origin.strip()
-    names = _allowed_hosts(port)
     allowed = {f"http://{item}" for item in names} | {f"https://{item}" for item in names}
+    allowed.update(entry.strip() for entry in settings.allowed_origins if entry.strip())
     if os.environ.get("SEVN_DEV") == "1":
         allowed.add(_DEV_ORIGIN)
     if origin not in allowed:
@@ -371,17 +388,35 @@ def refusal(headers: Headers, port: int, *, server: object = None) -> str | None
     return None
 
 
-def _allowed_hosts(port: int) -> set[str]:
+def _allowed_hosts(port: int, http: HttpSettings) -> set[str]:
+    """Host values the guard accepts: loopback with the bound port, plus the merged list."""
     hosts = {f"127.0.0.1:{port}", f"localhost:{port}", f"[::1]:{port}"}
     # Vite forwards the browser Host. D8 already allows this origin when SEVN_DEV=1.
     if os.environ.get("SEVN_DEV") == "1":
         hosts.add(_DEV_HOST)
-    extra = os.environ.get("SEVN_ALLOWED_HOSTS", "")
-    for item in extra.split(","):
-        cleaned = item.strip()
-        if cleaned:
-            hosts.add(cleaned)
+    hosts.update(http.merged_allowed_hosts())
     return hosts
+
+
+# Characters that would end a CSP source or directive. An entry holding one is dropped.
+_CSP_UNSAFE = frozenset(" \t\r\n;,'\"")
+
+
+def content_security_policy(http: HttpSettings) -> str:
+    """The SPA's CSP (plan 0055 D8).
+
+    ``connect-src`` is ``'self'``, then ``wss://`` for every allowed host, then
+    ``http.connect_src``. With neither set it is exactly ``CSP``.
+    """
+    sources = ["'self'"]
+    candidates = [f"wss://{name}" for name in http.merged_allowed_hosts()]
+    candidates.extend(entry.strip() for entry in http.connect_src)
+    for source in candidates:
+        if source and source not in sources and not _CSP_UNSAFE.intersection(source):
+            sources.append(source)
+    if len(sources) == 1:
+        return CSP
+    return CSP.replace("connect-src 'self'", "connect-src " + " ".join(sources), 1)
 
 
 def _testclient_socket(host: str, server: object) -> bool:
@@ -450,20 +485,22 @@ async def _serve_socket(websocket: WebSocket, state: AppState) -> None:
     await websocket.accept()
     raw_cookie = websocket.cookies.get("sevn_session")
     cookie = raw_cookie if raw_cookie else None
+    peer = websocket.client.host if websocket.client is not None else None
     session = Session(
         WsConnection(websocket),
         hub,
         token=state.token,
         queue_limit=state.settings.protocol.session_queue_limit,
         cookie=cookie,
-        loopback=_loopback_peer(websocket),
-        allowed_hosts=sorted(_allowed_hosts(state.runtime.port)),
+        loopback=is_loopback(websocket.headers, peer, state.runtime.port),
+        allowed_hosts=sorted(_allowed_hosts(state.runtime.port, state.settings.http)),
     )
     await session.run()
 
 
 # Headers a reverse proxy (``tailscale serve`` among them) adds. Any one of them makes
-# the request non-loopback; none of them is ever read as identity (plan 0055 D4).
+# the request non-loopback, even with an empty value. Only their presence is checked;
+# none of them is ever read, and never as identity (plan 0055 D4, W0.3).
 _PROXY_HEADERS = (
     "forwarded",
     "x-forwarded-for",
@@ -477,18 +514,28 @@ _PROXY_HEADERS = (
 )
 
 
-def _loopback_peer(websocket: WebSocket) -> bool:
-    """Conservative loopback check: a loopback peer address and no proxy header."""
-    client = websocket.client
-    if client is None:
+def is_loopback(headers: Headers, peer: str | None, port: int) -> bool:
+    """Whether a request is a loopback owner request (plan 0055 D4).
+
+    True only when the peer address is loopback, ``Host`` names ``127.0.0.1``,
+    ``localhost`` or ``[::1]`` with the bound ``port``, and no proxy header is present.
+    ``tailscale serve`` connects from 127.0.0.1, so the proxy headers decide that case.
+    """
+    if peer is None:
         return False
     try:
-        peer = ipaddress.ip_address(client.host)
+        address = ipaddress.ip_address(peer)
     except ValueError:
         return False
-    if not peer.is_loopback:
+    if not address.is_loopback:
         return False
-    return not any(name in websocket.headers for name in _PROXY_HEADERS)
+    host = headers.get("host")
+    if host is None:
+        return False
+    local = {f"127.0.0.1:{port}", f"localhost:{port}", f"[::1]:{port}"}
+    if host.strip().lower() not in local:
+        return False
+    return not any(name in headers for name in _PROXY_HEADERS)
 
 
 async def _reject_websocket(send: Send, message: str) -> None:

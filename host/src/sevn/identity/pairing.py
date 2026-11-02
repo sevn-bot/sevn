@@ -136,14 +136,13 @@ def pair_uri(identity: HostIdentity, ticket: str, direct_url: str | None) -> str
 
 
 def default_direct_url(http: HttpSettings) -> str | None:
-    """The first non-loopback ``http.allowed_hosts`` entry as a WebSocket URL.
+    """The first non-loopback allowed host (config, then ``SEVN_ALLOWED_HOSTS``) as a URL.
 
     ``wss://`` when ``http.public_scheme = "https"`` (``tailscale serve``), else ``ws://``.
     """
     scheme = "wss" if http.public_scheme == "https" else "ws"
-    for entry in http.allowed_hosts:
-        cleaned = entry.strip()
-        if cleaned == "" or _host_part(cleaned).lower() in _LOOPBACK_HOSTS:
+    for cleaned in http.merged_allowed_hosts():
+        if _host_part(cleaned).lower() in _LOOPBACK_HOSTS:
             continue
         return f"{scheme}://{cleaned}/ws"
     return None

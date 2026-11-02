@@ -41,6 +41,7 @@ devices_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 app.add_typer(devices_app, name="devices")
 
 _LOOPBACK = frozenset({"127.0.0.1", "localhost", "::1", "[::1]"})
+_ANY_ADDRESS = frozenset({"0.0.0.0", "::", "[::]"})  # noqa: S104 — names, not a bind
 
 
 @app.command()
@@ -58,6 +59,14 @@ def serve(
     bind_port = settings.http.port if port is None else port
     if bind_host not in _LOOPBACK and not allow_remote_bind:
         typer.echo(f"refusing to bind {bind_host}: pass --allow-remote-bind", err=True)
+        raise typer.Exit(code=2)
+    if bind_host in _ANY_ADDRESS and not settings.http.merged_allowed_hosts():
+        # Plan 0055 D5: every interface, but no name the Host guard would accept.
+        typer.echo(
+            f"refusing to bind {bind_host} with no http.allowed_hosts: add the name clients "
+            "use (config [http] allowed_hosts or SEVN_ALLOWED_HOSTS)",
+            err=True,
+        )
         raise typer.Exit(code=2)
     from sevn.log import setup
 

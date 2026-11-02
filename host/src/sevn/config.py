@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import tomllib
 from typing import Literal
 
@@ -35,6 +36,23 @@ class HttpSettings(BaseModel):
     allowed_hosts: list[str] = Field(default_factory=list)
     # ``https`` when a proxy such as ``tailscale serve`` terminates TLS in front of sevn.
     public_scheme: Literal["http", "https"] = "http"
+    # Exact origins of web clients served by other hosts (``https://linux.tailnet.ts.net``).
+    allowed_origins: list[str] = Field(default_factory=list)
+    # Extra CSP ``connect-src`` sources: other hosts this SPA dials (plan 0055 D8).
+    connect_src: list[str] = Field(default_factory=list)
+
+    def merged_allowed_hosts(self) -> list[str]:
+        """``allowed_hosts`` then ``SEVN_ALLOWED_HOSTS`` (comma-separated), lower-cased, deduped.
+
+        The one list the Host guard, the WebSocket session and the pairing URL share.
+        """
+        raw = [*self.allowed_hosts, *os.environ.get("SEVN_ALLOWED_HOSTS", "").split(",")]
+        merged: list[str] = []
+        for item in raw:
+            cleaned = item.strip().lower()
+            if cleaned and cleaned not in merged:
+                merged.append(cleaned)
+        return merged
 
 
 class RuntimeSettings(BaseModel):
