@@ -38,7 +38,6 @@ from support.pairing import (
     start_pairing,
 )
 
-W2 = pytest.mark.xfail(strict=False, reason="green after W2")
 W3 = pytest.mark.xfail(strict=False, reason="green after W3")
 
 SHORT_CODE = re.compile(r"^[0-9A-HJKMNP-TV-Z]{8}$")
@@ -89,7 +88,6 @@ async def _dispatch(session: Any, method: str, params: dict[str, Any]) -> Any:
 # --- pairing.start ---------------------------------------------------------------------------
 
 
-@W2
 @pytest.mark.parametrize("scope", ["member", "read_only"])
 async def test_start_is_owner_only(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, scope: str
@@ -105,7 +103,6 @@ async def test_start_is_owner_only(
         assert tickets == []
 
 
-@W2
 async def test_owner_ticket_needs_loopback_owner(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -133,7 +130,6 @@ async def test_owner_ticket_needs_loopback_owner(
         assert device.scope == "owner"
 
 
-@W2
 async def test_start_returns_ticket_code_uri_and_ten_minute_expiry(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -158,7 +154,6 @@ async def test_start_returns_ticket_code_uri_and_ten_minute_expiry(
         assert paired.scope == "member"
 
 
-@W2
 async def test_start_rejects_unknown_scope(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     async with _host(tmp_path, monkeypatch) as host:
         owner = await owner_client(host)
@@ -170,7 +165,6 @@ async def test_start_rejects_unknown_scope(tmp_path: Path, monkeypatch: pytest.M
 # --- tickets ---------------------------------------------------------------------------------
 
 
-@W2
 async def test_ticket_single_use_and_expires(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -188,7 +182,6 @@ async def test_ticket_single_use_and_expires(
         await _expect_refused(host, expired["ticket"], "unauthorized", BAD_TICKET)
 
 
-@W2
 async def test_ticket_stored_hashed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """K-CANARY: a ticket and its short code exist only as SHA-256 on the host."""
     from support.canary import canary
@@ -216,7 +209,6 @@ async def test_ticket_stored_hashed(tmp_path: Path, monkeypatch: pytest.MonkeyPa
         await complete(host, complete_frame(ticket, new_device()))
 
 
-@W2
 async def test_short_code_maps_to_ticket(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     async with _host(tmp_path, monkeypatch) as host:
         owner = await owner_client(host)
@@ -239,7 +231,6 @@ _HTTPS_HOSTS = (
 _HTTP_HOSTS = '\n[http]\nallowed_hosts = ["127.0.0.1:8787", "100.101.102.103:8787"]\n'
 
 
-@W2
 @pytest.mark.parametrize(
     ("http", "scheme", "netloc"),
     [
@@ -265,7 +256,6 @@ async def test_qr_uri_has_direct_url_from_allowed_hosts(
         assert explicit_query["d"] == ["wss://linux.tailnet.ts.net/ws"]
 
 
-@W2
 async def test_qr_uri_without_remote_host_has_no_direct_url(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -278,7 +268,6 @@ async def test_qr_uri_without_remote_host_has_no_direct_url(
 # --- rate limits -----------------------------------------------------------------------------
 
 
-@W2
 @pytest.mark.parametrize(("failures", "burned"), [(4, False), (5, True)])
 async def test_five_failures_burn_ticket(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failures: int, burned: bool
@@ -295,7 +284,6 @@ async def test_five_failures_burn_ticket(
             assert paired.device_id.startswith("dev_")
 
 
-@W2
 async def test_host_rate_limit_20_per_hour(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     async with _host(tmp_path, monkeypatch) as host:
         owner = await owner_client(host)
@@ -316,7 +304,6 @@ async def test_host_rate_limit_20_per_hour(tmp_path: Path, monkeypatch: pytest.M
 # --- pair.complete ---------------------------------------------------------------------------
 
 
-@W2
 async def test_complete_stores_device_and_returns_paired(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -345,7 +332,6 @@ async def test_complete_stores_device_and_returns_paired(
         assert device.pubkey in repr(devices)
 
 
-@W2
 async def test_complete_refuses_a_malformed_device_key(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -405,7 +391,6 @@ async def test_pair_complete_with_a_bad_ticket_closes_4001(
 # --- sevn pair (CLI) -------------------------------------------------------------------------
 
 
-@W2
 def test_cli_pair_prints_uri_and_code(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from typer.testing import CliRunner
 

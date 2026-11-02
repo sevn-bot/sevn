@@ -29,8 +29,6 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey,
 from support.pairing import auth_bytes, b64u, challenge_bytes, fingerprint, raw_public, unb64u
 from support.repo import repo_root
 
-W2 = pytest.mark.xfail(strict=False, reason="green after W2")
-
 VECTORS = repo_root() / "contracts" / "vectors" / "handshake_ws.json"
 
 
@@ -104,7 +102,6 @@ def test_a_changed_origin_or_nonce_breaks_the_vector_signatures() -> None:
 # --- sevn.identity.handshake (W2) -------------------------------------------------------------
 
 
-@W2
 @pytest.mark.parametrize("case", _CASES, ids=_IDS)
 def test_messages_match_vectors(case: dict[str, Any]) -> None:
     from sevn.identity import handshake
@@ -116,7 +113,6 @@ def test_messages_match_vectors(case: dict[str, Any]) -> None:
     )
 
 
-@W2
 @pytest.mark.parametrize("case", _CASES, ids=_IDS)
 def test_signatures_match_vectors_byte_for_byte(case: dict[str, Any]) -> None:
     from sevn.identity import handshake
@@ -128,7 +124,6 @@ def test_signatures_match_vectors_byte_for_byte(case: dict[str, Any]) -> None:
     )
 
 
-@W2
 @pytest.mark.parametrize("case", _CASES, ids=_IDS)
 def test_vector_signatures_verify(case: dict[str, Any]) -> None:
     from sevn.identity import handshake
@@ -154,7 +149,6 @@ def _tamper_fp(case: dict[str, Any]) -> tuple[bytes, str, str]:
     return unb64u(case["nonce"]), case["origin"], "AAAAAAAAAAAAAAAAAAAAAA"
 
 
-@W2
 @pytest.mark.parametrize("case", _CASES, ids=_IDS)
 @pytest.mark.parametrize(
     "tamper", [_tamper_origin, _tamper_nonce], ids=["changed-origin", "changed-nonce"]
@@ -168,7 +162,6 @@ def test_changed_origin_or_nonce_fails_challenge(case: dict[str, Any], tamper: A
     assert str(exc.value) == "bad signature"
 
 
-@W2
 @pytest.mark.parametrize("case", _CASES, ids=_IDS)
 @pytest.mark.parametrize(
     "tamper",
@@ -186,7 +179,6 @@ def test_changed_origin_nonce_or_host_fails_auth(case: dict[str, Any], tamper: A
     assert str(exc.value) == "bad signature"
 
 
-@W2
 def test_wrong_key_fails_and_garbage_signature_fails() -> None:
     from sevn.identity import handshake
 
@@ -201,7 +193,6 @@ def test_wrong_key_fails_and_garbage_signature_fails() -> None:
         )
 
 
-@W2
 def test_fingerprint_and_nonce_helpers() -> None:
     from sevn.identity import handshake
 
@@ -238,7 +229,6 @@ def test_host_identity_from_vector_seed_matches_host_id() -> None:
     assert identity.host_pubkey_fp == _DOC["host"]["pubkey_fp"]
 
 
-@W2
 def test_gen_vectors_reproduces_the_committed_file() -> None:
     script = repo_root() / "scripts" / "gen_vectors.py"
     spec = importlib.util.spec_from_file_location("sevn_gen_vectors", script)

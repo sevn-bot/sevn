@@ -23,10 +23,9 @@ from typing import Any
 
 import pytest
 from support.memory import MemoryHost, memory_host
+from support.migrations import down_revision_of, revision_ending, script_head
 from support.pairing import call, op_id, owner_client, pair_device, register_methods
 from support.repo import repo_root
-
-W2 = pytest.mark.xfail(strict=False, reason="green after W2")
 
 LAST_OWNER = "cannot revoke the last owner device"
 DEVICE_COLUMNS = {
@@ -40,8 +39,9 @@ DEVICE_COLUMNS = {
     "last_seen",
     "revoked_at",
 }
-PREVIOUS_HEAD = "0005_metrics_shares"
-THIS_HEAD = "0011_devices"
+# K-MIG: this plan's revision is the one ending in "_devices" (planned 0011_devices); its
+# parent is whatever head it was chained onto, so a re-chain at merge keeps these green.
+DEVICES_SUFFIX = "_devices"
 
 
 @asynccontextmanager
@@ -69,7 +69,6 @@ def _remote(host: MemoryHost, *, scope: str, device_id: str) -> Any:
 # --- devices.* -------------------------------------------------------------------------------
 
 
-@W2
 async def test_list_and_rename_are_owner_only(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -97,7 +96,6 @@ async def test_list_and_rename_are_owner_only(
                 assert res.e.code == "forbidden", (scope, method)
 
 
-@W2
 async def test_revoke_unknown_device_is_not_found(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -107,7 +105,6 @@ async def test_revoke_unknown_device_is_not_found(
         assert res["e"]["code"] == "not_found"
 
 
-@W2
 def test_revoke_persists_and_cli_revoke_works_offline(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -150,7 +147,6 @@ def test_revoke_persists_and_cli_revoke_works_offline(
     asyncio.run(_with_host(tmp_path, monkeypatch, check))
 
 
-@W2
 def test_cli_revoke_unknown_device_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from typer.testing import CliRunner
 
@@ -162,7 +158,6 @@ def test_cli_revoke_unknown_device_fails(tmp_path: Path, monkeypatch: pytest.Mon
     assert "device not found: dev_missing" in result.output + (result.stderr or "")
 
 
-@W2
 async def test_last_owner_not_revocable_remotely(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -190,7 +185,6 @@ async def test_last_owner_not_revocable_remotely(
 # --- identity package ------------------------------------------------------------------------
 
 
-@W2
 def test_identity_imports_unchanged() -> None:
     """0001's ``sevn.identity`` names still import after the move into a package."""
     import sevn.identity as identity
@@ -235,7 +229,6 @@ class _DictStore:
 # --- K-MIG -----------------------------------------------------------------------------------
 
 
-@W2
 def test_migrations_single_head() -> None:
     completed = subprocess.run(
         ["make", "db-heads"],  # noqa: S607
@@ -245,10 +238,11 @@ def test_migrations_single_head() -> None:
         text=True,
     )
     assert completed.returncode == 0, completed.stderr
-    assert THIS_HEAD in completed.stdout, completed.stdout
+    head = script_head()
+    assert head == revision_ending(DEVICES_SUFFIX)
+    assert head in completed.stdout, completed.stdout
 
 
-@W2
 def test_migration_file_chains_from_previous_head() -> None:
     versions = repo_root() / "host/src/sevn/store/migrations/versions"
     matches = sorted(versions.glob("*_devices.py"))
@@ -257,13 +251,14 @@ def test_migration_file_chains_from_previous_head() -> None:
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    assert module.revision == THIS_HEAD
-    assert module.down_revision == PREVIOUS_HEAD
+    assert module.revision == revision_ending(DEVICES_SUFFIX)
+    assert module.revision.endswith("_devices")
+    assert module.down_revision == down_revision_of(module.revision)
+    assert module.down_revision is not None
     text = matches[0].read_text(encoding="utf-8")
     assert "sevn.store.models" not in text, "migrations are frozen DDL"
 
 
-@W2
 def test_upgrade_from_previous_head(tmp_path: Path) -> None:
     """A database at 0005 with rows in it upgrades to 0011; the rows survive."""
     from alembic import command
@@ -272,7 +267,8 @@ def test_upgrade_from_previous_head(tmp_path: Path) -> None:
     db = tmp_path / "sevn.db"
     cfg = _alembic_config()
     cfg.set_main_option("sqlalchemy.url", f"sqlite:///{db}")
-    command.upgrade(cfg, PREVIOUS_HEAD)
+    this_head = revision_ending(DEVICES_SUFFIX)
+    command.upgrade(cfg, down_revision_of(this_head))
     stamp = "2026-11-01 09:00:00.000000+00:00"
     with sqlite3.connect(db) as connection:
         connection.execute(
@@ -295,7 +291,7 @@ def test_upgrade_from_previous_head(tmp_path: Path) -> None:
         }
         columns = {row[1] for row in connection.execute("PRAGMA table_info(devices)")}
         nullable = {row[1]: not row[3] for row in connection.execute("PRAGMA table_info(devices)")}
-    assert version == [(THIS_HEAD,)]
+    assert version == [(this_head,)]
     assert events == [(1, "system.ping", '{"note": "before 0011"}')]
     assert shares == [("shr_fixture", "Fixture link")]
     assert {"devices", "pairing_tickets", "pairing_attempts"} <= tables
