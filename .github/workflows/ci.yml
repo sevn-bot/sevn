@@ -59,9 +59,11 @@ jobs:
   # the tests run as an unprivileged user that owns the checkout.
   host-arch:
     runs-on: ubuntu-latest
+    # --init: the default PID 1 (`tail -f /dev/null`) never reaps orphans, so the
+    # shell-timeout tests would see their killed children linger as zombies.
     container:
       image: archlinux:base
-      options: --privileged
+      options: --privileged --init
     steps:
       - name: Install the pacman dependencies and uv
         run: |
