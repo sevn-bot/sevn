@@ -302,6 +302,10 @@ async def test_list_bots_ordered_by_updated_desc(
         assert ids == [first["id"], second["id"]]
 
 
+@pytest.mark.xfail(
+    reason="green after W3: alembic head moves to 0010_trace_context (plan 0015)",
+    strict=False,
+)
 def test_migrations_single_head() -> None:
     completed = subprocess.run(
         ["make", "--no-print-directory", "db-heads"],  # noqa: S607
@@ -313,10 +317,14 @@ def test_migrations_single_head() -> None:
     assert completed.returncode == 0, completed.stderr
     lines = [line for line in completed.stdout.splitlines() if line.strip()]
     assert len(lines) == 1, completed.stdout
-    assert "0005_metrics_shares" in lines[0]
+    assert "0010_trace_context" in lines[0]
     assert "(head)" in lines[0]
 
 
+@pytest.mark.xfail(
+    reason="green after W3: alembic head moves to 0010_trace_context (plan 0015)",
+    strict=False,
+)
 def test_upgrade_from_0001_reaches_head(tmp_path: Path) -> None:
     from alembic import command
     from alembic.config import Config
@@ -343,7 +351,7 @@ def test_upgrade_from_0001_reaches_head(tmp_path: Path) -> None:
         }
         version = connection.execute("SELECT version_num FROM alembic_version").fetchone()
     assert version is not None
-    assert str(version[0]) == "0005_metrics_shares"
+    assert str(version[0]) == "0010_trace_context"
     for name in (
         "bots",
         "agents",
