@@ -31,6 +31,15 @@ export function isBriefPath(path: string): boolean {
   return path === "/brief";
 }
 
+/** Settings → Devices on the serving host (plan 0055 D9). */
+export const devicesPath = "/settings/devices";
+
+/** Pair this browser with another host (plan 0055 D9). */
+export const pairingPath = "/pairing";
+
+/** The serving host's own fleet dashboard. */
+export const fleetPath = "/fleet";
+
 export type ShareRoute = { shareId: string; secret: string };
 
 /** ``/share/<id>/<secret>``: a read-only page that needs no login. */

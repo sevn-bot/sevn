@@ -21,12 +21,16 @@ export type HostStatus = Status | "idle" | "refused";
 
 export type HostEventHandler = (hostId: string, event: ProtocolEvent) => void;
 
+export type HostStatusHandler = (hostId: string, status: HostStatus) => void;
+
 export type Hosts = {
   /** Dial every profile that passes the D7 check. */
   start: () => void;
   /** Close every connection; each host keeps its cursor for the next `start`. */
   stop: () => void;
   onEvent: (handler: HostEventHandler) => () => void;
+  /** Called on every status change of any host. */
+  onStatus: (handler: HostStatusHandler) => () => void;
   status: (hostId: string) => HostStatus;
   /** Why a host is not connected (`DirectUrlRefused`, `HostIdentityChanged`, …), if known. */
   error: (hostId: string) => Error | null;
@@ -68,7 +72,18 @@ export function createHosts(options: {
     });
   }
   const handlers: HostEventHandler[] = [];
+  const statusHandlers: HostStatusHandler[] = [];
   let running = false;
+
+  function setStatus(entry: Entry, next: HostStatus): void {
+    if (entry.status === next) {
+      return;
+    }
+    entry.status = next;
+    for (const handler of [...statusHandlers]) {
+      handler(entry.profile.host_id, next);
+    }
+  }
 
   function open(entry: Entry): void {
     if (entry.connection !== null || FINAL.has(entry.status)) {
@@ -82,8 +97,8 @@ export function createHosts(options: {
       allow_plain_ws: profile.allow_plain_ws,
     });
     if (!check.ok) {
-      entry.status = "refused";
       entry.error = new DirectUrlRefused(profile.direct_url, check.reason);
+      setStatus(entry, "refused");
       return;
     }
     entry.error = null;
@@ -100,7 +115,7 @@ export function createHosts(options: {
     entry.connection = connection;
     connection.onStatus((next) => {
       if (entry.connection === connection) {
-        entry.status = next;
+        setStatus(entry, next);
       }
     });
     connection.onEvent((event) => {
@@ -126,7 +141,7 @@ export function createHosts(options: {
       return;
     }
     entry.connection = null;
-    entry.status = "idle";
+    setStatus(entry, "idle");
     connection.close();
   }
 
@@ -162,8 +177,8 @@ export function createHosts(options: {
       for (const entry of entries.values()) {
         const connection = entry.connection;
         entry.connection = null;
-        entry.status = "idle";
         entry.error = null;
+        setStatus(entry, "idle");
         connection?.close();
       }
     },
@@ -173,6 +188,15 @@ export function createHosts(options: {
         const index = handlers.indexOf(handler);
         if (index >= 0) {
           handlers.splice(index, 1);
+        }
+      };
+    },
+    onStatus(handler) {
+      statusHandlers.push(handler);
+      return () => {
+        const index = statusHandlers.indexOf(handler);
+        if (index >= 0) {
+          statusHandlers.splice(index, 1);
         }
       };
     },
