@@ -1,11 +1,17 @@
-"""Create or load the host Ed25519 identity."""
+"""Create or load the host Ed25519 identity.
+
+The private key lives in the secrets backend (or ``keys/host.pem`` when the
+backend is read-only). ``HostIdentity`` keeps the loaded key in memory so the
+host can sign handshake challenges; it is never part of ``repr``, equality or
+any serialised form, and nothing here writes it anywhere else.
+"""
 
 from __future__ import annotations
 
 import base64
 import hashlib
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol
 
 from cryptography.hazmat.primitives import serialization
@@ -30,6 +36,13 @@ class HostIdentity:
     public_key: bytes
     host_id: str
     host_pubkey_fp: str
+    _key: Ed25519PrivateKey | None = field(default=None, repr=False, compare=False)
+
+    def sign(self, message: bytes) -> bytes:
+        """Ed25519 signature over ``message`` with the host key (64 bytes)."""
+        if self._key is None:
+            raise RuntimeError("host identity has no signing key")
+        return self._key.sign(message)
 
 
 def load_or_create(backend: SecretStore) -> HostIdentity:
@@ -91,8 +104,9 @@ def _from_private(private: Ed25519PrivateKey) -> HostIdentity:
     )
     return HostIdentity(
         public_key=public_key,
-        host_id=_host_id(public_key),
-        host_pubkey_fp=_fingerprint(public_key),
+        host_id=host_id_for(public_key),
+        host_pubkey_fp=fingerprint(public_key),
+        _key=private,
     )
 
 
@@ -103,11 +117,13 @@ def _from_pem(pem: str) -> HostIdentity:
     return _from_private(loaded)
 
 
-def _host_id(pubkey: bytes) -> str:
+def host_id_for(pubkey: bytes) -> str:
+    """``host_`` plus 26 lowercase base32 characters of SHA-256(pubkey)."""
     encoded = base64.b32encode(hashlib.sha256(pubkey).digest()).decode("ascii")
     return "host_" + encoded.rstrip("=").lower()[:26]
 
 
-def _fingerprint(pubkey: bytes) -> str:
+def fingerprint(pubkey: bytes) -> str:
+    """``host_pubkey_fp``: base64url (no padding) of the first 16 bytes of SHA-256."""
     digest = hashlib.sha256(pubkey).digest()
     return base64.urlsafe_b64encode(digest[:16]).decode("ascii").rstrip("=")

@@ -24,10 +24,12 @@ from starlette.websockets import WebSocket
 
 import sevn.api.agents as agent_api
 import sevn.api.bots as bot_api
+import sevn.api.devices as device_api
 import sevn.api.fleet as fleet_api
 import sevn.api.memories as memory_api
 import sevn.api.messages as message_api
 import sevn.api.models as model_api
+import sevn.api.pairing as pairing_api
 import sevn.api.pending as pending_api
 import sevn.api.routines as routine_api
 import sevn.api.shares as share_api
@@ -87,6 +89,11 @@ _REGISTERED = (
     share_api.shares_create,
     share_api.shares_list,
     share_api.shares_revoke,
+    pairing_api.pairing_start,
+    device_api.devices_list,
+    device_api.devices_rename,
+    device_api.devices_revoke,
+    device_api.devices_self,
 )
 
 _ROUTINE_TICK_S = 30

@@ -10,7 +10,7 @@ import subprocess
 import sys
 from collections.abc import Coroutine
 from pathlib import Path
-from typing import Annotated, NoReturn
+from typing import TYPE_CHECKING, Annotated, NoReturn
 
 import typer
 
@@ -23,6 +23,11 @@ from sevn.probe import ProbeError, call_method, events_since, parse_params
 from sevn.secrets.backends import AgeFileBackend, EnvBackend, KeychainBackend, open_backend
 from sevn.secrets.errors import SecretBackendReadOnly, SecretNotFound
 
+if TYPE_CHECKING:
+    from sevn.identity.devices import DeviceRecord
+    from sevn.identity.pairing import Ticket
+    from sevn.protocol.errors import Scope
+
 app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 probe_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 contracts_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
@@ -32,6 +37,8 @@ app.add_typer(probe_app, name="probe")
 app.add_typer(contracts_app, name="contracts")
 app.add_typer(secret_app, name="secret")
 app.add_typer(evals_app, name="evals")
+devices_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
+app.add_typer(devices_app, name="devices")
 
 _LOOPBACK = frozenset({"127.0.0.1", "localhost", "::1", "[::1]"})
 
@@ -194,6 +201,105 @@ def evals_run(suite: str) -> None:
         raise typer.Exit(code=1) from exc
     if outcome.disabled:
         typer.echo("evals disabled")
+
+
+_PAIR_SCOPES: dict[str, Scope] = {"owner": "owner", "member": "member", "read_only": "read_only"}
+
+
+@app.command()
+def pair(
+    scope: Annotated[str, typer.Option("--scope")] = "member",
+    name: Annotated[str | None, typer.Option("--name")] = None,
+    home: Annotated[Path | None, typer.Option("--home")] = None,
+) -> None:
+    """Print a one-time pairing code, URI and QR (plan 0055 D1). No host needs to run."""
+    _apply_home(home)
+    settings = _settings()
+    chosen = _PAIR_SCOPES.get(scope)
+    if chosen is None:
+        typer.echo(f"unknown scope {scope}: use owner, member or read_only", err=True)
+        raise typer.Exit(code=2)
+    ticket = _run(_pair_ticket(settings, chosen, name))
+    # The code comes first: it is what a browser user types.
+    typer.echo(f"Pairing code: {ticket.short_code}")
+    typer.echo(f"Scope: {chosen}, expires {ticket.expires_at:%H:%M:%S} UTC")
+    typer.echo(ticket.qr_uri)
+    typer.echo(_qr_text(ticket.qr_uri))
+
+
+@devices_app.command("list")
+def devices_list(
+    as_json: Annotated[bool, typer.Option("--json")] = False,
+    home: Annotated[Path | None, typer.Option("--home")] = None,
+) -> None:
+    """List paired devices from the store. No host needs to run."""
+    _apply_home(home)
+    _settings()
+    rows = _run(_devices_list())
+    if as_json:
+        typer.echo(json.dumps([row.model_dump(mode="json") for row in rows]))
+        return
+    for row in rows:
+        state = "revoked" if row.revoked_at is not None else "active"
+        typer.echo(f"{row.id}  {row.scope:<9}  {state:<7}  {row.name} ({row.platform})")
+
+
+@devices_app.command("revoke")
+def devices_revoke(
+    device_id: str,
+    home: Annotated[Path | None, typer.Option("--home")] = None,
+) -> None:
+    """Revoke a device in the store. A running host refuses its next ``auth``."""
+    from sevn.identity.devices import DeviceError
+
+    _apply_home(home)
+    _settings()
+    try:
+        record = _run(_devices_revoke(device_id))
+    except DeviceError as exc:
+        typer.echo(exc.message, err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(f"revoked {record.id}")
+
+
+async def _store_ready() -> None:
+    from sevn.store.db import upgrade
+
+    await upgrade(f"sqlite+aiosqlite:///{Paths.from_env().db}")
+
+
+async def _pair_ticket(settings: Settings, scope: Scope, name: str | None) -> Ticket:
+    from sevn.identity import load_or_create
+    from sevn.identity.pairing import start
+
+    await _store_ready()
+    identity = load_or_create(open_backend(settings, Paths.from_env()))
+    return await start(identity=identity, http=settings.http, scope=scope, name=name)
+
+
+async def _devices_list() -> list[DeviceRecord]:
+    from sevn.identity.devices import list_devices
+
+    await _store_ready()
+    return await list_devices()
+
+
+async def _devices_revoke(device_id: str) -> DeviceRecord:
+    from sevn.identity.devices import revoke
+
+    await _store_ready()
+    # The host's own CLI is local, so it may revoke the last owner device.
+    return await revoke(device_id, allow_last_owner=True)
+
+
+def _qr_text(data: str) -> str:
+    import io
+
+    import segno
+
+    out = io.StringIO()
+    segno.make(data, error="m").terminal(out=out, compact=True)
+    return out.getvalue()
 
 
 def _open_secrets() -> KeychainBackend | AgeFileBackend | EnvBackend:

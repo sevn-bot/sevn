@@ -36,6 +36,26 @@ export const methods = {
     params: "BotsUpdateParams",
     result: "BotRecord",
   },
+  "devices.list": {
+    mutating: false,
+    params: "DevicesListParams",
+    result: "DevicesListResult",
+  },
+  "devices.rename": {
+    mutating: true,
+    params: "DevicesRenameParams",
+    result: "DeviceRecord",
+  },
+  "devices.revoke": {
+    mutating: true,
+    params: "DevicesRevokeParams",
+    result: "DeviceRecord",
+  },
+  "devices.self": {
+    mutating: false,
+    params: "DevicesSelfParams",
+    result: "DeviceRecord",
+  },
   "fleet.brief": {
     mutating: false,
     params: "FleetBriefParams",
@@ -90,6 +110,11 @@ export const methods = {
     mutating: false,
     params: "ModelsListParams",
     result: "ModelsListResult",
+  },
+  "pairing.start": {
+    mutating: true,
+    params: "PairingStartParams",
+    result: "PairingStartResult",
   },
   "pending.answer": {
     mutating: true,

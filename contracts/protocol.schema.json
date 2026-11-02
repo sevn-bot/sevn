@@ -826,6 +826,153 @@
       "title": "Challenge",
       "type": "object"
     },
+    "DeviceRecord": {
+      "additionalProperties": false,
+      "description": "A paired device as the owner sees it. Keys are not part of the record.",
+      "properties": {
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "last_seen": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Last Seen"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "platform": {
+          "title": "Platform",
+          "type": "string"
+        },
+        "revoked_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Revoked At"
+        },
+        "scope": {
+          "$ref": "#/$defs/Scope"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "platform",
+        "scope",
+        "created_at",
+        "last_seen",
+        "revoked_at"
+      ],
+      "title": "DeviceRecord",
+      "type": "object"
+    },
+    "DevicesListParams": {
+      "additionalProperties": false,
+      "properties": {},
+      "title": "DevicesListParams",
+      "type": "object"
+    },
+    "DevicesListResult": {
+      "additionalProperties": false,
+      "properties": {
+        "devices": {
+          "items": {
+            "$ref": "#/$defs/DeviceRecord"
+          },
+          "title": "Devices",
+          "type": "array"
+        }
+      },
+      "required": [
+        "devices"
+      ],
+      "title": "DevicesListResult",
+      "type": "object"
+    },
+    "DevicesRenameParams": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "op_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op Id"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "title": "DevicesRenameParams",
+      "type": "object"
+    },
+    "DevicesRevokeParams": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "op_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op Id"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "DevicesRevokeParams",
+      "type": "object"
+    },
+    "DevicesSelfParams": {
+      "additionalProperties": false,
+      "properties": {},
+      "title": "DevicesSelfParams",
+      "type": "object"
+    },
     "ErrorBody": {
       "description": "`res.e` object: code, message, and optional data.",
       "properties": {
@@ -1768,6 +1915,18 @@
           "title": "Last Seq",
           "type": "integer"
         },
+        "origin": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Origin"
+        },
         "proto": {
           "items": {
             "type": "integer"
@@ -2508,6 +2667,178 @@
       ],
       "type": "string"
     },
+    "PairComplete": {
+      "description": "A new device proves a one-time pairing ticket (plan 0055 D1).",
+      "properties": {
+        "device_name": {
+          "title": "Device Name",
+          "type": "string"
+        },
+        "device_pubkey_ed25519": {
+          "title": "Device Pubkey Ed25519",
+          "type": "string"
+        },
+        "device_pubkey_x25519": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Device Pubkey X25519"
+        },
+        "platform": {
+          "title": "Platform",
+          "type": "string"
+        },
+        "t": {
+          "const": "pair.complete",
+          "title": "T",
+          "type": "string"
+        },
+        "ticket": {
+          "title": "Ticket",
+          "type": "string"
+        }
+      },
+      "required": [
+        "t",
+        "ticket",
+        "device_pubkey_ed25519",
+        "device_name",
+        "platform"
+      ],
+      "title": "PairComplete",
+      "type": "object"
+    },
+    "Paired": {
+      "description": "The host stored the device; it reconnects and authenticates next.",
+      "properties": {
+        "device_id": {
+          "title": "Device Id",
+          "type": "string"
+        },
+        "host_id": {
+          "title": "Host Id",
+          "type": "string"
+        },
+        "host_pubkey": {
+          "title": "Host Pubkey",
+          "type": "string"
+        },
+        "scope": {
+          "enum": [
+            "owner",
+            "member",
+            "read_only"
+          ],
+          "title": "Scope",
+          "type": "string"
+        },
+        "t": {
+          "const": "paired",
+          "title": "T",
+          "type": "string"
+        }
+      },
+      "required": [
+        "t",
+        "device_id",
+        "host_id",
+        "host_pubkey",
+        "scope"
+      ],
+      "title": "Paired",
+      "type": "object"
+    },
+    "PairingStartParams": {
+      "additionalProperties": false,
+      "description": "Mint a one-time pairing ticket (plan 0055 D1). Owner only.",
+      "properties": {
+        "direct_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Direct Url"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "op_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op Id"
+        },
+        "scope": {
+          "default": "member",
+          "enum": [
+            "owner",
+            "member",
+            "read_only"
+          ],
+          "title": "Scope",
+          "type": "string"
+        }
+      },
+      "title": "PairingStartParams",
+      "type": "object"
+    },
+    "PairingStartResult": {
+      "additionalProperties": false,
+      "description": "The ticket, its short code and the QR URI are shown once, to this response.",
+      "properties": {
+        "expires_at": {
+          "format": "date-time",
+          "title": "Expires At",
+          "type": "string"
+        },
+        "qr_uri": {
+          "title": "Qr Uri",
+          "type": "string"
+        },
+        "short_code": {
+          "title": "Short Code",
+          "type": "string"
+        },
+        "ticket": {
+          "title": "Ticket",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ticket",
+        "qr_uri",
+        "short_code",
+        "expires_at"
+      ],
+      "title": "PairingStartResult",
+      "type": "object"
+    },
     "PendingAnswerParams": {
       "additionalProperties": false,
       "description": "An approval takes ``answer``. A question takes ``option_id`` or ``text``.",
@@ -3115,6 +3446,14 @@
       "title": "SandboxModeResult",
       "type": "object"
     },
+    "Scope": {
+      "enum": [
+        "owner",
+        "member",
+        "read_only"
+      ],
+      "type": "string"
+    },
     "ShareRecord": {
       "additionalProperties": false,
       "description": "A share link as the owner sees it. The secret is shown once, at create.",
@@ -3699,6 +4038,26 @@
       "params": "BotsUpdateParams",
       "result": "BotRecord"
     },
+    "devices.list": {
+      "mutating": false,
+      "params": "DevicesListParams",
+      "result": "DevicesListResult"
+    },
+    "devices.rename": {
+      "mutating": true,
+      "params": "DevicesRenameParams",
+      "result": "DeviceRecord"
+    },
+    "devices.revoke": {
+      "mutating": true,
+      "params": "DevicesRevokeParams",
+      "result": "DeviceRecord"
+    },
+    "devices.self": {
+      "mutating": false,
+      "params": "DevicesSelfParams",
+      "result": "DeviceRecord"
+    },
     "fleet.brief": {
       "mutating": false,
       "params": "FleetBriefParams",
@@ -3753,6 +4112,11 @@
       "mutating": false,
       "params": "ModelsListParams",
       "result": "ModelsListResult"
+    },
+    "pairing.start": {
+      "mutating": true,
+      "params": "PairingStartParams",
+      "result": "PairingStartResult"
     },
     "pending.answer": {
       "mutating": true,
@@ -3847,6 +4211,12 @@
     },
     {
       "$ref": "#/$defs/AuthDevice"
+    },
+    {
+      "$ref": "#/$defs/PairComplete"
+    },
+    {
+      "$ref": "#/$defs/Paired"
     },
     {
       "$ref": "#/$defs/Welcome"

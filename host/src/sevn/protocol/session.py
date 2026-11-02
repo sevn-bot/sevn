@@ -51,6 +51,11 @@ class Session:
 
     scope: Scope
     hub: Hub
+    # Plan 0055: whether the peer is the local machine, and the paired device this
+    # session authenticated as. Every session today authenticates with the loopback
+    # token or cookie; W3 adds non-loopback sessions and sets these from the transport.
+    loopback: bool
+    device_id: str | None
 
     def __init__(
         self,
@@ -64,6 +69,8 @@ class Session:
         self._connection = connection
         self.hub = hub
         self.scope = "read_only"
+        self.loopback = True
+        self.device_id = None
         self._token = token
         self._queue_limit = queue_limit
         self._phase = _Phase.HELLO
@@ -87,9 +94,20 @@ class Session:
         self._attached = False
 
     @classmethod
-    def for_test(cls, *, scope: Scope) -> Self:
+    def for_test(
+        cls,
+        *,
+        scope: Scope,
+        loopback: bool = True,
+        hub: Hub | None = None,
+        device_id: str | None = None,
+    ) -> Self:
         session = cls.__new__(cls)
         session.scope = scope
+        session.loopback = loopback
+        session.device_id = device_id
+        if hub is not None:
+            session.hub = hub
         return session
 
     async def run(self) -> None:

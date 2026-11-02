@@ -272,6 +272,18 @@ export type ShareRecord = {
   opens: number;
 };
 
+export type DeviceScope = "owner" | "member" | "read_only";
+
+export type DeviceRecord = {
+  id: string;
+  name: string;
+  platform: string;
+  scope: DeviceScope;
+  created_at: string;
+  last_seen: string | null;
+  revoked_at: string | null;
+};
+
 export type SharedFleet = {
   as_of: string;
   label: string;
@@ -443,6 +455,16 @@ export type MethodParams = {
   "routines.pause": { routine_id: string; op_id?: string };
   "routines.resume": { routine_id: string; op_id?: string };
   "routines.cancel": { routine_id: string; op_id?: string };
+  "pairing.start": {
+    name?: string | null;
+    scope?: DeviceScope;
+    direct_url?: string | null;
+    op_id?: string;
+  };
+  "devices.list": Record<string, never>;
+  "devices.rename": { id: string; name: string; op_id?: string };
+  "devices.revoke": { id: string; op_id?: string };
+  "devices.self": Record<string, never>;
 };
 
 export type MethodResult = {
@@ -486,6 +508,16 @@ export type MethodResult = {
   "routines.pause": Routine;
   "routines.resume": Routine;
   "routines.cancel": Routine;
+  "pairing.start": {
+    ticket: string;
+    qr_uri: string;
+    short_code: string;
+    expires_at: string;
+  };
+  "devices.list": { devices: DeviceRecord[] };
+  "devices.rename": DeviceRecord;
+  "devices.revoke": DeviceRecord;
+  "devices.self": DeviceRecord;
 };
 
 export type Status =

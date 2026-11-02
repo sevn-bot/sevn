@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Pair devices with a one-time ticket or 8-character code (`pairing.start`, `sevn pair` prints a terminal QR), list, rename and revoke them (`devices.*`, `sevn devices list|revoke` with no host running), and ship the signed direct-handshake reference with its test vectors. Tickets are stored only as SHA-256, burn after 5 failures, and the host refuses pairing after 20 failures an hour.
+
 - Close shell option-abbreviation approval bypasses, redact tool results before model history, serialize message publication, support confined Git commands in linked worktrees, refresh resolved routing chips and sandbox warnings, coalesce event replay, and retain confirmed sandbox settings after failed updates.
 
 - Fix lane cancellation, crash retry message identity, purge ordering, reroute labels, connection retries, compaction fallback, and confined Git worktree creation.

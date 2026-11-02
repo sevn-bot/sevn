@@ -5,11 +5,13 @@
  * and run json-schema-to-typescript to regenerate this file.
  */
 
-export type Frame = Hello | Challenge | AuthToken | AuthDevice | Welcome | Req | Res | Evt | Tick;
+export type Frame =
+  Hello | Challenge | AuthToken | AuthDevice | PairComplete | Paired | Welcome | Req | Res | Evt | Tick;
 export type Caps = string[];
 export type Client = string;
 export type Device = string;
 export type LastSeq = number;
+export type Origin = string | null;
 /**
  * @minItems 2
  * @maxItems 2
@@ -24,10 +26,21 @@ export type T2 = "auth";
 export type Token = string;
 export type DeviceSig = string;
 export type T3 = "auth";
+export type DeviceName = string;
+export type DevicePubkeyEd25519 = string;
+export type DevicePubkeyX25519 = string | null;
+export type Platform = string;
+export type T4 = "pair.complete";
+export type Ticket = string;
+export type DeviceId = string;
+export type HostId = string;
+export type HostPubkey = string;
+export type Scope = "owner" | "member" | "read_only";
+export type T5 = "paired";
 export type Caps1 = string[];
 export type HostSeq = number;
 export type Proto1 = number;
-export type T4 = "welcome";
+export type T6 = "welcome";
 export type Id = string;
 export type M = string;
 export type JsonValue =
@@ -39,22 +52,23 @@ export type JsonValue =
       [k: string]: JsonValue;
     }
   | null;
-export type T5 = "req";
+export type T7 = "req";
 export type Code = string;
 export type Message = string;
 export type Id1 = string;
-export type T6 = "res";
+export type T8 = "res";
 export type K = string;
 export type S = number;
-export type T7 = "evt";
+export type T9 = "evt";
 export type K1 = string;
-export type T8 = "tick";
+export type T10 = "tick";
 
 export interface Hello {
   caps: Caps;
   client: Client;
   device: Device;
   last_seq: LastSeq;
+  origin?: Origin;
   proto: Proto;
   t: T;
 }
@@ -72,17 +86,38 @@ export interface AuthDevice {
   device_sig: DeviceSig;
   t: T3;
 }
+/**
+ * A new device proves a one-time pairing ticket (plan 0055 D1).
+ */
+export interface PairComplete {
+  device_name: DeviceName;
+  device_pubkey_ed25519: DevicePubkeyEd25519;
+  device_pubkey_x25519?: DevicePubkeyX25519;
+  platform: Platform;
+  t: T4;
+  ticket: Ticket;
+}
+/**
+ * The host stored the device; it reconnects and authenticates next.
+ */
+export interface Paired {
+  device_id: DeviceId;
+  host_id: HostId;
+  host_pubkey: HostPubkey;
+  scope: Scope;
+  t: T5;
+}
 export interface Welcome {
   caps: Caps1;
   host_seq: HostSeq;
   proto: Proto1;
-  t: T4;
+  t: T6;
 }
 export interface Req {
   id: Id;
   m: M;
   p: JsonObject;
-  t: T5;
+  t: T7;
 }
 export interface JsonObject {
   [k: string]: JsonValue;
@@ -91,7 +126,7 @@ export interface Res {
   e?: ErrorBody | null;
   id: Id1;
   r?: JsonObject | null;
-  t: T6;
+  t: T8;
 }
 /**
  * `res.e` object: code, message, and optional data.
@@ -105,10 +140,10 @@ export interface Evt {
   d: JsonObject;
   k: K;
   s: S;
-  t: T7;
+  t: T9;
 }
 export interface Tick {
   d: JsonObject;
   k: K1;
-  t: T8;
+  t: T10;
 }

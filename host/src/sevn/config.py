@@ -31,6 +31,10 @@ class SecretsSettings(BaseModel):
 class HttpSettings(BaseModel):
     host: str = "127.0.0.1"
     port: int = 8787
+    # Plan 0055 D5: extra Host names (``host`` or ``host:port``), e.g. a tailnet name.
+    allowed_hosts: list[str] = Field(default_factory=list)
+    # ``https`` when a proxy such as ``tailscale serve`` terminates TLS in front of sevn.
+    public_scheme: Literal["http", "https"] = "http"
 
 
 class RuntimeSettings(BaseModel):
