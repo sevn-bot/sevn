@@ -39,12 +39,21 @@ from sevn.domain.agents import expire_agents
 from sevn.domain.errors import DomainError
 from sevn.domain.routines import run_due
 from sevn.domain.shares import shared_snapshot
+from sevn.identity import HostIdentity, load_or_create
 from sevn.log import logger
+from sevn.observability.setup import (
+    ObservabilityHandle,
+    choose_exporter,
+    instrument_fastapi,
+    setup,
+    uninstrument_fastapi,
+)
 from sevn.paths import Paths
 from sevn.protocol.hub import Hub
 from sevn.protocol.session import Session
 from sevn.runtime.recovery import recover
 from sevn.runtime.worker import Worker, bind
+from sevn.secrets.backends import open_backend
 from sevn.secrets.registry import register
 from sevn.store.db import upgrade
 from sevn.store.oplog import OpLog
@@ -217,6 +226,56 @@ async def _routine_loop(hub: Hub) -> None:
 
 @asynccontextmanager
 async def _lifespan(app: ASGIApp) -> AsyncGenerator[None]:
+    """Telemetry wraps the host: it starts before the store opens and flushes last (D2)."""
+    state = _state(app)
+    await asyncio.to_thread(_ensure_home, Paths.from_env().home)
+    telemetry = await asyncio.to_thread(_start_observability, state.settings)
+    traced = app if telemetry.exporter != "none" and isinstance(app, FastAPI) else None
+    if traced is not None:
+        _instrument(traced)
+    try:
+        async with _host_lifespan(app):
+            yield
+    finally:
+        if traced is not None:
+            _uninstrument(traced)
+        await asyncio.to_thread(telemetry.shutdown)
+
+
+def _start_observability(settings: Settings) -> ObservabilityHandle:
+    """Never raises: tracing must not fail startup. Off reads no host identity."""
+    try:
+        if choose_exporter(settings) == "none":
+            return ObservabilityHandle("none")
+        identity = _identity(settings)
+    except Exception as exc:  # noqa: BLE001 — tracing must not fail startup
+        logger.warning(
+            "observability is off: secret backend unavailable ({kind})", kind=type(exc).__name__
+        )
+        return ObservabilityHandle("none")
+    return setup(settings, identity)
+
+
+def _identity(settings: Settings) -> HostIdentity:
+    return load_or_create(open_backend(settings, Paths.from_env()))
+
+
+def _instrument(app: FastAPI) -> None:
+    try:
+        instrument_fastapi(app)
+    except Exception as exc:  # noqa: BLE001 — tracing must not fail startup
+        logger.warning("observability: HTTP spans are off ({kind})", kind=type(exc).__name__)
+
+
+def _uninstrument(app: FastAPI) -> None:
+    try:
+        uninstrument_fastapi(app)
+    except Exception as exc:  # noqa: BLE001 — tracing must not fail shutdown
+        logger.warning("observability: HTTP span removal failed ({kind})", kind=type(exc).__name__)
+
+
+@asynccontextmanager
+async def _host_lifespan(app: ASGIApp) -> AsyncGenerator[None]:
     state = _state(app)
     paths = Paths.from_env()
     await asyncio.to_thread(_ensure_home, paths.home)

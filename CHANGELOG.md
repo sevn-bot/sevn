@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- The host can export OTel traces to Logfire or to any OTLP collector, including a Datadog Agent (`datadog-agent`) or Datadog's agentless intake (`datadog-agentless`), through a new `[observability]` config section. Nothing is exported unless an exporter is set or a Logfire token is stored. Header values must be `secret://` references, registered secrets and key patterns are scrubbed from every exported span, and an unreachable collector is reported once and never delays startup or shutdown past 5 seconds.
+
 - Close shell option-abbreviation approval bypasses, redact tool results before model history, serialize message publication, support confined Git commands in linked worktrees, refresh resolved routing chips and sandbox warnings, coalesce event replay, and retain confirmed sandbox settings after failed updates.
 
 - Fix lane cancellation, crash retry message identity, purge ordering, reroute labels, connection retries, compaction fallback, and confined Git worktree creation.
