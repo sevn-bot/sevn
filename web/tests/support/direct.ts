@@ -245,6 +245,8 @@ export async function directHost(
     devicePubkey: string;
     hostSeq?: number;
     signWith?: CryptoKey;
+    /** Result objects by method name (default `{}`); `sync.since` has its own default. */
+    replies?: Record<string, Record<string, unknown>>;
   },
 ): Promise<DirectHost> {
   const server = new mock.Server(options.url);
@@ -318,14 +320,16 @@ export async function directHost(
       return;
     }
     if (frame.t === "req") {
+      const method = String(frame.m);
       const result =
-        frame.m === "sync.since"
+        options.replies?.[method] ??
+        (method === "sync.since"
           ? {
               host_seq: options.hostSeq ?? 0,
               next_seq: options.hostSeq ?? 0,
               more: false,
             }
-          : {};
+          : {});
       socket.send(JSON.stringify({ t: "res", id: frame.id, r: result }));
     }
   }
