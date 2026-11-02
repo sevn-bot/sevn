@@ -9,8 +9,6 @@ from __future__ import annotations
 
 import pytest
 
-D12 = pytest.mark.xfail(strict=False, reason="green after D12 member scope")
-
 
 @pytest.mark.parametrize(
     ("have", "need", "allowed"),
@@ -19,7 +17,7 @@ D12 = pytest.mark.xfail(strict=False, reason="green after D12 member scope")
         ("member", None, True),
         ("read_only", None, True),
         ("owner", "owner", True),
-        pytest.param("member", "owner", True, marks=D12),
+        ("member", "owner", True),
         ("read_only", "owner", False),
         ("owner", "member", True),
         ("member", "member", True),

@@ -27,8 +27,6 @@ from support.migrations import down_revision_of, revision_ending, script_head
 from support.pairing import call, op_id, owner_client, pair_device, register_methods
 from support.repo import repo_root
 
-D12 = pytest.mark.xfail(strict=False, reason="green after D12 member scope")
-
 LAST_OWNER = "cannot revoke the last owner device"
 DEVICE_COLUMNS = {
     "id",
@@ -98,7 +96,6 @@ async def test_list_and_rename_are_owner_only(
                 assert res.e.code == "forbidden", (scope, method)
 
 
-@D12
 async def test_member_device_may_admin_devices_but_keeps_its_scope(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

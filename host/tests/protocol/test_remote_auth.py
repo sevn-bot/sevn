@@ -44,8 +44,6 @@ from support.pairing import (
     verify_host_sig,
 )
 
-D12 = pytest.mark.xfail(strict=False, reason="green after D12 member scope")
-
 
 @asynccontextmanager
 async def _host(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[MemoryHost]:
@@ -124,7 +122,7 @@ async def test_loopback_cookie_does_not_open_a_non_loopback_session(
 
 @pytest.mark.parametrize(
     "scope",
-    ["owner", pytest.param("member", marks=D12), "read_only"],
+    ["owner", "member", "read_only"],
 )
 async def test_valid_device_auth_sets_device_scope(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, scope: str

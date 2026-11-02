@@ -38,8 +38,6 @@ from support.pairing import (
     start_pairing,
 )
 
-D12 = pytest.mark.xfail(strict=False, reason="green after D12 member scope")
-
 SHORT_CODE = re.compile(r"^[0-9A-HJKMNP-TV-Z]{8}$")
 BAD_TICKET = "invalid pairing ticket"
 RATE_LIMITED = "too many pairing attempts"
@@ -101,7 +99,6 @@ async def test_start_refuses_read_only(tmp_path: Path, monkeypatch: pytest.Monke
         assert tickets == []
 
 
-@D12
 async def test_member_may_start_pairing_but_not_an_owner_ticket(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

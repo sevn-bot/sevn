@@ -16,8 +16,6 @@ from support.memory import (
     send_req,
 )
 
-D12 = pytest.mark.xfail(strict=False, reason="green after D12 member scope")
-
 
 async def test_hello_welcome_with_token(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from support.memory import count_events
@@ -124,7 +122,6 @@ async def test_owner_only_method_refuses_read_only() -> None:
     assert called == []
 
 
-@D12
 async def test_owner_only_method_allows_member() -> None:
     """D12: ``member`` = ``owner`` for now, in ``scope_allows`` only."""
     from pydantic import BaseModel

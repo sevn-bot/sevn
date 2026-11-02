@@ -10,22 +10,13 @@ import {
 } from "./support/twohosts.ts";
 
 /**
- * Plan 0055 W6 follow-up (WV.1): chat with a bot on each host from one window.
- *
- * Host B is paired as `member`. Gated until the pending member-scope decision lands: today
- * `messages.send` is owner-only, so the member send is refused `forbidden`. Both options under
- * decision make `messages.send` member-callable; then remove this gate. Runs only with
- * SEVN_RUN_MARKED=1.
+ * Plan 0055 W6 follow-up (WV.1): chat with a bot on each host from one window. Host B is
+ * paired as `member`, which may send (D12: `member` = `owner` for now).
  */
-const RUN_MARKED = process.env.SEVN_RUN_MARKED === "1";
 
 test.use({ launchOptions: { args: RESOLVER_ARGS } });
 
-test.describe("per-host chat [green after member scopes allow messages.send]", () => {
-  test.skip(
-    !RUN_MARKED,
-    "green after the member-scope change makes messages.send member-callable (set SEVN_RUN_MARKED=1)",
-  );
+test.describe("per-host chat", () => {
   test.setTimeout(90_000);
 
   let hostA: Host | undefined;
