@@ -8,20 +8,23 @@ import os
 import shutil
 import subprocess
 import sys
-from collections.abc import Coroutine
+from collections.abc import Callable, Coroutine
 from pathlib import Path
-from typing import Annotated, NoReturn
+from typing import Annotated, NoReturn, cast
 
 import typer
 
+import sevn.runtime.installs
+import sevn.secrets
+import sevn.system
 from sevn import __version__
 from sevn.config import Settings
 from sevn.errors import ConfigError
 from sevn.http import AppState, create_app, web_dist_path
 from sevn.paths import Paths
 from sevn.probe import ProbeError, call_method, events_since, parse_params
-from sevn.secrets.backends import AgeFileBackend, EnvBackend, KeychainBackend, open_backend
-from sevn.secrets.errors import SecretBackendReadOnly, SecretNotFound
+from sevn.secrets.backends import SecretBackend, open_backend
+from sevn.secrets.errors import SecretBackendReadOnly, SecretNotFound, SecretsBackendError
 from sevn.service import ServiceError, ServiceManager, service_home, sevn_executable
 from sevn.service import manager as service_manager
 
@@ -56,6 +59,7 @@ def serve(
     if bind_host not in _LOOPBACK and not allow_remote_bind:
         typer.echo(f"refusing to bind {bind_host}: pass --allow-remote-bind", err=True)
         raise typer.Exit(code=2)
+    _require_secrets(settings)
     from sevn.log import setup
 
     paths = Paths.from_env()
@@ -122,15 +126,16 @@ def contracts_export(
 def doctor(
     as_json: Annotated[bool, typer.Option("--json")] = False,
 ) -> None:
-    """Print host paths, the secret backend, decision routing, and Claude login."""
+    """Print host paths, the secret backend, decision routing, Claude login, and host checks."""
     settings = _settings()
     paths = Paths.from_env()
+    checks = sevn.system.run_checks(_host_checks(settings, paths))
     claude_present, claude_login = _run(_claude_login())
     decisions = settings.decisions
-    payload = {
+    payload: dict[str, object] = {
         "home": str(paths.home.resolve()),
         "db": str(paths.db),
-        "secrets_backend": _secrets_backend(settings),
+        "secrets_backend": checks.pop("secrets_backend"),
         "web_dist": str(web_dist_path()),
         "version": __version__,
         "claude_present": claude_present,
@@ -140,11 +145,12 @@ def doctor(
         "allow_cli_fallback": decisions.allow_cli_fallback,
         "decisions_provider": decisions.provider,
     }
+    payload.update(checks)
     if as_json:
         typer.echo(json.dumps(payload))
         return
     for key, value in payload.items():
-        typer.echo(f"{key}: {value}")
+        typer.echo(f"{key}: {_doctor_text(value)}")
 
 
 @secret_app.command("set")
@@ -180,6 +186,39 @@ def secret_rm(name: str) -> None:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1) from exc
     typer.echo(f"removed {name}")
+
+
+@secret_app.command("migrate")
+def secret_migrate(
+    to: Annotated[str, typer.Option("--to", help="secret-service or age-file")],
+) -> None:
+    """Move every secret (and the host identity) to another backend, then switch to it.
+
+    Each secret is read back from the target before ``secrets.backend`` is written to
+    config.toml, and the source copies are deleted only after that.
+    """
+    from sevn.secrets.migrate import MigrationError, migrate
+
+    settings = _settings()
+    if os.environ.get("SEVN_SECRETS__BACKEND", "").strip():
+        typer.echo(
+            "SEVN_SECRETS__BACKEND is set and overrides config.toml; unset it after migrating",
+            err=True,
+        )
+    try:
+        outcome = migrate(settings, Paths.from_env(), to)
+    except MigrationError as exc:
+        typer.echo(exc.message, err=True)
+        raise typer.Exit(code=exc.exit_code) from exc
+    count = len(outcome.names)
+    noun = "secret" if count == 1 else "secrets"
+    typer.echo(f"migrated {count} {noun} from {outcome.source} to {outcome.target}")
+    if outcome.leftovers:
+        typer.echo(
+            f"could not delete the {outcome.source} copies of: {', '.join(outcome.leftovers)}",
+            err=True,
+        )
+        raise typer.Exit(code=1)
 
 
 @evals_app.command("run")
@@ -286,8 +325,93 @@ def _service_fail(exc: ServiceError) -> NoReturn:
     raise typer.Exit(code=exc.exit_code) from exc
 
 
-def _open_secrets() -> KeychainBackend | AgeFileBackend | EnvBackend:
+def _open_secrets() -> SecretBackend:
     return open_backend(_settings(), Paths.from_env())
+
+
+def _require_secrets(settings: Settings) -> None:
+    """Refuse to start on a configured Secret Service that is locked or missing (D4).
+
+    When no backend is configured and the selection picks the Secret Service, pin that
+    choice in config.toml, so a later start with a locked keyring refuses instead of
+    silently moving to a fresh age file (and a new host identity).
+    """
+    paths = Paths.from_env()
+    configured = settings.secrets.backend
+    if configured is None:
+        if sevn.secrets.selected_backend(settings, paths) != "secret-service":
+            return
+        try:
+            path = sevn.secrets.pin_backend(paths, "secret-service")
+        except (ConfigError, OSError) as exc:
+            typer.echo(f"could not pin the secret backend: {exc}", err=True)
+            raise typer.Exit(code=1) from exc
+        typer.echo(f'pinned [secrets] backend = "secret-service" in {path}', err=True)
+        return
+    if configured != "secret-service":
+        return
+    state = sevn.secrets.probe_secret_service()
+    if state == "unlocked":
+        return
+    if state == "locked":
+        message = (
+            "secrets_locked: the Secret Service collection is locked; "
+            "unlock it (log in to the desktop session) and start again"
+        )
+    else:
+        message = (
+            "secrets_unavailable: secrets.backend is secret-service but no Secret Service "
+            "answered on the session bus; sevn will not fall back to another backend"
+        )
+    typer.echo(message, err=True)
+    raise typer.Exit(code=1)
+
+
+def _host_checks(settings: Settings, paths: Paths) -> dict[str, Callable[[], object]]:
+    """The doctor checks that run concurrently, each bounded at 2 s (plan 0025 D7)."""
+    system = sevn.system
+    checks: dict[str, Callable[[], object]] = {
+        "secrets_backend": lambda: _secrets_backend(settings, paths),
+        "platform": lambda: system.probe_platform(),
+        "service": lambda: system.probe_service(),
+        "runtimes": _runtimes_report,
+    }
+    if sys.platform.startswith("linux"):
+        checks["bubblewrap"] = lambda: system.probe_bubblewrap(in_container=system.in_container())
+        checks["display"] = lambda: system.probe_display()
+        checks["portals"] = lambda: system.probe_portals()
+        checks["linger"] = lambda: system.probe_linger()
+    else:
+        for key in ("bubblewrap", "display", "portals", "linger"):
+            checks[key] = lambda: system.NOT_APPLICABLE
+    ordered = ("secrets_backend", "platform", "service", "bubblewrap", "display", "portals")
+    keys = (*ordered, "linger", "runtimes")
+    return {key: checks[key] for key in keys}
+
+
+def _runtimes_report() -> dict[str, dict[str, str | None]]:
+    report: dict[str, dict[str, str | None]] = {}
+    for name in sevn.runtime.installs.RUNTIMES:
+        found = sevn.runtime.installs.resolve(name)
+        if found is None:
+            report[name] = {"source": "none", "version": None}
+        else:
+            report[name] = {"source": found.source, "version": found.version}
+    return report
+
+
+def _doctor_text(value: object) -> str:
+    if not isinstance(value, dict):
+        return str(value)
+    parts: list[str] = []
+    for name, entry in cast("dict[str, object]", value).items():
+        if isinstance(entry, dict):
+            fields = cast("dict[str, object]", entry)
+            words = [str(fields.get("source", "")), str(fields.get("version") or "")]
+            parts.append(f"{name}={' '.join(word for word in words if word)}")
+        else:
+            parts.append(f"{name}={entry}")
+    return ", ".join(parts)
 
 
 def _apply_home(home: Path | None) -> None:
@@ -339,6 +463,8 @@ def _jev_key(settings: Settings, paths: Paths) -> str:
         open_backend(settings, paths).get("provider/typesafe")
     except SecretNotFound:
         return "no"
+    except SecretsBackendError:
+        return "unknown"
     return "yes"
 
 
@@ -358,13 +484,14 @@ def _ollama_reachable() -> str:
     return "yes"
 
 
-def _secrets_backend(settings: Settings) -> str:
-    choice = settings.secrets.backend
-    if choice is not None:
-        return choice
-    if sys.platform == "darwin":
-        return "keychain"
-    return "age-file"
+def _secrets_backend(settings: Settings, paths: Paths) -> str:
+    """The selected backend; a configured Secret Service that is not unlocked says so."""
+    choice = sevn.secrets.selected_backend(settings, paths)
+    if settings.secrets.backend == "secret-service":
+        state = sevn.secrets.probe_secret_service()
+        if state != "unlocked":
+            return f"{choice} ({state})"
+    return choice
 
 
 def _run[T](main: Coroutine[object, object, T]) -> T:

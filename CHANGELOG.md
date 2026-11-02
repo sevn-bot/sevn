@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Add a Secret Service backend for Linux desktops (`secrets.backend = "secret-service"`), picked when no backend is configured, a session bus answers and the collection is unlocked, while hosts with an existing `secrets.age` keep it. `sevn serve` refuses to start with `secrets_locked` or `secrets_unavailable` instead of falling back, and `sevn secret migrate --to secret-service|age-file` copies and verifies every secret before switching. `sevn doctor` adds `platform`, `service`, `bubblewrap`, `display`, `portals`, `linger` and `runtimes`, each bounded at 2 seconds.
+
 - Add `sevn service install|uninstall|status|logs|restart`: a launchd agent on macOS and a systemd `--user` unit on Linux, idempotent installs that replace a different unit only with `--force`, `status --json` states, and a `loginctl enable-linger` hint that sevn never runs itself.
 
 - Close shell option-abbreviation approval bypasses, redact tool results before model history, serialize message publication, support confined Git commands in linked worktrees, refresh resolved routing chips and sandbox warnings, coalesce event replay, and retain confirmed sandbox settings after failed updates.

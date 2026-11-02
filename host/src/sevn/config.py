@@ -16,7 +16,7 @@ from pydantic_settings import (
 from sevn.errors import ConfigError
 from sevn.paths import Paths
 
-type BackendName = Literal["keychain", "age-file", "env"]
+type BackendName = Literal["keychain", "age-file", "env", "secret-service"]
 type DecisionProvider = Literal["jev", "llm", "rules"]
 
 
