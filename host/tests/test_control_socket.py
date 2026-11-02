@@ -38,8 +38,6 @@ from support.serve import (
     short_root,
 )
 
-WV = pytest.mark.xfail(strict=False, reason="green after WV fix: control socket")
-
 _HELLO_LOOPBACK = {
     "t": "hello",
     "proto": [1, 1],
@@ -72,24 +70,25 @@ def overlay_host(monkeypatch: pytest.MonkeyPatch) -> Iterator[Served]:
             yield served
 
 
-async def _unix_first_frame(path: Path, headers: dict[str, str] | None = None) -> dict[str, Any]:
-    """hello + token auth over the control socket; returns the first frame the host sends."""
+async def _unix_first_frame(
+    path: Path, headers: dict[str, str] | None = None, *, with_token: bool
+) -> dict[str, Any]:
+    """Over the control socket: ``hello`` (plus ``auth{token}`` when ``with_token``), then the
+    first frame the host sends. A loopback token session sends nothing until ``auth``; a
+    non-loopback session sends ``challenge`` right after ``hello``."""
     from websockets.asyncio.client import unix_connect
 
     token = (path.parent / "token").read_text(encoding="utf-8").strip()
     async with unix_connect(str(path), "ws://localhost/ws", additional_headers=headers) as ws:
         await ws.send(json.dumps(_HELLO_LOOPBACK))
-        first = json.loads(await asyncio.wait_for(ws.recv(), 5))
-        if first.get("t") == "challenge":
-            return first
-        await ws.send(json.dumps({"t": "auth", "token": token}))
+        if with_token:
+            await ws.send(json.dumps({"t": "auth", "token": token}))
         return json.loads(await asyncio.wait_for(ws.recv(), 5))
 
 
 # --- the control socket itself ----------------------------------------------------------------
 
 
-@WV
 def test_control_socket_is_0600_and_removed_on_shutdown() -> None:
     from support.serve import stop
 
@@ -105,13 +104,11 @@ def test_control_socket_is_0600_and_removed_on_shutdown() -> None:
         assert not path.exists(), "the control socket must be removed on shutdown"
 
 
-@WV
 def test_control_socket_gives_a_loopback_owner_session(loopback_host: Served) -> None:
-    first = asyncio.run(_unix_first_frame(loopback_host.control))
+    first = asyncio.run(_unix_first_frame(loopback_host.control, with_token=True))
     assert first["t"] == "welcome", first
 
 
-@WV
 @pytest.mark.parametrize(
     "header",
     ["X-Forwarded-For", "Forwarded", "Tailscale-User-Login"],
@@ -119,14 +116,15 @@ def test_control_socket_gives_a_loopback_owner_session(loopback_host: Served) ->
 def test_control_socket_still_applies_proxy_headers(loopback_host: Served, header: str) -> None:
     """D4 on the control listener too: a proxied request there is not loopback."""
     assert loopback_host.control.exists()
-    first = asyncio.run(_unix_first_frame(loopback_host.control, {header: "100.101.102.103"}))
+    first = asyncio.run(
+        _unix_first_frame(loopback_host.control, {header: "100.101.102.103"}, with_token=False)
+    )
     assert first["t"] == "challenge", first
 
 
 # --- overlay bind: probe and live revoke ------------------------------------------------------
 
 
-@WV
 def test_probe_works_on_an_overlay_bind(overlay_host: Served) -> None:
     ping = sevn(
         overlay_host.home,
@@ -139,7 +137,6 @@ def test_probe_works_on_an_overlay_bind(overlay_host: Served) -> None:
     assert "seq" in ping.stdout
 
 
-@WV
 def test_cli_revoke_on_an_overlay_bind_closes_the_live_session(overlay_host: Served) -> None:
     async def scenario() -> None:
         device, host_pubkey = await pair_over_tcp(overlay_host)
@@ -159,7 +156,7 @@ def test_cli_revoke_on_an_overlay_bind_closes_the_live_session(overlay_host: Ser
 def test_tcp_on_an_overlay_bind_cannot_use_the_loopback_token(overlay_host: Served) -> None:
     """The control-socket privilege is not reachable over TCP: the token is refused there.
 
-    Green now and must stay green after the fix.
+    Passes before and after the fix.
     """
     from websockets.asyncio.client import connect
     from websockets.exceptions import ConnectionClosed
@@ -190,7 +187,6 @@ def test_tcp_on_an_overlay_bind_cannot_use_the_loopback_token(overlay_host: Serv
 # --- refusals are not "no host" ---------------------------------------------------------------
 
 
-@WV
 def test_cli_revoke_does_not_claim_success_when_the_host_refuses(loopback_host: Served) -> None:
     """A host answered but refused (here: a wrong token, no control socket): exit non-zero,
     never print ``revoked``."""
@@ -210,7 +206,8 @@ def test_cli_revoke_does_not_claim_success_when_the_host_refuses(loopback_host: 
 
 
 def test_cli_revoke_writes_offline_when_no_host_answers(tmp_path: Path) -> None:
-    """Control for the rule above (green now, stays green): nothing listening -> offline write."""
+    """Control for the rule above: nothing listening means an offline write (passes before
+    and after the fix)."""
     home = make_home(tmp_path)
     with serve(home) as served:
 
@@ -227,7 +224,6 @@ def test_cli_revoke_writes_offline_when_no_host_answers(tmp_path: Path) -> None:
 # --- sevn serve --open on a specific non-loopback bind ----------------------------------------
 
 
-@WV
 def test_serve_open_on_an_overlay_bind_prints_a_pair_hint(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

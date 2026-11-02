@@ -1,5 +1,5 @@
 import { createElement } from "react";
-import { afterEach, expect, vi } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import {
   type DirectHost,
   directHost,
@@ -9,7 +9,6 @@ import {
   newHostKey,
   stubSockets,
 } from "../support/direct.ts";
-import { red } from "../support/red.ts";
 
 /**
  * Plan 0055 WV advisory A1: a direct dial whose `host_sig` fails stays the hard error
@@ -17,7 +16,6 @@ import { red } from "../support/red.ts";
  * also says the host may not list this address in `http.allowed_hosts` (a decoy challenge
  * looks exactly like a changed key).
  */
-const wvFix = red("WV fix");
 
 afterEach(async () => {
   const testing = await import("@testing-library/react");
@@ -62,61 +60,58 @@ async function servingHost(
   return { stop: () => server.stop() };
 }
 
-wvFix(
-  "a failed host signature names http.allowed_hosts next to the re-pair message",
-  async () => {
-    const mock = await stubSockets();
-    const pinned = await newHostKey();
-    const decoy = await newHostKey();
-    const url = "ws://100.101.102.2:8787/ws";
-    const made = await makeProfile(
-      { host_id: "host_b", name: "Omarchy", direct_url: url },
-      pinned,
+test("a failed host signature names http.allowed_hosts next to the re-pair message", async () => {
+  const mock = await stubSockets();
+  const pinned = await newHostKey();
+  const decoy = await newHostKey();
+  const url = "ws://100.101.102.2:8787/ws";
+  const made = await makeProfile(
+    { host_id: "host_b", name: "Omarchy", direct_url: url },
+    pinned,
+  );
+  const profile: HostProfile = made.profile;
+  let remote: DirectHost | undefined;
+  let local: { stop: () => void } | undefined;
+  const testing = await import("@testing-library/react");
+  try {
+    remote = await directHost(mock, {
+      url,
+      hostId: "host_b",
+      key: pinned,
+      devicePubkey: made.devicePubkey,
+      signWith: decoy.pair.privateKey,
+    });
+    local = await servingHost(mock);
+    const { profileStore } = (await import(
+      "../../src/app/hosts/useHosts.ts"
+    )) as { profileStore: () => { put: (p: HostProfile) => Promise<void> } };
+    await profileStore().put(profile);
+    const app = (await import("../../src/app/App.tsx")) as {
+      default: () => unknown;
+    };
+    testing.render(createElement(app.default as never));
+    const region = await testing.screen.findByRole(
+      "region",
+      { name: "Omarchy" },
+      { timeout: 4000 },
     );
-    const profile: HostProfile = made.profile;
-    let remote: DirectHost | undefined;
-    let local: { stop: () => void } | undefined;
-    const testing = await import("@testing-library/react");
-    try {
-      remote = await directHost(mock, {
-        url,
-        hostId: "host_b",
-        key: pinned,
-        devicePubkey: made.devicePubkey,
-        signWith: decoy.pair.privateKey,
-      });
-      local = await servingHost(mock);
-      const { profileStore } = (await import(
-        "../../src/app/hosts/useHosts.ts"
-      )) as { profileStore: () => { put: (p: HostProfile) => Promise<void> } };
-      await profileStore().put(profile);
-      const app = (await import("../../src/app/App.tsx")) as {
-        default: () => unknown;
-      };
-      testing.render(createElement(app.default as never));
-      const region = await testing.screen.findByRole(
-        "region",
-        { name: "Omarchy" },
-        { timeout: 4000 },
-      );
-      await testing.waitFor(
-        () => {
-          const text = region.textContent ?? "";
-          expect(text).toContain("Host identity changed — re-pair to continue");
-          expect(text).toContain("http.allowed_hosts");
-        },
-        { timeout: 4000 },
-      );
-      expect(
-        testing.within(region).getByRole("img", { name: "unreachable" }),
-      ).toBeTruthy();
-      // No auth was sent to a host whose signature failed.
-      expect(
-        (remote.connections.flat() ?? []).some((frame) => frame.t === "auth"),
-      ).toBe(false);
-    } finally {
-      remote?.stop();
-      local?.stop();
-    }
-  },
-);
+    await testing.waitFor(
+      () => {
+        const text = region.textContent ?? "";
+        expect(text).toContain("Host identity changed — re-pair to continue");
+        expect(text).toContain("http.allowed_hosts");
+      },
+      { timeout: 4000 },
+    );
+    expect(
+      testing.within(region).getByRole("img", { name: "unreachable" }),
+    ).toBeTruthy();
+    // No auth was sent to a host whose signature failed.
+    expect(
+      (remote.connections.flat() ?? []).some((frame) => frame.t === "auth"),
+    ).toBe(false);
+  } finally {
+    remote?.stop();
+    local?.stop();
+  }
+});
