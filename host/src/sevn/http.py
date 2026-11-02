@@ -643,7 +643,15 @@ class _ControlServer:
 
 
 def _bind_control(path: Path, run: Path) -> socket.socket:
-    """Bind the unix socket 0600; replace only a stale socket, never another file."""
+    """Bind the unix socket 0600; replace only a stale socket, never another file.
+
+    ``run`` holds the token and the pointer and is made 0700 here too, so the socket is
+    never bound before its directory is private (clients refuse it otherwise, WV F4).
+    """
+    run.mkdir(mode=0o700, parents=True, exist_ok=True)
+    run.chmod(0o700)
+    if not control.trusted_dir(path.parent):
+        raise control.ControlPathError(f"{path.parent} is not private to this user")
     with suppress(FileNotFoundError):
         if not stat.S_ISSOCK(path.lstat().st_mode):
             raise control.ControlPathError(f"{path} exists and is not a socket")

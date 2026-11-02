@@ -3,13 +3,16 @@
 ``sevn serve`` also serves its app on a unix socket so the local CLI (``sevn probe``,
 ``sevn devices revoke``) reaches the host as a loopback session on any TCP bind. The
 socket is ``<home>/run/control.sock`` when that path fits AF_UNIX's limit. Otherwise
-it goes in a short private directory under the system temp dir, and
-``<home>/run/control`` holds its path so clients can find it.
+it goes in a fresh private directory with a random name under the system temp dir,
+and ``<home>/run/control`` holds its path so clients can find it.
+
+Clients send the loopback token over this socket, so they trust it only when the socket
+and its directory belong to this user and the directory is closed to everyone else
+(WV F4). A pointer that fails the check is ignored, never replaced by another path.
 """
 
 from __future__ import annotations
 
-import hashlib
 import os
 import stat
 import sys
@@ -31,47 +34,50 @@ def fits(path: Path) -> bool:
 
 
 def server_path(home: Path, run: Path) -> Path:
-    """The path the host binds. Creates the short private directory when needed."""
+    """The path the host binds. Makes a fresh private directory when ``run`` is too deep."""
+    del home  # the fallback name is random, not derived from the home
     preferred = run / SOCKET_NAME
     if fits(preferred):
         return preferred
-    tag = hashlib.sha256(os.fsencode(str(home.resolve()))).hexdigest()[:16]
-    name = f"sevn-{os.getuid()}-{tag}"
-    for base in (Path(tempfile.gettempdir()), Path("/tmp")):  # noqa: S108 — private 0700 dir
-        candidate = base / name / SOCKET_NAME
-        if fits(candidate):
-            _private_dir(candidate.parent)
-            return candidate
+    prefix = f"sevn-{os.getuid()}-"
+    for base in (Path(tempfile.gettempdir()), Path("/tmp")):  # noqa: S108 — 0700 mkdtemp
+        # ``mkdtemp`` adds 8 random characters and creates the directory 0700.
+        if fits(base / (prefix + "x" * 8) / SOCKET_NAME):
+            created = Path(tempfile.mkdtemp(prefix=prefix, dir=base))
+            if not trusted_dir(created):
+                raise ControlPathError(f"{created} is not private to this user")
+            return created / SOCKET_NAME
     raise ControlPathError("no short enough path for the control socket")
 
 
 def client_path(run: Path) -> Path | None:
-    """The live control socket for this home, if one exists (the pointer wins)."""
+    """The trusted control socket for this home, if any. A pointer, when present, decides."""
     pointer = run / POINTER_NAME
     if pointer.is_file():
         text = pointer.read_text(encoding="utf-8").strip()
-        if text:
-            found = Path(text)
-            return found if _is_socket(found) else None
+        found = Path(text) if text else None
+        return found if found is not None and trusted_socket(found) else None
     found = run / SOCKET_NAME
-    return found if _is_socket(found) else None
+    return found if trusted_socket(found) else None
 
 
-def _is_socket(path: Path) -> bool:
+def trusted_socket(path: Path) -> bool:
+    """A unix socket owned by this user, in a directory only this user can reach."""
     try:
-        return stat.S_ISSOCK(path.lstat().st_mode)
+        info = path.lstat()
     except OSError:
         return False
+    if not stat.S_ISSOCK(info.st_mode) or info.st_uid != os.getuid():
+        return False
+    return trusted_dir(path.parent)
 
 
-def _private_dir(path: Path) -> None:
-    """Create ``path`` 0700, or accept it only if it is ours and not reachable by others."""
+def trusted_dir(path: Path) -> bool:
+    """A real directory (not a symlink) owned by this user with no group/other bits."""
     try:
-        path.mkdir(mode=0o700)
-    except FileExistsError:
-        pass
-    info = path.lstat()
+        info = path.lstat()
+    except OSError:
+        return False
     if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid():
-        raise ControlPathError(f"{path} is not a directory owned by this user")
-    if stat.S_IMODE(info.st_mode) & 0o077:
-        raise ControlPathError(f"{path} is reachable by other users")
+        return False
+    return stat.S_IMODE(info.st_mode) & 0o077 == 0
