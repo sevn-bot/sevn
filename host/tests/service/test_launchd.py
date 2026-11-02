@@ -20,8 +20,6 @@ import pytest
 from fakes.fake_runner import FakeRunner
 from support.service import combined, invoke, status_json
 
-pytestmark = pytest.mark.xfail(strict=False, reason="green after W2")
-
 _GOLDEN = Path(__file__).with_name("golden") / "bot.sevn.host.plist"
 _EXE = Path("/opt/sevn/bin/sevn")
 _HOME = Path("/srv/sevn")

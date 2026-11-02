@@ -25,8 +25,6 @@ from support.service import (
     unit_words,
 )
 
-pytestmark = pytest.mark.xfail(strict=False, reason="green after W2")
-
 _GOLDEN = Path(__file__).with_name("golden") / "sevn.service"
 _EXE = Path("/opt/sevn/bin/sevn")
 _HOME = Path("/srv/sevn")
