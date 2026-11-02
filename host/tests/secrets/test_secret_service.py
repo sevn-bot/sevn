@@ -9,6 +9,7 @@ installed with ``sevn.secrets.backends.use_keyring``, and the 2 s collection pro
 from __future__ import annotations
 
 import itertools
+import os
 import secrets
 import socket
 import sys
@@ -21,8 +22,6 @@ from typing import Any
 import pytest
 from fakes.fake_keyring import FakeKeyring
 from support.canary import canary
-
-pytestmark = pytest.mark.xfail(strict=False, reason="green after W3")
 
 _BUS = "unix:path=/run/user/1000/bus"
 
@@ -628,9 +627,8 @@ def test_probe_is_bounded_when_the_bus_hangs(monkeypatch: pytest.MonkeyPatch) ->
 
 
 @pytest.mark.live
+@pytest.mark.session_bus
 def test_live_secret_service_roundtrip(tmp_path: Path) -> None:
-    import os
-
     if not sys.platform.startswith("linux") or not os.environ.get("DBUS_SESSION_BUS_ADDRESS"):
         pytest.skip("needs a Linux desktop session bus")
     from sevn.secrets import probe_secret_service
@@ -648,3 +646,17 @@ def test_live_secret_service_roundtrip(tmp_path: Path) -> None:
     finally:
         backend.delete(name)
     assert name not in backend.names()
+
+
+# --- isolation guard (W3.R) --------------------------------------------------
+
+_BUS_AT_IMPORT = os.environ.get("DBUS_SESSION_BUS_ADDRESS")
+
+
+def test_tests_never_see_the_real_session_bus() -> None:
+    assert "DBUS_SESSION_BUS_ADDRESS" not in os.environ
+
+
+@pytest.mark.session_bus
+def test_session_bus_marker_keeps_the_real_variable() -> None:
+    assert os.environ.get("DBUS_SESSION_BUS_ADDRESS") == _BUS_AT_IMPORT

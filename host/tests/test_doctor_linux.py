@@ -24,8 +24,6 @@ import pytest
 from fakes.fake_keyring import FakeKeyring
 from fakes.fake_runner import FakeRunner
 
-pytestmark = pytest.mark.xfail(strict=False, reason="green after W3")
-
 _EXISTING_KEYS = {
     "home": str,
     "db": str,
