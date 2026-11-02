@@ -68,8 +68,10 @@ sevn service restart
 sevn service uninstall
 ```
 
-Installing again with the same settings changes nothing. A unit with other content is replaced
-only with `--force`. `--home PATH` and `--port N` go into the unit.
+Installing again with the same settings leaves the unit as it is (`unchanged`) but restarts the
+service when it is running, so re-running `install.sh` for an upgrade takes effect. A stopped or
+failed service is not restarted. A unit with other content is replaced only with `--force`.
+`--home PATH` and `--port N` go into the unit.
 
 A user service stops when your last session ends. To keep sevn running after you log out (on a
 server, or across reboots before you log in), enable lingering for your user yourself:
@@ -96,7 +98,10 @@ On a Linux desktop, secrets go to the Secret Service (GNOME Keyring, KeePassXC, 
 When `sevn serve` picks `secret-service` this way, it writes `backend = "secret-service"` under
 `[secrets]` in `config.toml`. From then on, a locked or missing keyring stops the host with
 `secrets_locked` or `secrets_unavailable` instead of starting on an empty age file with a new
-host identity. Unlock the keyring (log in to the desktop session) and start it again.
+host identity. Unlock the keyring (log in to the desktop session) and start it again. If the
+keyring locks or goes away while the host runs, calls that need a secret (listing models,
+creating a bot) answer `secrets_locked` or `secrets_unavailable`, and routing carries on without
+jev until the keyring answers again.
 
 To move an existing host between backends, use `sevn secret migrate`. It copies every secret,
 reads each one back, writes the new backend to `config.toml`, and only then deletes the old
@@ -252,7 +257,9 @@ sevn runtimes remove opencode
 The host uses the managed copy first, then the one on `PATH` (unless
 `[runtimes.<name>] use_system = false`), then, for Claude only, the CLI bundled with the SDK.
 `SEVN_RUNTIMES_DIR` (or `[runtimes] dir`) moves the root; the images set it to
-`/opt/sevn/runtimes`.
+`/opt/sevn/runtimes`. On a root you cannot write to (that image directory is read-only to the
+`sevn` user), `install` and `remove` stop with `read_only_root` and the path, before any
+download or change.
 
 ## Troubleshooting
 

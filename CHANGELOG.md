@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add `sevn service install|uninstall|status|logs|restart`: a launchd agent on macOS and a systemd `--user` unit on Linux, idempotent installs that replace a different unit only with `--force`, `status --json` states, and a `loginctl enable-linger` hint that sevn never runs itself.
 
+- A keyring that locks or goes away while the host runs no longer turns calls into `internal` errors: `models.list`, `bots.create` and the `sevn secret` commands answer `secrets_locked` or `secrets_unavailable`, and jev routing and the compaction model pick fall through with a warning that names the code, never a value. Re-running `sevn service install` (or `install.sh`) with an unchanged unit restarts a running service so an upgrade takes effect. `sevn doctor` reports a derivative distro by its known family (`arch` on Omarchy and EndeavourOS, `ubuntu` on Pop!_OS, `debian` on Kali). `sevn runtimes install` and `remove` on a read-only root stop with `read_only_root` and the path, before any download or change.
+
 - Close shell option-abbreviation approval bypasses, redact tool results before model history, serialize message publication, support confined Git commands in linked worktrees, refresh resolved routing chips and sandbox warnings, coalesce event replay, and retain confirmed sandbox settings after failed updates.
 
 - Fix lane cancellation, crash retry message identity, purge ordering, reroute labels, connection retries, compaction fallback, and confined Git worktree creation.

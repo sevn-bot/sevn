@@ -1,5 +1,9 @@
 """Secret backend errors."""
 
+from typing import Literal
+
+type SecretsErrorCode = Literal["secrets_locked", "secrets_unavailable"]
+
 
 class SecretNotFound(Exception):
     def __init__(self, name: str) -> None:
@@ -16,7 +20,7 @@ class SecretBackendReadOnly(Exception):
 class SecretsBackendError(Exception):
     """The secret store cannot be used right now. ``code`` is stable; the message holds no value."""
 
-    code: str = "secrets_unavailable"
+    code: SecretsErrorCode = "secrets_unavailable"
 
     def __init__(self, message: str) -> None:
         self.message = message

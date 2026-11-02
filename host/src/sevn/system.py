@@ -134,9 +134,17 @@ def _os_release_fields(text: str) -> dict[str, str]:
     return fields
 
 
+_KNOWN_FAMILIES = ("ubuntu", "arch", "debian")
+
+
 def classify_platform(os_release: str | None, *, in_container: bool) -> str:
-    """``container``, ``ubuntu <version>``, the os-release ``ID`` (``arch``, ``debian``), or
-    ``linux`` when there is no os-release."""
+    """``container``, ``ubuntu <version>``, ``arch`` or ``debian`` (plan 0025 D7, D13), or
+    ``linux`` when there is no os-release.
+
+    A known ``ID`` wins. Otherwise the first ``ID_LIKE`` word in the known set names the
+    family without a version (Omarchy → ``arch``, Pop!_OS → ``ubuntu``); with none, the
+    ``ID`` is reported as it is (``fedora``).
+    """
     if in_container:
         return "container"
     fields = _os_release_fields(os_release or "")
@@ -146,6 +154,11 @@ def classify_platform(os_release: str | None, *, in_container: bool) -> str:
     if ident == "ubuntu":
         version = fields.get("VERSION_ID", "").strip()
         return f"ubuntu {version}" if version else "ubuntu"
+    if ident in _KNOWN_FAMILIES:
+        return ident
+    for like in fields.get("ID_LIKE", "").lower().split():
+        if like in _KNOWN_FAMILIES:
+            return like
     return ident
 
 

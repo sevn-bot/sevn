@@ -24,7 +24,7 @@ from sevn.log import logger
 from sevn.paths import Paths
 from sevn.runtime.errors import ModelError
 from sevn.secrets.backends import open_backend
-from sevn.secrets.errors import SecretNotFound
+from sevn.secrets.errors import SecretNotFound, SecretsBackendError
 
 ECHO_ID = "echo"
 # The lane e2e starts its clock before both sends. Both replies must be painted
@@ -160,8 +160,15 @@ def model_override_active() -> bool:
 
 
 def cheapest_configured_model() -> str | None:
-    """The cheapest catalog id among providers that have a key, or none."""
-    configured = _configured_providers()
+    """The cheapest catalog id among providers that have a key, or none.
+
+    A locked or unreachable secret store counts as no key: the caller falls through.
+    """
+    try:
+        configured = _configured_providers()
+    except SecretsBackendError as exc:
+        logger.warning("no cheap model: the secret store is unavailable ({})", exc.code)
+        return None
     for provider, model_id in _CHEAPEST:
         if provider in configured:
             return model_id
@@ -188,6 +195,7 @@ def _ollama_url() -> str | None:
 
 
 def _provider_key(provider_name: str) -> str | None:
+    """The provider's API key, or none. A failing secret store raises ``SecretsBackendError``."""
     secret = _SECRET_NAMES.get(provider_name)
     if secret is None:
         return None

@@ -315,6 +315,7 @@ def install(name: str, *, version: str | None = None, sha256: str | None = None)
 
     root = runtimes_root()
     directory = root / name
+    _require_writable(root, directory)
     version_dir = directory / chosen
     if (version_dir / name).is_file():
         _switch_current(root, directory, chosen)
@@ -407,6 +408,21 @@ def _download(url: str, tmp: Path, name: str, version: str, expected: str) -> Pa
         path.unlink(missing_ok=True)
         raise
     return path
+
+
+def _require_writable(root: Path, *paths: Path) -> None:
+    """Refuse before any download or change when the root (or a directory under it) is
+    read-only, like the images' root-owned ``/opt/sevn/runtimes`` (plan 0025 D13)."""
+    for path in (root, *paths):
+        existing = path
+        while not existing.exists() and existing.parent != existing:
+            existing = existing.parent
+        if not os.access(existing, os.W_OK | os.X_OK):
+            raise InstallError(
+                "read_only_root",
+                f"the runtimes root {root} is read-only ({existing} is not writable); "
+                "set SEVN_RUNTIMES_DIR or [runtimes] dir to a writable directory",
+            )
 
 
 def _switch_current(root: Path, directory: Path, version: str) -> None:
@@ -577,6 +593,7 @@ def remove(name: str, *, version: str | None = None) -> None:
             raise InstallError("not_installed", f"{name} {version} is not installed")
         doomed = [version]
         drops_current = version == current
+    _require_writable(root, directory)
     if drops_current and _busy(name):
         raise InstallError(
             "runtime_busy",

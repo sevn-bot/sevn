@@ -93,6 +93,9 @@ class LaunchdService:
         if action == "unchanged":
             if not self._loaded():
                 self._bootstrap()
+            elif self.status().state == "running":
+                # An upgrade keeps the plist but not the code: restart the running agent.
+                self.restart()
             return InstallResult(path=self.plist, action=action)
         # Unload any earlier copy so the new plist is the one launchd runs; failure means
         # nothing was loaded.

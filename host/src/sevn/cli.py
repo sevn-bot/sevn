@@ -166,7 +166,7 @@ def secret_set(name: str) -> None:
         raise typer.Exit(code=1)
     try:
         _open_secrets().set(name, value)
-    except SecretBackendReadOnly as exc:
+    except (SecretBackendReadOnly, SecretsBackendError) as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1) from exc
     typer.echo(f"stored {name}")
@@ -175,7 +175,12 @@ def secret_set(name: str) -> None:
 @secret_app.command("list")
 def secret_list() -> None:
     """Print secret names. Values stay in the backend."""
-    for name in _open_secrets().names():
+    try:
+        names = _open_secrets().names()
+    except SecretsBackendError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    for name in names:
         typer.echo(name)
 
 
@@ -184,7 +189,7 @@ def secret_rm(name: str) -> None:
     """Delete one secret by name."""
     try:
         _open_secrets().delete(name)
-    except (SecretNotFound, SecretBackendReadOnly) as exc:
+    except (SecretNotFound, SecretBackendReadOnly, SecretsBackendError) as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1) from exc
     typer.echo(f"removed {name}")

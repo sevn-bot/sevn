@@ -122,10 +122,16 @@ class SystemdService:
     ) -> InstallResult:
         content = render_unit(executable, home, port).encode()
         action = plan_write(self.unit, content, force=force)
+        # An unchanged unit after an upgrade still runs the old code: restart it when it is
+        # running (``enable --now`` below would leave it alone). A stopped one is not started
+        # by the restart.
+        restart = action == "replace" or (
+            action == "unchanged" and self.status().state == "running"
+        )
         if action != "unchanged":
             write_atomic(self.unit, content)
             self._systemctl("daemon-reload")
-        if action == "replace":
+        if restart:
             # A running unit keeps its old ExecStart until restarted; a stopped one stays put.
             self._systemctl("try-restart", UNIT_NAME)
         self._systemctl("enable", "--now", UNIT_NAME)

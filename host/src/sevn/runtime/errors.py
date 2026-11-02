@@ -36,6 +36,7 @@ type InstallErrorCode = Literal[
     "unsafe_archive",
     "runtime_busy",
     "not_installed",
+    "read_only_root",
 ]
 
 
