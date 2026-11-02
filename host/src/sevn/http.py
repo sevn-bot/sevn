@@ -41,6 +41,7 @@ from sevn.domain.routines import run_due
 from sevn.domain.shares import shared_snapshot
 from sevn.identity import HostIdentity, load_or_create
 from sevn.log import logger
+from sevn.observability import metrics as host_metrics
 from sevn.observability.setup import (
     ObservabilityHandle,
     choose_exporter,
@@ -235,7 +236,17 @@ async def _lifespan(app: ASGIApp) -> AsyncGenerator[None]:
         _instrument(traced)
     try:
         async with _host_lifespan(app):
-            yield
+            # Host gauges read the store, so they start once it is open (D9).
+            sampler = (
+                asyncio.create_task(host_metrics.run()) if telemetry.exporter != "none" else None
+            )
+            try:
+                yield
+            finally:
+                if sampler is not None:
+                    sampler.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await sampler
     finally:
         if traced is not None:
             _uninstrument(traced)

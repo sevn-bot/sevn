@@ -1,8 +1,10 @@
-"""Turn OTel export on or off at host startup (plan 0015 D1-D4, D10, D12).
+"""Turn OTel export on or off at host startup (plan 0015 D1-D4, D8-D10, D12).
 
 Tracing never changes behaviour: a missing secret, a bad endpoint or an
 unreachable collector is logged once at WARNING and leaves the host running.
 With the exporter off nothing is installed, so the OTel API stays a no-op.
+With it on, traces, loguru records (``logs``) and the host gauges (``metrics``)
+go to the same backend, each behind sevn's own redaction and failure report.
 """
 
 from __future__ import annotations
@@ -26,6 +28,7 @@ from sevn import __version__
 from sevn.config import SECRET_REF_PREFIX, ExporterName, ObservabilitySettings, Settings
 from sevn.identity import HostIdentity
 from sevn.log import logger
+from sevn.observability import logs, metrics
 from sevn.observability.presets import ExportTarget, resolve
 from sevn.observability.redact import RedactingExporter, logfire_callback
 from sevn.paths import Paths
@@ -35,6 +38,8 @@ from sevn.secrets.errors import SecretNotFound
 if TYPE_CHECKING:
     from fastapi import FastAPI
     from logfire import Logfire
+    from opentelemetry.sdk._logs.export import LogRecordExporter
+    from opentelemetry.sdk.metrics.export import MetricExporter
 
 LOGFIRE_TOKEN_SECRET = "logfire/token"  # noqa: S105 — a secret name, not a value
 
@@ -141,12 +146,27 @@ def _setup_otlp(settings: Settings, identity: HostIdentity) -> ObservabilityHand
     target = resolve(obs)
     host = _endpoint_host(target.traces_endpoint)
     headers = _resolve_headers(target.trace_headers, settings)
+    log_headers = _resolve_headers(target.log_headers, settings)
+    metric_headers = _resolve_headers(target.metric_headers, settings)
     notice = FailureNotice()
+    resource = _resource(obs, identity)
     exporter = _ReportingExporter(_otlp_span_exporter(target, headers), notice, "traces", host)
-    provider = TracerProvider(resource=_resource(obs, identity), sampler=_sampler(obs))
+    provider = TracerProvider(resource=resource, sampler=_sampler(obs))
     provider.add_span_processor(_batch(exporter))
+    close = _install_signals(
+        provider.shutdown,
+        resource,
+        notice,
+        host,
+        logs.otlp_exporter(
+            target.protocol, target.logs_endpoint, log_headers, timeout_s=_EXPORT_TIMEOUT_S
+        ),
+        metrics.otlp_exporter(
+            target.protocol, target.metrics_endpoint, metric_headers, timeout_s=_EXPORT_TIMEOUT_S
+        ),
+    )
     trace.set_tracer_provider(provider)
-    return ObservabilityHandle("otlp", close=provider.shutdown)
+    return ObservabilityHandle("otlp", close=close)
 
 
 def _otlp_span_exporter(target: ExportTarget, headers: dict[str, str]) -> SpanExporter:
@@ -211,7 +231,8 @@ def _setup_logfire(settings: Settings, identity: HostIdentity) -> ObservabilityH
         compression=Compression.Gzip,
         timeout=_EXPORT_TIMEOUT_S,
     )
-    processor = _batch(_ReportingExporter(exporter, FailureNotice(), "traces", host))
+    notice = FailureNotice()
+    processor = _batch(_ReportingExporter(exporter, notice, "traces", host))
     environment = _environment()
     with _without_env(_LOGFIRE_IGNORED_ENV):
         instance = logfire.configure(
@@ -235,8 +256,30 @@ def _setup_logfire(settings: Settings, identity: HostIdentity) -> ObservabilityH
             distributed_tracing=True,
             advanced=advanced,
         )
+    # Logs and metrics go to Logfire's intake the same way: sevn's exporters, redacted.
+    intake = {"Authorization": token, "User-Agent": f"sevn/{__version__}"}
+    close = _install_signals(
+        lambda: _close_logfire(instance),
+        _resource(obs, identity),
+        notice,
+        host,
+        logs.otlp_exporter(
+            "http/protobuf",
+            urljoin(base_url, "/v1/logs"),
+            intake,
+            timeout_s=_EXPORT_TIMEOUT_S,
+            gzip=True,
+        ),
+        metrics.otlp_exporter(
+            "http/protobuf",
+            urljoin(base_url, "/v1/metrics"),
+            intake,
+            timeout_s=_EXPORT_TIMEOUT_S,
+            gzip=True,
+        ),
+    )
     trace.set_tracer_provider(instance.config.get_tracer_provider())
-    return ObservabilityHandle("logfire", close=lambda: _close_logfire(instance))
+    return ObservabilityHandle("logfire", close=close)
 
 
 def _close_logfire(instance: Logfire) -> None:
@@ -260,6 +303,47 @@ def _logfire_token(settings: Settings) -> str:
 
 
 # --- shared pieces --------------------------------------------------------------------
+
+
+def _install_signals(
+    close_traces: Callable[[], object],
+    resource: Resource,
+    notice: FailureNotice,
+    host: str,
+    log_exporter: LogRecordExporter,
+    metric_exporter: MetricExporter,
+) -> Callable[[], None]:
+    """Install log and metric export next to the traces; return the close for all three.
+
+    The three exporters share ``notice``, so a dead collector is one WARNING (D12).
+    The log sink is detached first, so nothing logged while closing is queued.
+    """
+
+    def report(signal: str) -> Callable[[str], None]:
+        return lambda detail: notice.report(signal, host, detail)
+
+    log_export = logs.install(
+        log_exporter, resource, report("logs"), export_timeout_s=_EXPORT_TIMEOUT_S
+    )
+    metric_export = metrics.install(
+        metric_exporter,
+        resource,
+        report("metrics"),
+        export_timeout_s=_EXPORT_TIMEOUT_S,
+        drop_report=report("telemetry"),
+    )
+    steps: tuple[Callable[[], object], ...] = (
+        log_export.detach,
+        close_traces,
+        log_export.close,
+        metric_export.close,
+    )
+
+    def close() -> None:
+        for step in steps:
+            _run_close(step)
+
+    return close
 
 
 def _resource(obs: ObservabilitySettings, identity: HostIdentity) -> Resource:
