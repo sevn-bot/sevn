@@ -22,16 +22,20 @@ from sevn.paths import Paths
 from sevn.probe import ProbeError, call_method, events_since, parse_params
 from sevn.secrets.backends import AgeFileBackend, EnvBackend, KeychainBackend, open_backend
 from sevn.secrets.errors import SecretBackendReadOnly, SecretNotFound
+from sevn.service import ServiceError, ServiceManager, service_home, sevn_executable
+from sevn.service import manager as service_manager
 
 app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 probe_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 contracts_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 secret_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 evals_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
+service_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 app.add_typer(probe_app, name="probe")
 app.add_typer(contracts_app, name="contracts")
 app.add_typer(secret_app, name="secret")
 app.add_typer(evals_app, name="evals")
+app.add_typer(service_app, name="service", help="Run the host as a launchd or systemd service.")
 
 _LOOPBACK = frozenset({"127.0.0.1", "localhost", "::1", "[::1]"})
 
@@ -194,6 +198,92 @@ def evals_run(suite: str) -> None:
         raise typer.Exit(code=1) from exc
     if outcome.disabled:
         typer.echo("evals disabled")
+
+
+@service_app.command("install")
+def service_install(
+    home: Annotated[Path | None, typer.Option("--home")] = None,
+    port: Annotated[int | None, typer.Option("--port", min=1, max=65535)] = None,
+    force: Annotated[bool, typer.Option("--force")] = False,
+) -> None:
+    """Install and start the host as a launchd agent (macOS) or systemd user unit (Linux)."""
+    manager = _service_manager()
+    try:
+        outcome = manager.install(sevn_executable(), service_home(home), port, force=force)
+    except ServiceError as exc:
+        _service_fail(exc)
+    if outcome.action == "unchanged":
+        typer.echo(f"{outcome.path} unchanged")
+    else:
+        verb = "replaced" if outcome.action == "replace" else "installed"
+        typer.echo(f"{verb} {outcome.path}")
+    for hint in outcome.hints:
+        typer.echo(hint)
+
+
+@service_app.command("uninstall")
+def service_uninstall() -> None:
+    """Stop the service and remove its unit or plist."""
+    manager = _service_manager()
+    try:
+        outcome = manager.uninstall()
+    except ServiceError as exc:
+        _service_fail(exc)
+    for warning in outcome.warnings:
+        typer.echo(warning, err=True)
+    typer.echo(f"removed {outcome.path}" if outcome.removed else "not-installed")
+
+
+@service_app.command("status")
+def service_status(as_json: Annotated[bool, typer.Option("--json")] = False) -> None:
+    """Print running, stopped, failed or not-installed, with the last exit code."""
+    manager = _service_manager()
+    try:
+        status = manager.status()
+    except ServiceError as exc:
+        _service_fail(exc)
+    if as_json:
+        typer.echo(json.dumps(status.to_json()))
+        return
+    if status.exit_code is None:
+        typer.echo(status.state)
+    else:
+        typer.echo(f"{status.state} (exit code {status.exit_code})")
+
+
+@service_app.command("logs")
+def service_logs(follow: Annotated[bool, typer.Option("--follow", "-f")] = False) -> None:
+    """Show the service log (journalctl on Linux, the launchd log file on macOS)."""
+    manager = _service_manager()
+    try:
+        text = manager.logs(follow=follow)
+    except ServiceError as exc:
+        _service_fail(exc)
+    if text:
+        typer.echo(text, nl=not text.endswith("\n"))
+
+
+@service_app.command("restart")
+def service_restart() -> None:
+    """Restart the service."""
+    manager = _service_manager()
+    try:
+        manager.restart()
+    except ServiceError as exc:
+        _service_fail(exc)
+    typer.echo("restarted")
+
+
+def _service_manager() -> ServiceManager:
+    try:
+        return service_manager()
+    except ServiceError as exc:
+        _service_fail(exc)
+
+
+def _service_fail(exc: ServiceError) -> NoReturn:
+    typer.echo(exc.message, err=True)
+    raise typer.Exit(code=exc.exit_code) from exc
 
 
 def _open_secrets() -> KeychainBackend | AgeFileBackend | EnvBackend:
