@@ -782,8 +782,41 @@ def test_remove_current_refused_while_turn_runs(
         remove("claude", version="2.0.0")
     assert (env.root / "claude" / "current").resolve() == (env.root / "claude" / "2.0.0").resolve()
 
+
+@pytest.mark.parametrize("status", ["running", "waiting"])
+def test_remove_older_version_refused_while_turn_runs(
+    env: Env, server: FileServer, use_manifest: Any, status: str
+) -> None:
+    from sevn.runtime.installs import InstallError, install, remove
+
+    # A turn can start on 1.0.0 and still be spawning from its tree after 2.0.0 is current.
+    use_manifest({"claude": _publish(server, "claude", "1.0.0", "raw")})
+    install("claude")
+    use_manifest({"claude": _publish(server, "claude", "2.0.0", "raw")})
+    install("claude")
+    _turn(env.data, "claude", status)
+
+    with pytest.raises(InstallError) as caught:
+        remove("claude", version="1.0.0")
+    assert caught.value.code == "runtime_busy"
+    assert "claude" in str(caught.value)
+    assert (env.root / "claude" / "1.0.0").is_dir()
+
+
+def test_remove_older_version_after_the_turn_ends(
+    env: Env, server: FileServer, use_manifest: Any
+) -> None:
+    from sevn.runtime.installs import install, remove
+
+    use_manifest({"claude": _publish(server, "claude", "1.0.0", "raw")})
+    install("claude")
+    use_manifest({"claude": _publish(server, "claude", "2.0.0", "raw")})
+    install("claude")
+    _turn(env.data, "claude", "done")
+
     remove("claude", version="1.0.0")
     assert not (env.root / "claude" / "1.0.0").exists()
+    assert (env.root / "claude" / "current").resolve() == (env.root / "claude" / "2.0.0").resolve()
 
 
 def test_remove_after_the_turn_ends(env: Env, server: FileServer, use_manifest: Any) -> None:

@@ -572,8 +572,8 @@ def _finish_tree(staging: Path, name: str, binary: str) -> None:
 def remove(name: str, *, version: str | None = None) -> None:
     """Remove one managed version, or every managed version and ``current``.
 
-    Refuses with ``runtime_busy`` when ``current`` would go while a turn of ``name`` is
-    running or waiting.
+    Refuses with ``runtime_busy`` while a turn of ``name`` is running or waiting. A turn
+    records no version and can outlive a switch of ``current``, so any version may be in use.
     """
     known = set(RUNTIMES) | set(load_manifest().runtimes)
     if name not in known:
@@ -594,11 +594,10 @@ def remove(name: str, *, version: str | None = None) -> None:
         doomed = [version]
         drops_current = version == current
     _require_writable(root, directory)
-    if drops_current and _busy(name):
+    if _busy(name):
         raise InstallError(
             "runtime_busy",
-            f"cannot remove the current {name}: a {name} turn is running or waiting; "
-            "try again when it ends",
+            f"cannot remove {name}: a {name} turn is running or waiting; try again when it ends",
         )
     if drops_current:
         (directory / _CURRENT).unlink(missing_ok=True)
