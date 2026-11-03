@@ -1,4 +1,4 @@
-"""Span redaction and content capture (plan 0015 D7; green after W2).
+"""Span redaction and content capture (plan 0015 D7).
 
 K-CANARY: a registered secret placed in span attributes, events, an exception
 and the status description is absent from every byte the loopback receiver saw,

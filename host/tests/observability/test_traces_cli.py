@@ -1,4 +1,4 @@
-"""``sevn doctor`` observability fields and ``sevn traces test`` (plan 0015 D11; green after W5).
+"""``sevn doctor`` observability fields and ``sevn traces test`` (plan 0015 D11).
 
 The file is not named ``test_cli.py``: ``host/tests/test_cli.py`` exists, and the
 tests tree has no packages, so two modules with one basename cannot both import.

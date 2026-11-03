@@ -1,4 +1,4 @@
-"""Trace shape: job -> route.decide -> turn -> tools (plan 0015 D5; green after W3).
+"""Trace shape: job -> route.decide -> turn -> tools (plan 0015 D5).
 
 These tests run against the in-memory span exporter (``span_exporter``): the SDK
 provider is global, so sevn's spans and Pydantic AI's spans land in one place.

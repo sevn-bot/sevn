@@ -1,4 +1,4 @@
-"""Config, setup, exporters and presets (plan 0015 D1-D4, D10, D12; green after W2).
+"""Config, setup, exporters and presets (plan 0015 D1-D4, D10, D12).
 
 Every exporter in this file points at a loopback receiver from ``support.spans``.
 Nothing is sent over the network.

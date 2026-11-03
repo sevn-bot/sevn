@@ -1,4 +1,4 @@
-"""Trace ids on log records, OTel log export, host gauges (plan 0015 D8, D9; green after W4)."""
+"""Trace ids on log records, OTel log export, host gauges, drop counter (plan 0015 D8, D9, D12)."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from support.observability import (
     start_observability,
     write_observability_config,
 )
-from support.spans import OtlpReceiver, dead_port
+from support.spans import TRACES, OtlpReceiver, dead_port
 
 pytestmark = pytest.mark.usefixtures("otel_clean")
 
@@ -220,3 +220,55 @@ async def test_gauges_report_queue_running_and_ollama(
         latest = [point for point in points if point.name == name]
         assert latest[-1].value == expected, (name, latest)
         assert "sevn.bot_id" not in latest[-1].attributes
+
+
+# --- D12: dropped telemetry -------------------------------------------------------------
+
+# D12 / docs/observability.md: at most 2 048 spans wait; the SDK batch default is 512.
+_SPAN_QUEUE_CAP = 2048
+_EXPORT_BATCH = 512
+_OVERFLOW_SPANS = 6000
+
+
+@pytest.mark.xfail(reason="green after WV fix F1: count dropped spans exactly", strict=False)
+def test_dropped_counter_counts_every_span_dropped_on_a_full_queue(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A stalled collector overflows the span queue; ``sevn.otel.dropped`` counts each drop.
+
+    The collector holds the first trace export open, so the batch worker is stuck with
+    one batch in flight while the queue fills. Every span emitted past the cap is a
+    drop, and every span the collector finally receives is not, so the counter
+    (``sevn.signal = traces``) must equal emitted minus received, not one per log line.
+    """
+    from opentelemetry import trace
+
+    with OtlpReceiver(hang_s=30) as receiver:
+        arm_observability(monkeypatch, tmp_path, otlp_section(receiver.url))
+        handle = start_observability()
+        assert handle.exporter == "otlp"
+        tracer = trace.get_tracer("sevn.tests")
+        try:
+            for index in range(_EXPORT_BATCH):
+                tracer.start_span(f"fill-{index}").end()
+            # The worker took a batch and is blocked on the collector: nothing leaves now.
+            receiver.wait_for(lambda seen: bool(seen.signal_requests(TRACES)), timeout_s=3)
+            for index in range(_OVERFLOW_SPANS - _EXPORT_BATCH):
+                tracer.start_span(f"overflow-{index}").end()
+        finally:
+            receiver.release.set()
+            handle.shutdown()
+        exported = len({span.span_id for span in receiver.spans()})
+        points = [point for point in receiver.metrics() if point.name == "sevn.otel.dropped"]
+    by_signal: dict[str, float] = {}
+    for point in points:
+        signal = str(point.attributes.get("sevn.signal", ""))
+        by_signal[signal] = by_signal.get(signal, 0.0) + point.value
+    dropped = _OVERFLOW_SPANS - exported
+    assert 0 < exported <= _SPAN_QUEUE_CAP + _EXPORT_BATCH, exported
+    assert dropped >= _OVERFLOW_SPANS - _SPAN_QUEUE_CAP - _EXPORT_BATCH
+    assert by_signal.get(TRACES, 0.0) == dropped, (
+        f"sevn.otel.dropped reported {by_signal or 'nothing'} but {dropped} spans were dropped "
+        f"(emitted {_OVERFLOW_SPANS}, collector received {exported})"
+    )
+    assert set(by_signal) == {TRACES}, by_signal

@@ -1,4 +1,4 @@
-"""Trace context and collector settings for CLI runtimes (plan 0015 D6; green after W4).
+"""Trace context and collector settings for CLI runtimes (plan 0015 D6).
 
 K-CANARY: no export credential (the Logfire token, a Datadog API key, any
 ``headers`` value) reaches a child CLI's env.
