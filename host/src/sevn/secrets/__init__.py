@@ -163,6 +163,8 @@ def _with_backend(text: str, backend: str) -> str:
             lines[index] = f"{match.group(1)}secrets.backend = {value}{eol}"
             return "".join(lines)
     if header_at is not None:
+        if not lines[header_at].endswith("\n"):
+            lines[header_at] += "\n"
         lines.insert(header_at + 1, f"backend = {value}\n")
         return "".join(lines)
     prefix = "".join(lines)

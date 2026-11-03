@@ -237,6 +237,32 @@ def test_secret_set_pins_the_secret_service(
     assert selected_backend(settings, Paths.from_env()) == "secret-service"
 
 
+@pytest.mark.parametrize(
+    "config",
+    ["[secrets]", "[secrets] # the store", "[http]\nport = 9123\n[secrets]"],
+    ids=["header-only", "header-with-comment", "last-line"],
+)
+def test_pin_after_an_unterminated_secrets_header(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fake_keyring: FakeKeyring, config: str
+) -> None:
+    from sevn.config import Settings
+
+    home = _home(tmp_path, monkeypatch, None, extra_toml=config)
+    assert not (home / "config.toml").read_text(encoding="utf-8").endswith("\n")
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setenv("DBUS_SESSION_BUS_ADDRESS", _BUS)
+    _probe_returns(monkeypatch, "unlocked")
+    value = secrets.token_urlsafe(16)
+    monkeypatch.setattr("getpass.getpass", lambda *_a, **_k: value)
+
+    result = _invoke(["secret", "set", "provider/openai"])
+    assert result.exit_code == 0, _out(result)
+    settings = Settings.load()
+    assert settings.secrets.backend == "secret-service"
+    if "port" in config:
+        assert settings.http.port == 9123
+
+
 # --- backend behaviour -------------------------------------------------------
 
 
