@@ -230,7 +230,6 @@ _EXPORT_BATCH = 512
 _OVERFLOW_SPANS = 6000
 
 
-@pytest.mark.xfail(reason="green after WV fix F1: count dropped spans exactly", strict=False)
 def test_dropped_counter_counts_every_span_dropped_on_a_full_queue(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
