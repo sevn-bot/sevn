@@ -23,7 +23,7 @@ from sevn.errors import ConfigError
 from sevn.http import AppState, create_app, web_dist_path
 from sevn.paths import Paths
 from sevn.probe import ProbeError, call_method, events_since, parse_params
-from sevn.secrets.backends import SecretBackend, open_backend
+from sevn.secrets.backends import SecretBackend, backend_named, open_backend
 from sevn.secrets.errors import SecretBackendReadOnly, SecretNotFound, SecretsBackendError
 from sevn.service import ServiceError, ServiceManager, service_home, sevn_executable
 from sevn.service import manager as service_manager
@@ -164,11 +164,16 @@ def secret_set(name: str) -> None:
     if value == "":
         typer.echo("secret value is empty", err=True)
         raise typer.Exit(code=1)
+    settings = _settings()
+    paths = Paths.from_env()
+    chosen = sevn.secrets.selected_backend(settings, paths)
     try:
-        _open_secrets().set(name, value)
+        backend_named(chosen, paths).set(name, value)
     except (SecretBackendReadOnly, SecretsBackendError) as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1) from exc
+    if settings.secrets.backend is None and chosen == "secret-service":
+        _pin_secret_service(paths)
     typer.echo(f"stored {name}")
 
 
@@ -415,24 +420,31 @@ def _open_secrets() -> SecretBackend:
     return open_backend(_settings(), Paths.from_env())
 
 
+def _pin_secret_service(paths: Paths) -> None:
+    """Pin ``secret-service`` in config.toml once secrets live there (D4).
+
+    Without the pin, a later start with a locked keyring would select the age file and
+    silently start on a fresh one (and a new host identity) instead of refusing.
+    """
+    try:
+        path = sevn.secrets.pin_backend(paths, "secret-service")
+    except (ConfigError, OSError) as exc:
+        typer.echo(f"could not pin the secret backend: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(f'pinned [secrets] backend = "secret-service" in {path}', err=True)
+
+
 def _require_secrets(settings: Settings) -> None:
     """Refuse to start on a configured Secret Service that is locked or missing (D4).
 
     When no backend is configured and the selection picks the Secret Service, pin that
-    choice in config.toml, so a later start with a locked keyring refuses instead of
-    silently moving to a fresh age file (and a new host identity).
+    choice in config.toml (see :func:`_pin_secret_service`).
     """
     paths = Paths.from_env()
     configured = settings.secrets.backend
     if configured is None:
-        if sevn.secrets.selected_backend(settings, paths) != "secret-service":
-            return
-        try:
-            path = sevn.secrets.pin_backend(paths, "secret-service")
-        except (ConfigError, OSError) as exc:
-            typer.echo(f"could not pin the secret backend: {exc}", err=True)
-            raise typer.Exit(code=1) from exc
-        typer.echo(f'pinned [secrets] backend = "secret-service" in {path}', err=True)
+        if sevn.secrets.selected_backend(settings, paths) == "secret-service":
+            _pin_secret_service(paths)
         return
     if configured != "secret-service":
         return

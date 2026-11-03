@@ -9,13 +9,14 @@ leaves the source and the config as they were. No message ever contains a value.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal
 
 import sevn.secrets
 from sevn.config import BackendName, Settings
 from sevn.errors import ConfigError
 from sevn.paths import Paths
-from sevn.secrets.backends import EnvBackend, SecretBackend, backend_named
+from sevn.secrets.backends import AgeFileBackend, EnvBackend, SecretBackend, backend_named
 from sevn.secrets.errors import SecretBackendReadOnly, SecretNotFound, SecretsBackendError
 
 type MigrationTarget = Literal["secret-service", "age-file"]
@@ -87,7 +88,7 @@ def migrate(settings: Settings, paths: Paths, raw_target: str) -> MigrationResul
         raise MigrationError(
             _code(exc), f"cannot read {target_name}: {_reason(exc)}; nothing was copied"
         ) from exc
-    undo = _Undo(target, existing)
+    undo = _Undo(target, existing, _new_files(target))
     for name in names:
         try:
             value = source.get(name)
@@ -139,12 +140,27 @@ def _require_unlocked() -> None:
         )
 
 
-class _Undo:
-    """Puts the target back as it was: new copies are deleted, overwritten items restored."""
+def _new_files(target: SecretBackend) -> tuple[Path, ...]:
+    """The age-file target's files that do not exist yet, so an undo can remove them.
 
-    def __init__(self, target: SecretBackend, existing: set[str]) -> None:
+    Deleting the last secret leaves an encrypted empty ``secrets.age``, and selection keeps
+    any existing ``secrets.age``; a failed migration must not leave one behind.
+    """
+    if not isinstance(target, AgeFileBackend):
+        return ()
+    return tuple(path for path in target.files if not path.exists())
+
+
+class _Undo:
+    """Puts the target back as it was: new copies are deleted, overwritten items restored,
+    and files the target created are removed."""
+
+    def __init__(
+        self, target: SecretBackend, existing: set[str], new_files: tuple[Path, ...] = ()
+    ) -> None:
         self._target = target
         self._existing = existing
+        self._new_files = new_files
         self._touched: list[str] = []
         self._previous: dict[str, str] = {}
 
@@ -163,6 +179,8 @@ class _Undo:
                     self._target.delete(name)
             except _BACKEND_FAILURES:
                 continue
+        for path in self._new_files:
+            path.unlink(missing_ok=True)
 
 
 def _code(exc: Exception) -> str:

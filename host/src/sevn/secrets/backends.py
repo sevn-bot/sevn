@@ -14,6 +14,7 @@ from typing import Protocol, assert_never, cast
 import keyring
 import keyring.errors
 
+import sevn.secrets
 from sevn.config import BackendName, Settings
 from sevn.paths import Paths
 from sevn.secrets import selected_backend
@@ -148,6 +149,19 @@ def _secret_service_keyring() -> KeyringAPI:
     return Keyring()
 
 
+def _require_unlocked_collection() -> None:
+    """Refuse before ``keyring`` touches a locked or missing collection.
+
+    ``keyring`` unlocks a locked collection on access, which on a desktop opens a prompt and
+    blocks until it is answered. The bounded probe reads the lock state without unlocking.
+    """
+    state = sevn.secrets.probe_secret_service()
+    if state == "locked":
+        raise SecretsLocked
+    if state == "unavailable":
+        raise SecretsUnavailable("no Secret Service answered on the session bus")
+
+
 def home_key(home: Path) -> str:
     """A short, stable id for one sevn home, so two homes never share Secret Service items."""
     digest = hashlib.sha256(str(home.expanduser().resolve()).encode("utf-8")).hexdigest()
@@ -219,6 +233,7 @@ class SecretServiceBackend:
             return self._keyring
         if _keyring_override is not None:
             return _keyring_override
+        _require_unlocked_collection()
         return _secret_service_keyring()
 
     def _call[T](self, operation: Callable[[KeyringAPI], T], action: str) -> T:
@@ -261,6 +276,11 @@ class AgeFileBackend:
     def __init__(self, secrets_file: Path, identity_file: Path) -> None:
         self._secrets_file = secrets_file
         self._identity_file = identity_file
+
+    @property
+    def files(self) -> tuple[Path, Path]:
+        """The secrets file and the age identity that encrypts it."""
+        return self._secrets_file, self._identity_file
 
     def set(self, name: str, value: str) -> None:
         with _path_lock(self._secrets_file):

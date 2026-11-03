@@ -148,6 +148,16 @@ def _packages(argv: list[str]) -> set[str]:
     return {word for word in argv if not word.startswith("-") and word not in {"install"}}
 
 
+def _command(argv: list[str]) -> list[str]:
+    """The command under a leading ``env NAME=value ...`` (how apt gets its environment)."""
+    if argv[:1] != ["env"]:
+        return argv
+    index = 1
+    while index < len(argv) and "=" in argv[index]:
+        index += 1
+    return argv[index:]
+
+
 def _installs(box: Sandbox, manager: str) -> list[list[str]]:
     calls = box.calls(manager)
     if manager == "apt-get":
@@ -195,7 +205,7 @@ def test_package_list_per_manager(sandbox: Sandbox, manager: str, expected: set[
     if os.geteuid() != 0:
         sudo = sandbox.calls("sudo")
         assert sudo, "the package step runs through sudo"
-        assert all(argv[0] == manager for argv in sudo), sudo
+        assert all(_command(argv)[0] == manager for argv in sudo), sudo
 
 
 def test_without_a_known_manager_prints_packages_and_continues(sandbox: Sandbox) -> None:
@@ -248,13 +258,35 @@ def test_service_is_installed_with_the_home(sandbox: Sandbox) -> None:
     assert doctor_at > sevn.index(service[0])
 
 
+_APT_ENV = """
+with open(os.environ["FAKE_LOG"] + ".apt-env", "a", encoding="utf-8") as seen:
+    seen.write(os.environ.get("DEBIAN_FRONTEND", "") + "\\n")
+"""
+
+
+def test_apt_runs_noninteractive_through_sudo(sandbox: Sandbox) -> None:
+    # sudo's env_reset drops exported variables, so the setting has to be on the command.
+    _write_fake(sandbox.fakes, "apt-get", _APT_ENV)
+    wheel = _local_wheel(sandbox)
+    completed = _run(sandbox, "--no-service", "--wheel", str(wheel))
+    assert completed.returncode == 0, completed.stderr
+    assert len(sandbox.calls("apt-get")) == 2, sandbox.calls()
+    seen = Path(str(sandbox.log) + ".apt-env").read_text(encoding="utf-8").splitlines()
+    assert seen == ["noninteractive", "noninteractive"]
+    if os.geteuid() != 0:
+        sudo = sandbox.calls("sudo")
+        assert len(sudo) == 2, sudo
+        for argv in sudo:
+            assert argv[:3] == ["env", "DEBIAN_FRONTEND=noninteractive", "apt-get"], argv
+
+
 def test_sudo_is_only_used_for_packages(sandbox: Sandbox) -> None:
     _write_fake(sandbox.fakes, "apt-get", _SILENT)
     wheel = _local_wheel(sandbox)
     completed = _run(sandbox, "--wheel", str(wheel))
     assert completed.returncode == 0, completed.stderr
     for argv in sandbox.calls("sudo"):
-        assert argv[0] in {"apt-get", "pacman"}, argv
+        assert _command(argv)[0] in {"apt-get", "pacman"}, argv
 
 
 def test_never_edits_shell_profiles_without_a_tty(sandbox: Sandbox) -> None:

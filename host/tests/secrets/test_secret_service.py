@@ -207,6 +207,36 @@ def test_existing_age_file_is_never_switched(
     assert fake_keyring.store == {}
 
 
+def test_secret_set_pins_the_secret_service(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fake_keyring: FakeKeyring
+) -> None:
+    from sevn.config import Settings
+    from sevn.paths import Paths
+    from sevn.secrets import selected_backend
+
+    home = _home(tmp_path, monkeypatch, None, extra_toml="[http]\nport = 9123\n")
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setenv("DBUS_SESSION_BUS_ADDRESS", _BUS)
+    _probe_returns(monkeypatch, "unlocked")
+    value = secrets.token_urlsafe(16)
+    monkeypatch.setattr("getpass.getpass", lambda *_a, **_k: value)
+
+    result = _invoke(["secret", "set", "provider/openai"])
+    assert result.exit_code == 0, _out(result)
+    assert 'pinned [secrets] backend = "secret-service"' in _out(result)
+    assert value not in _out(result)
+    assert value in fake_keyring.values()
+    assert not (home / "secrets.age").exists()
+    settings = Settings.load()
+    assert settings.secrets.backend == "secret-service"
+    assert settings.http.port == 9123
+
+    # A later start with a locked keyring keeps the Secret Service (and refuses), instead
+    # of selecting a fresh age file.
+    _probe_returns(monkeypatch, "locked")
+    assert selected_backend(settings, Paths.from_env()) == "secret-service"
+
+
 # --- backend behaviour -------------------------------------------------------
 
 
@@ -280,6 +310,51 @@ def test_locked_keyring_raises_secrets_locked(tmp_path: Path, fake_keyring: Fake
     assert caught.value.code == "secrets_locked"
     assert "locked" in str(caught.value)
     assert not isinstance(caught.value, SecretNotFound)
+
+
+@pytest.mark.parametrize(
+    ("state", "code"),
+    [("locked", "secrets_locked"), ("unavailable", "secrets_unavailable")],
+)
+def test_real_keyring_is_never_reached_unless_unlocked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, state: str, code: str
+) -> None:
+    from sevn.secrets import backends
+    from sevn.secrets.errors import SecretsBackendError
+
+    calls = _probe_returns(monkeypatch, state)
+
+    def no_keyring() -> object:
+        raise AssertionError("keyring unlocks a locked collection, which opens a prompt")
+
+    monkeypatch.setattr(backends, "_secret_service_keyring", no_keyring)
+    backend = backends.SecretServiceBackend(tmp_path / "home")
+    operations: list[Callable[[], object]] = [
+        lambda: backend.get("provider/openai"),
+        lambda: backend.set("provider/openai", secrets.token_urlsafe(16)),
+        lambda: backend.delete("provider/openai"),
+        backend.names,
+    ]
+    for operation in operations:
+        with pytest.raises(SecretsBackendError) as caught:
+            operation()
+        assert caught.value.code == code
+    assert len(calls) == len(operations)
+
+
+def test_real_keyring_is_used_when_unlocked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sevn.secrets import backends
+
+    calls = _probe_returns(monkeypatch, "unlocked")
+    ring = FakeKeyring()
+    monkeypatch.setattr(backends, "_secret_service_keyring", lambda: ring)
+    backend = backends.SecretServiceBackend(tmp_path / "home")
+    value = secrets.token_urlsafe(16)
+    backend.set("provider/openai", value)
+    assert backend.get("provider/openai") == value
+    assert calls, "every real keyring access checks the lock state first"
 
 
 # --- startup refusal ---------------------------------------------------------
@@ -472,6 +547,51 @@ def test_migrate_back_to_age_file(
         assert value not in fake_keyring.values()
     assert SecretServiceBackend(home).names() == []
     assert Settings.load().secrets.backend == "age-file"
+
+
+@pytest.mark.parametrize("existing_age", [False, True], ids=["new-age-file", "existing-age-file"])
+def test_failed_migrate_to_age_file_leaves_no_new_age_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    fake_keyring: FakeKeyring,
+    existing_age: bool,
+) -> None:
+    from sevn.config import Settings
+    from sevn.secrets.backends import AgeFileBackend, SecretServiceBackend
+
+    home = _home(tmp_path, monkeypatch, "secret-service")
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setenv("DBUS_SESSION_BUS_ADDRESS", _BUS)
+    _probe_returns(monkeypatch, "unlocked")
+    source = SecretServiceBackend(home)
+    seeded = {f"provider/test{index}": secrets.token_urlsafe(24) for index in range(3)}
+    for name, value in seeded.items():
+        source.set(name, value)
+    kept = secrets.token_urlsafe(24)
+    if existing_age:
+        _age(home).set("other/kept", kept)
+    real_set = AgeFileBackend.set
+
+    def failing_set(self: AgeFileBackend, name: str, value: str) -> None:
+        if name == "provider/test1":
+            raise OSError(28, "No space left on device")
+        real_set(self, name, value)
+
+    monkeypatch.setattr(AgeFileBackend, "set", failing_set)
+
+    result = _invoke(["secret", "migrate", "--to", "age-file"])
+    assert result.exit_code == 1, _out(result)
+    assert "provider/test1" in _out(result)
+    assert "nothing was changed" in _out(result)
+    if existing_age:
+        assert _age(home).names() == ["other/kept"]
+        assert _age(home).get("other/kept") == kept
+    else:
+        assert not (home / "secrets.age").exists()
+        assert not (home / "keys" / "age.key").exists()
+    for name, value in seeded.items():
+        assert source.get(name) == value
+    assert Settings.load().secrets.backend == "secret-service"
 
 
 def test_migrate_to_the_current_backend_is_refused(

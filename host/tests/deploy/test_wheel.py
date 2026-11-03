@@ -118,6 +118,11 @@ def test_release_workflow_publishes_wheel_and_sums_on_tags() -> None:
     assert "${{ secrets.GITHUB_TOKEN }}" in text or "github.token" in text
     other_secrets = re.findall(r"\$\{\{\s*secrets\.(\w+)", text)
     assert set(other_secrets) <= {"GITHUB_TOKEN"}, other_secrets
+    # A release build never restores a cache another workflow could have written.
+    for job in jobs.values():
+        for step in job.get("steps", []):
+            if str(step.get("uses", "")).startswith("astral-sh/setup-uv@"):
+                assert step.get("with", {}).get("enable-cache") is False, step
 
 
 # --- CI jobs (D12) -----------------------------------------------------------

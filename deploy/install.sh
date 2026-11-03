@@ -196,11 +196,11 @@ install_system_packages() {
     case $manager in
         apt-get)
             say "system packages (apt): $APT_PACKAGES"
-            DEBIAN_FRONTEND=noninteractive
-            export DEBIAN_FRONTEND
-            as_root apt-get update
+            # Passed through env, not exported: sudo's env_reset drops exported variables.
+            as_root env DEBIAN_FRONTEND=noninteractive apt-get update
             # shellcheck disable=SC2086 # the package list is split on purpose
-            as_root apt-get install -y --no-install-recommends $APT_PACKAGES
+            as_root env DEBIAN_FRONTEND=noninteractive \
+                apt-get install -y --no-install-recommends $APT_PACKAGES
             ;;
         pacman)
             say "system packages (pacman): $PACMAN_PACKAGES"
