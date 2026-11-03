@@ -262,6 +262,7 @@ def _setup_logfire(settings: Settings, identity: HostIdentity) -> ObservabilityH
             resource_attributes={
                 "sevn.host_id": identity.host_id,
                 "deployment.environment": environment,
+                "deployment.environment.name": environment,
             },
             console=False,
             additional_span_processors=[processor],
@@ -372,6 +373,7 @@ def _resource(obs: ObservabilitySettings, identity: HostIdentity) -> Resource:
             SERVICE_VERSION: __version__,
             "sevn.host_id": identity.host_id,
             "deployment.environment": _environment(),
+            "deployment.environment.name": _environment(),
         }
     )
 

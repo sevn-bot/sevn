@@ -18,7 +18,7 @@ Settings live in the `[observability]` table of `$SEVN_HOME/config.toml`. Every 
 | `datadog_site` | `datadoghq.com` | Datadog site for `datadog-agentless`. |
 | `service_name` | `sevnd` | `service.name` on every span. |
 
-Every span also carries `service.version`, `sevn.host_id`, and `deployment.environment`, which is `SEVN_ENV` or `local` when that is unset.
+Every span also carries `service.version`, `sevn.host_id`, and `deployment.environment` (also as `deployment.environment.name`, the current semantic-convention key that Datadog reads), which is `SEVN_ENV` or `local` when that is unset.
 
 With `exporter = "otlp"` and no `endpoint`, the host reads the standard `OTEL_EXPORTER_OTLP_ENDPOINT` variable. A set `endpoint` wins. The standard variable is ignored for every other exporter.
 
@@ -83,7 +83,7 @@ datadog_site = "datadoghq.eu"
 
 The preset sends to `https://otlp.<datadog_site>/v1/traces`, `/v1/logs` and `/v1/metrics`, for example `otlp.datadoghq.com`, `otlp.us3.datadoghq.com`, `otlp.datadoghq.eu`, `otlp.ap1.datadoghq.com` or `otlp.ddog-gov.com`. Every request carries `dd-api-key`, read from `secret://datadog/api_key`. To keep the key under another name, set `headers = { "dd-api-key" = "secret://<name>" }`.
 
-Trace requests also carry `dd-otlp-source: llmobs`, so traces appear in LLM Observability as well as APM. The model call spans follow the OTel GenAI semantic conventions, which LLM Observability reads, and the LLM Observability app name is the root span's service (`service_name`).
+Trace requests also carry `dd-otlp-source: llmobs`, so traces appear in LLM Observability as well as APM, and `compute_stats: true`, without which Datadog computes no trace metrics for agentless traffic and the service does not appear on the APM service pages. Datadog keeps unindexed spans in APM Live Search for 15 minutes; older spans are searchable only if a retention filter indexed them. The model call spans follow the OTel GenAI semantic conventions, which LLM Observability reads, and the LLM Observability app name is the root span's service (`service_name`).
 
 Datadog's agentless intake accepts `http/protobuf` only. `datadog-agentless` with `protocol = "grpc"` is a config error.
 

@@ -14,8 +14,10 @@ from sevn.config import ObservabilitySettings, OtlpProtocol
 
 DATADOG_KEY_HEADER = "dd-api-key"
 DATADOG_KEY_REF = "secret://datadog/api_key"
-# Datadog routes OTLP traces carrying this header into LLM Observability (W0.3).
-_LLMOBS_HEADER = ("dd-otlp-source", "llmobs")
+# Trace-only Datadog headers (W0.3): ``dd-otlp-source`` routes traces into LLM
+# Observability; ``compute_stats`` makes the intake compute APM trace metrics, which
+# it skips for direct (agentless) traffic, so the service never shows up without it.
+_DATADOG_TRACE_HEADERS = {"dd-otlp-source": "llmobs", "compute_stats": "true"}
 
 _AGENT_HTTP = "http://localhost:4318"
 _AGENT_GRPC = "http://localhost:4317"
@@ -56,14 +58,13 @@ def _agentless(obs: ObservabilitySettings) -> ExportTarget:
     key_ref = obs.headers.get(DATADOG_KEY_HEADER, DATADOG_KEY_REF)
     common = {**obs.headers, DATADOG_KEY_HEADER: key_ref}
     target = _target("http/protobuf", base, common)
-    name, value = _LLMOBS_HEADER
     return ExportTarget(
         protocol=target.protocol,
         base_endpoint=target.base_endpoint,
         traces_endpoint=target.traces_endpoint,
         logs_endpoint=target.logs_endpoint,
         metrics_endpoint=target.metrics_endpoint,
-        trace_headers={**common, name: value},
+        trace_headers={**common, **_DATADOG_TRACE_HEADERS},
         log_headers=dict(common),
         metric_headers=dict(common),
         loopback=target.loopback,

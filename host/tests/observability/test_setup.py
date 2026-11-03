@@ -210,6 +210,7 @@ def test_resource_attributes(
     assert resource["service.version"] == sevn.__version__
     assert resource["sevn.host_id"] == identity.host_id
     assert resource["deployment.environment"] == "staging"
+    assert resource["deployment.environment.name"] == "staging"
 
 
 def test_deployment_environment_defaults_to_local(
@@ -225,6 +226,7 @@ def test_deployment_environment_defaults_to_local(
     handle.shutdown()
     resource = next(span.resource for span in otlp_receiver.spans() if span.name == "probe")
     assert resource["deployment.environment"] == "local"
+    assert resource["deployment.environment.name"] == "local"
     assert resource["service.name"] == "sevnd-lab"
 
 
@@ -360,6 +362,7 @@ def test_datadog_agentless_preset_sets_site_endpoint_and_key_header(
     assert target.trace_headers == {
         "dd-api-key": "secret://datadog/api_key",
         "dd-otlp-source": "llmobs",
+        "compute_stats": "true",
     }
     assert target.log_headers == {"dd-api-key": "secret://datadog/api_key"}
     assert target.metric_headers == {"dd-api-key": "secret://datadog/api_key"}
