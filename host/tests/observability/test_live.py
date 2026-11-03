@@ -37,10 +37,10 @@ pytestmark = [
 
 _TRACE_ID = re.compile(r"\b[0-9a-f]{32}\b")
 _READ_BACK_S = 120
-_LOGFIRE_TOKEN = "SEVN_LIVE_LOGFIRE_TOKEN"  # noqa: S105 — env var names, not values
-_LOGFIRE_READ_TOKEN = "SEVN_LIVE_LOGFIRE_READ_TOKEN"  # noqa: S105
-_DD_API_KEY = "SEVN_LIVE_DD_API_KEY"
-_CREDENTIAL_ENV = (_LOGFIRE_TOKEN, _LOGFIRE_READ_TOKEN, _DD_API_KEY)
+_LOGFIRE_WRITE_ENV = "SEVN_LIVE_LOGFIRE_TOKEN"
+_LOGFIRE_READ_ENV = "SEVN_LIVE_LOGFIRE_READ_TOKEN"
+_DD_KEY_ENV = "SEVN_LIVE_DD_API_KEY"
+_CREDENTIAL_ENV = (_LOGFIRE_WRITE_ENV, _LOGFIRE_READ_ENV, _DD_KEY_ENV)
 
 
 def _has(env_name: str) -> bool:
@@ -94,12 +94,12 @@ def _logfire_rows(trace_id: str, since: datetime) -> list[dict[str, Any]]:
 
     assert _TRACE_ID.fullmatch(trace_id)
     sql = (
-        "SELECT span_name, attributes->>'sevn.canary' AS canary "  # noqa: S608 — trace_id is hex
+        "SELECT span_name, attributes->>'sevn.canary' AS canary "  # noqa: S608 — hex-checked above; no bind params
         f"FROM records WHERE trace_id = '{trace_id}'"
     )
     deadline = time.monotonic() + _READ_BACK_S
     try:
-        with LogfireQueryClient(read_token=os.environ[_LOGFIRE_READ_TOKEN]) as client:
+        with LogfireQueryClient(read_token=os.environ[_LOGFIRE_READ_ENV]) as client:
             while time.monotonic() < deadline:
                 body = client.query_json_rows(sql=sql, min_timestamp=since)
                 rows = body.get("rows", []) if isinstance(body, dict) else []
@@ -115,14 +115,14 @@ def _logfire_rows(trace_id: str, since: datetime) -> list[dict[str, Any]]:
 
 
 def test_live_logfire_trace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    if not _has(_LOGFIRE_TOKEN):
-        pytest.skip(f"skipped: no live gate ({_LOGFIRE_TOKEN} is not set)")
+    if not _has(_LOGFIRE_WRITE_ENV):
+        pytest.skip(f"skipped: no live gate ({_LOGFIRE_WRITE_ENV} is not set)")
     arm_observability(monkeypatch, tmp_path)
-    _store_from_env(_LOGFIRE_TOKEN, "logfire/token")
+    _store_from_env(_LOGFIRE_WRITE_ENV, "logfire/token")
     since = datetime.now(UTC) - timedelta(minutes=5)
     trace_id = _sent_trace_id()
-    if not _has(_LOGFIRE_READ_TOKEN):
-        pytest.skip(f"exported trace {trace_id}; no {_LOGFIRE_READ_TOKEN} to read it back")
+    if not _has(_LOGFIRE_READ_ENV):
+        pytest.skip(f"exported trace {trace_id}; no {_LOGFIRE_READ_ENV} to read it back")
     rows = _logfire_rows(trace_id, since)
     assert rows, f"trace {trace_id} not queryable after {_READ_BACK_S}s"
     names = [row.get("span_name") for row in rows]
@@ -134,15 +134,15 @@ def test_live_logfire_trace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
 
 def test_live_datadog_trace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     site = os.environ.get("SEVN_LIVE_DD_SITE", "") or os.environ.get("DD_SITE", "")
-    if not _has(_DD_API_KEY):
-        pytest.skip(f"skipped: no live gate ({_DD_API_KEY} is not set)")
+    if not _has(_DD_KEY_ENV):
+        pytest.skip(f"skipped: no live gate ({_DD_KEY_ENV} is not set)")
     arm_observability(
         monkeypatch,
         tmp_path,
         'exporter = "otlp"\npreset = "datadog-agentless"\n'
         f'datadog_site = "{site or "datadoghq.com"}"',
     )
-    _store_from_env(_DD_API_KEY, "datadog/api_key")
+    _store_from_env(_DD_KEY_ENV, "datadog/api_key")
     result = _invoke("doctor", "--json", "--check")
     output = _scrubbed(result.output)
     assert result.exit_code == 0, output

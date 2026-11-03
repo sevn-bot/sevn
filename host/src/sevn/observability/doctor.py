@@ -23,7 +23,7 @@ from sevn.secrets.registry import register
 TEST_SPAN = "sevn.test"
 CANARY_ATTRIBUTE = "sevn.canary"
 # The canary is registered under this name, so it exports as «redacted:traces/canary».
-CANARY_SECRET = "traces/canary"  # noqa: S105 — a secret name, not a value
+CANARY_SECRET = "traces/canary"  # noqa: S105 — the store key; the value is minted per run
 
 
 @dataclass(frozen=True, slots=True)

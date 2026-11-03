@@ -17,9 +17,11 @@ import asyncio
 import json
 from collections.abc import Generator, Mapping
 from contextlib import contextmanager
-from contextvars import ContextVar
+from contextvars import Context as TaskContext
+from contextvars import ContextVar, copy_context
 from dataclasses import dataclass, field
 
+from opentelemetry import context as otel_context
 from opentelemetry import trace
 from opentelemetry.context import Context
 from opentelemetry.trace import Span, Status, StatusCode, Tracer
@@ -171,6 +173,25 @@ def job_traceparent() -> str | None:
     if span is None or trace.get_current_span() is not span:
         return None
     return traceparent(span)
+
+
+def detached_context() -> TaskContext:
+    """A copy of the current context with no span current, for a long-lived task.
+
+    A task copies the context it starts in. The worker's pump starts inside the
+    first message's ``job`` span and then runs later jobs too, so without this
+    their log records would carry that first message's trace. Each turn takes
+    its parent from ``jobs.trace_parent`` instead.
+    """
+    context = copy_context()
+    context.run(_detach)
+    return context
+
+
+def _detach() -> None:
+    otel_context.attach(Context())
+    _job.set(None)
+    _turn.set(None)
 
 
 @contextmanager
@@ -352,6 +373,7 @@ __all__ = [
     "ToolSpans",
     "capture_content",
     "cli_tool_spans",
+    "detached_context",
     "job_span",
     "job_traceparent",
     "parent_context",

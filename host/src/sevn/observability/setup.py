@@ -42,7 +42,7 @@ if TYPE_CHECKING:
     from opentelemetry.sdk._logs.export import LogRecordExporter
     from opentelemetry.sdk.metrics.export import MetricExporter
 
-LOGFIRE_TOKEN_SECRET = "logfire/token"  # noqa: S105 — a secret name, not a value
+LOGFIRE_TOKEN_SECRET = "logfire/token"  # noqa: S105 — the store key the token is kept under
 
 SHUTDOWN_CAP_S = 5.0
 _EXPORT_TIMEOUT_S = 5.0

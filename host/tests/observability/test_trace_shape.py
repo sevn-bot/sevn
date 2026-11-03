@@ -318,6 +318,50 @@ async def test_turn_parented_from_job_row_across_tasks(
     assert parent_hex(turn) == span_hex(job)
 
 
+async def test_pump_started_inside_job_span_does_not_keep_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, span_exporter: Any
+) -> None:
+    """``messages.send`` kicks the pump inside the job span; the pump must not inherit it.
+
+    The pump outlives the message that started it, so an inherited span would stamp
+    the lifecycle logs of every later job with that first message's trace.
+    """
+    from opentelemetry import trace
+    from sevn.log import logger
+
+    _spans_module()
+    lifecycle = {"turn started", "turn finished"}
+    stamped: list[tuple[str, Any]] = []
+
+    def sink(message: Any) -> None:
+        if message.record["message"] in lifecycle:
+            stamped.append((message.record["message"], trace.get_current_span()))
+
+    handle = logger.add(sink)
+    try:
+        _bot, _sent, spans = await _pydantic_message(
+            tmp_path, monkeypatch, span_exporter, "hello", [[{"kind": "text", "text": "ok"}]]
+        )
+    finally:
+        logger.remove(handle)
+    job = one(spans, "job")
+    assert {message for message, _span in stamped} == lifecycle
+    assert all(span is not job for _message, span in stamped)
+    assert all(not span.get_span_context().is_valid for _message, span in stamped)
+
+
+def test_detached_context_drops_the_job_span(span_exporter: Any) -> None:
+    from opentelemetry import trace
+
+    _ = span_exporter
+    spans = _spans_module()
+    with spans.job_span("user", job_id="job_test") as job:
+        detached = spans.detached_context()
+        assert spans.job_traceparent() is not None
+    assert detached.run(trace.get_current_span) is not job
+    assert detached.run(spans.job_traceparent) is None
+
+
 async def test_resumed_turn_after_restart_stays_in_trace(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, span_exporter: Any
 ) -> None:
@@ -563,7 +607,7 @@ def test_job_span_is_a_new_root_inside_an_active_span(span_exporter: Any) -> Non
 
 def test_migrations_single_head() -> None:
     completed = subprocess.run(
-        ["make", "--no-print-directory", "db-heads"],  # noqa: S607 — the repo Makefile target
+        ["make", "--no-print-directory", "db-heads"],  # noqa: S607 — the repo Makefile target CI runs
         cwd=repo_root(),
         check=False,
         capture_output=True,
