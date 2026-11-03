@@ -150,9 +150,9 @@ Every runtime gets the sevn-side `turn` and `tool.<name>` spans whether or not i
 
 Tracing never changes what the host does. A missing token or header secret, a bad endpoint, or an unreachable collector never fails startup, a request or a turn.
 
-- A setup problem (a missing header secret, an endpoint that is not an `http://` or `https://` URL) is logged once at WARNING and leaves export off.
+- A setup problem (a missing header secret, an endpoint that is not an `http://` or `https://` URL, or another tracer provider already installed in the process) is logged once at WARNING and leaves export off.
 - An export failure is logged at WARNING at most once every 10 minutes per exporter. The exporter retries for up to 5 seconds, then drops that batch.
-- At most 2,048 spans wait for export. Past that, new spans are dropped and counted in `sevn.otel.dropped`.
+- At most 2,048 spans, and 2,048 log records, wait for export. Past that, new ones are dropped, and each one is counted in `sevn.otel.dropped` (`sevn.signal` is `traces` or `logs`).
 - Shutdown flushes what is left and never holds the host for more than 5 seconds.
 
 ## Checking the setup
@@ -167,7 +167,7 @@ observability_check: ok
 
 `observability_exporter` is `none`, `logfire`, or `otlp:<preset or endpoint host>`. `observability_check` is `ok`, `failed: …` with the reason, or `off` when no exporter is on. `sevn doctor --json` prints the same keys.
 
-`sevn traces test` sends one `sevn.test` span and prints its trace id. The span carries `sevn.canary`, a fresh value registered as a secret, so in the backend it must read `«redacted:traces/canary»`. Search for the trace id in Logfire or Datadog to see both the export and the redaction. With export off the command exits 1 and says the exporter is `none`. A failed export exits 1 with `failed: …`.
+`sevn traces test` sends one `sevn.test` span and prints its trace id. The span carries `sevn.canary`, a fresh value registered as a secret, so in the backend it must read `«redacted:traces/canary»`. Search for the trace id in Logfire or Datadog to see both the export and the redaction. With export off the command exits 1 and says why: the exporter is `none`, or `exporter = "none"` turns export off by config. A failed export exits 1 with `failed: …`.
 
 ```bash
 sevn traces test

@@ -134,6 +134,10 @@ def setup(settings: Settings, identity: HostIdentity) -> ObservabilityHandle:
         chosen = choose_exporter(settings)
         if chosen == "none":
             return ObservabilityHandle("none")
+        if not isinstance(trace.get_tracer_provider(), trace.ProxyTracerProvider):
+            # The OTel API keeps the first provider for the life of the process, so
+            # spans would not reach this setup's exporters (D12: report, stay off).
+            raise _SetupError("a tracer provider is already installed in this process")
         _quiet_otel_loggers()
         if chosen == "otlp":
             return _setup_otlp(settings, identity)
@@ -160,15 +164,16 @@ def _setup_otlp(settings: Settings, identity: HostIdentity) -> ObservabilityHand
     log_headers = _resolve_headers(target.log_headers, settings)
     metric_headers = _resolve_headers(target.metric_headers, settings)
     notice = FailureNotice()
+    drops = _drops(notice, host)
     resource = _resource(obs, identity)
-    exporter = _ReportingExporter(_otlp_span_exporter(target, headers), notice, "traces", host)
     provider = TracerProvider(resource=resource, sampler=_sampler(obs))
-    provider.add_span_processor(_batch(exporter))
+    provider.add_span_processor(_batch(_otlp_span_exporter(target, headers), notice, host, drops))
     close = _install_signals(
         provider.shutdown,
         resource,
         notice,
         host,
+        drops,
         logs.otlp_exporter(
             target.protocol, target.logs_endpoint, log_headers, timeout_s=_EXPORT_TIMEOUT_S
         ),
@@ -243,7 +248,8 @@ def _setup_logfire(settings: Settings, identity: HostIdentity) -> ObservabilityH
         timeout=_EXPORT_TIMEOUT_S,
     )
     notice = FailureNotice()
-    processor = _batch(_ReportingExporter(exporter, notice, "traces", host))
+    drops = _drops(notice, host)
+    processor = _batch(exporter, notice, host, drops)
     environment = _environment()
     with _without_env(_LOGFIRE_IGNORED_ENV):
         instance = logfire.configure(
@@ -274,6 +280,7 @@ def _setup_logfire(settings: Settings, identity: HostIdentity) -> ObservabilityH
         _resource(obs, identity),
         notice,
         host,
+        drops,
         logs.otlp_exporter(
             "http/protobuf",
             urljoin(base_url, "/v1/logs"),
@@ -321,6 +328,7 @@ def _install_signals(
     resource: Resource,
     notice: FailureNotice,
     host: str,
+    drops: metrics.Drops,
     log_exporter: LogRecordExporter,
     metric_exporter: MetricExporter,
 ) -> Callable[[], None]:
@@ -334,14 +342,14 @@ def _install_signals(
         return lambda detail: notice.report(signal, host, detail)
 
     log_export = logs.install(
-        log_exporter, resource, report("logs"), export_timeout_s=_EXPORT_TIMEOUT_S
+        log_exporter, resource, report("logs"), export_timeout_s=_EXPORT_TIMEOUT_S, drops=drops
     )
     metric_export = metrics.install(
         metric_exporter,
         resource,
         report("metrics"),
         export_timeout_s=_EXPORT_TIMEOUT_S,
-        drop_report=report("telemetry"),
+        drops=drops,
     )
     steps: tuple[Callable[[], object], ...] = (
         log_export.detach,
@@ -376,12 +384,37 @@ def _sampler(obs: ObservabilitySettings) -> ParentBased:
     return ParentBased(TraceIdRatioBased(obs.sample_ratio))
 
 
-def _batch(exporter: SpanExporter) -> BatchSpanProcessor:
-    return BatchSpanProcessor(
-        RedactingExporter(exporter),
-        max_queue_size=_QUEUE_CAP,
-        export_timeout_millis=int(_EXPORT_TIMEOUT_S * 1000),
+def _drops(notice: FailureNotice, host: str) -> metrics.Drops:
+    return metrics.Drops(lambda detail: notice.report("telemetry", host, detail))
+
+
+def _batch(
+    exporter: SpanExporter, notice: FailureNotice, host: str, drops: metrics.Drops
+) -> BatchSpanProcessor:
+    """The span queue: gated to ``_QUEUE_CAP``, redacted, failures reported (D7, D12)."""
+    gate = metrics.QueueGate("traces", _QUEUE_CAP, drops)
+    return _GatedSpanProcessor(
+        _ReportingExporter(RedactingExporter(exporter), notice, "traces", host, gate), gate
     )
+
+
+class _GatedSpanProcessor(BatchSpanProcessor):
+    """A batch processor that queues a span only when ``gate`` admits it (D12)."""
+
+    def __init__(self, exporter: SpanExporter, gate: metrics.QueueGate) -> None:
+        super().__init__(
+            exporter,
+            max_queue_size=_QUEUE_CAP,
+            export_timeout_millis=int(_EXPORT_TIMEOUT_S * 1000),
+        )
+        self._gate = gate
+
+    def on_end(self, span: ReadableSpan) -> None:
+        # Unsampled spans never reach the SDK queue, so they take no slot.
+        if span.context is None or not span.context.trace_flags.sampled:
+            return
+        if self._gate.admit():
+            super().on_end(span)
 
 
 def _endpoint_host(endpoint: str) -> str:
@@ -451,15 +484,27 @@ class FailureNotice:
 
 
 class _ReportingExporter(SpanExporter):
-    """Turns export failures and errors into one rate-limited warning; never raises."""
+    """Turns export failures and errors into one rate-limited warning; never raises.
 
-    def __init__(self, inner: SpanExporter, notice: FailureNotice, signal: str, host: str) -> None:
+    Each batch it is handed has left the queue, so it frees that many ``gate`` slots.
+    """
+
+    def __init__(
+        self,
+        inner: SpanExporter,
+        notice: FailureNotice,
+        signal: str,
+        host: str,
+        gate: metrics.QueueGate,
+    ) -> None:
         self._inner = inner
         self._notice = notice
         self._signal = signal
         self._host = host
+        self._gate = gate
 
     def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
+        self._gate.taken(len(spans))
         try:
             result = self._inner.export(spans)
         except Exception as exc:  # noqa: BLE001 — a failed export is dropped, not raised

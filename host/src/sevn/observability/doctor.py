@@ -77,11 +77,14 @@ def send_test_span(settings: Settings) -> SpanCheck:
     """
     chosen = choose_exporter(settings)
     if chosen == "none":
-        return SpanCheck(
-            trace_id="",
-            problem="observability exporter is none: set [observability] exporter "
-            "or store the secret logfire/token",
-        )
+        if settings.observability.exporter == "none":
+            problem = 'observability export is off by config ([observability] exporter = "none")'
+        else:
+            problem = (
+                "observability exporter is none: set [observability] exporter "
+                "or store the secret logfire/token"
+            )
+        return SpanCheck(trace_id="", problem=problem)
     try:
         identity = _identity(settings)
     except Exception as exc:  # noqa: BLE001 — reported to the operator, not raised

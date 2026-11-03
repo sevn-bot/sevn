@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, cast
 
 from opentelemetry._logs import SeverityNumber, set_logger_provider
 from opentelemetry.instrumentation.utils import is_instrumentation_enabled
-from opentelemetry.sdk._logs import LoggerProvider, ReadableLogRecord
+from opentelemetry.sdk._logs import LoggerProvider, ReadableLogRecord, ReadWriteLogRecord
 from opentelemetry.sdk._logs.export import (
     BatchLogRecordProcessor,
     LogRecordExporter,
@@ -32,6 +32,7 @@ from opentelemetry.util.types import AnyValue, AttributeValue
 
 from sevn import __version__
 from sevn.log import logger
+from sevn.observability.metrics import Drops, QueueGate
 from sevn.observability.redact import scrub, scrub_attributes
 
 if TYPE_CHECKING:
@@ -97,13 +98,15 @@ class RedactingLogExporter(LogRecordExporter):
 
 
 class _ReportingLogExporter(LogRecordExporter):
-    """Turns a failed export into one report; never raises."""
+    """Turns a failed export into one report; never raises. Frees ``gate`` slots."""
 
-    def __init__(self, inner: LogRecordExporter, report: FailureReport) -> None:
+    def __init__(self, inner: LogRecordExporter, report: FailureReport, gate: QueueGate) -> None:
         self._inner = inner
         self._report = report
+        self._gate = gate
 
     def export(self, batch: Sequence[ReadableLogRecord]) -> LogRecordExportResult:
+        self._gate.taken(len(batch))
         try:
             result = self._inner.export(batch)
         except Exception as exc:  # noqa: BLE001 — a failed export is dropped, not raised
@@ -186,19 +189,37 @@ def install(
     report: FailureReport,
     *,
     export_timeout_s: float,
+    drops: Drops,
 ) -> LogExport:
     """Make ``exporter`` (behind the redacting wrapper) the destination of loguru records."""
+    gate = QueueGate("logs", _QUEUE_CAP, drops)
     provider = LoggerProvider(resource=resource)
     provider.add_log_record_processor(
-        BatchLogRecordProcessor(
-            RedactingLogExporter(_ReportingLogExporter(exporter, report)),
-            max_queue_size=_QUEUE_CAP,
-            export_timeout_millis=export_timeout_s * 1000,
+        _GatedLogProcessor(
+            _ReportingLogExporter(RedactingLogExporter(exporter), report, gate),
+            gate,
+            export_timeout_s=export_timeout_s,
         )
     )
     set_logger_provider(provider)
     sink_id = logger.add(_Sink(provider), level=LEVEL, format="{message}", catch=True)
     return LogExport(provider, sink_id)
+
+
+class _GatedLogProcessor(BatchLogRecordProcessor):
+    """A batch processor that queues a record only when ``gate`` admits it (D12)."""
+
+    def __init__(
+        self, exporter: LogRecordExporter, gate: QueueGate, *, export_timeout_s: float
+    ) -> None:
+        super().__init__(
+            exporter, max_queue_size=_QUEUE_CAP, export_timeout_millis=export_timeout_s * 1000
+        )
+        self._gate = gate
+
+    def on_emit(self, log_record: ReadWriteLogRecord) -> None:
+        if self._gate.admit():
+            super().on_emit(log_record)
 
 
 class _Sink:

@@ -10,15 +10,17 @@ every ``INTERVAL_S``, which also caches the Ollama probe for that long.
 - ``sevn.agents.open``: agents in ``running``, ``waiting`` or ``idle``;
 - ``sevn.ollama.reachable``: 1 when ``SEVN_OLLAMA_URL`` answers, else 0.
 
-``sevn.otel.dropped`` counts spans and log records the batch processors drop
-because their queue is full (attribute ``sevn.signal``).
+``sevn.otel.dropped`` counts spans and log records turned away because their
+export queue is full (attribute ``sevn.signal``: ``traces`` or ``logs``). A
+``QueueGate`` in front of each batch processor does the counting, so every drop
+is counted once.
 """
 
 from __future__ import annotations
 
 import asyncio
-import logging
 import os
+import threading
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Protocol
@@ -64,9 +66,6 @@ TEMPORALITY: dict[type, AggregationTemporality] = {
     ObservableCounter: AggregationTemporality.DELTA,
     Histogram: AggregationTemporality.DELTA,
 }
-# The batch processors log this (per item) when their queue is full.
-_SDK_LOGGER = "opentelemetry.sdk._shared_internal"
-_QUEUE_FULL = "Queue full, dropping %s."
 
 type FailureReport = Callable[[str], None]
 type GaugeCallback = Callable[[CallbackOptions], Iterable[Observation]]
@@ -159,33 +158,75 @@ def _single(read: Callable[[HostSample], int]) -> GaugeCallback:
     return callback
 
 
-class _QueueFullFilter(logging.Filter):
-    """Counts the batch processors' per-item "queue full" lines, and hides them (D12)."""
+class Drops:
+    """``sevn.otel.dropped`` for one ``setup`` call, per ``sevn.signal`` (D12).
 
-    def __init__(self, counter: Counter, report: FailureReport) -> None:
-        super().__init__()
-        self._counter = counter
+    The queues exist before the meter does, so a drop seen before ``bind`` is held
+    and added once the counter exists. Each drop also goes to ``report``, which is
+    rate-limited to one WARNING.
+    """
+
+    def __init__(self, report: FailureReport) -> None:
         self._report = report
+        self._lock = threading.Lock()
+        self._counter: Counter | None = None
+        self._held: dict[str, int] = {}
 
-    def filter(self, record: logging.LogRecord) -> bool:
-        if record.msg != _QUEUE_FULL:
-            return True
-        args = record.args
-        signal = str(args[0]).lower() if isinstance(args, tuple) and args else "unknown"
-        self._counter.add(1, {SIGNAL: signal})
+    def bind(self, counter: Counter) -> None:
+        with self._lock:
+            self._counter = counter
+            held, self._held = self._held, {}
+        for signal, count in held.items():
+            counter.add(count, {SIGNAL: signal})
+
+    def add(self, signal: str) -> None:
+        with self._lock:
+            counter = self._counter
+            if counter is None:
+                self._held[signal] = self._held.get(signal, 0) + 1
+        if counter is not None:
+            counter.add(1, {SIGNAL: signal})
         self._report(f"{signal} queue full")
+
+
+class QueueGate:
+    """Holds one batch processor's queue to ``cap`` items and counts what it turns away.
+
+    The SDK's queue evicts its oldest item when full and only logs that, at most
+    once per 20 s. The gate admits an item only while fewer than ``cap`` wait for
+    the exporter, so the SDK queue (same cap) never overflows and every drop is
+    counted here. The processor calls ``admit``; the exporter calls ``taken``.
+    """
+
+    def __init__(self, signal: str, cap: int, drops: Drops) -> None:
+        self._signal = signal
+        self._cap = cap
+        self._drops = drops
+        self._lock = threading.Lock()
+        self._waiting = 0
+
+    def admit(self) -> bool:
+        """Reserve a queue slot; ``False`` (and one counted drop) when the queue is full."""
+        with self._lock:
+            if self._waiting < self._cap:
+                self._waiting += 1
+                return True
+        self._drops.add(self._signal)
         return False
+
+    def taken(self, count: int) -> None:
+        """The exporter took ``count`` items off the queue."""
+        with self._lock:
+            self._waiting = max(0, self._waiting - count)
 
 
 class MetricExport:
-    """The installed provider and drop counter. ``close`` exports the last reading."""
+    """The installed provider. ``close`` exports the last reading."""
 
-    def __init__(self, provider: MeterProvider, drop_filter: _QueueFullFilter) -> None:
+    def __init__(self, provider: MeterProvider) -> None:
         self.provider = provider
-        self._filter = drop_filter
 
     def close(self) -> None:
-        logging.getLogger(_SDK_LOGGER).removeFilter(self._filter)
         self.provider.shutdown()
 
 
@@ -195,7 +236,7 @@ def install(
     report: FailureReport,
     *,
     export_timeout_s: float,
-    drop_report: FailureReport,
+    drops: Drops,
 ) -> MetricExport:
     """A global ``MeterProvider`` exporting the host gauges every ``INTERVAL_S``."""
     reader = PeriodicExportingMetricReader(
@@ -226,15 +267,15 @@ def install(
         unit="1",
         description="1 when SEVN_OLLAMA_URL answers",
     )
-    dropped = meter.create_counter(
-        OTEL_DROPPED, unit="{item}", description="Telemetry dropped on a full export queue"
+    drops.bind(
+        meter.create_counter(
+            OTEL_DROPPED, unit="{item}", description="Telemetry dropped on a full export queue"
+        )
     )
-    drop_filter = _QueueFullFilter(dropped, drop_report)
-    logging.getLogger(_SDK_LOGGER).addFilter(drop_filter)
     # A sample from an earlier provider must not leak into this one's first export.
     _latest.sample = None
     set_meter_provider(provider)
-    return MetricExport(provider, drop_filter)
+    return MetricExport(provider)
 
 
 def otlp_exporter(
@@ -325,8 +366,10 @@ __all__ = [
     "OLLAMA_REACHABLE",
     "OTEL_DROPPED",
     "TURNS_RUNNING",
+    "Drops",
     "HostSample",
     "MetricExport",
+    "QueueGate",
     "install",
     "otlp_exporter",
     "run",
