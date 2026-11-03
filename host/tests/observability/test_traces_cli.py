@@ -162,6 +162,19 @@ def test_traces_test_with_exporter_off_fails(
     assert otlp_receiver.requests == []
 
 
+def test_traces_test_with_exporter_none_says_off_by_config(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, otlp_receiver: OtlpReceiver
+) -> None:
+    arm_observability(monkeypatch, tmp_path, 'exporter = "none"')
+    store_secret("logfire/token", fake_logfire_token())
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", otlp_receiver.url)
+    result = _invoke("traces", "test")
+    assert result.exit_code == 1, result.output
+    assert "off by config" in result.output
+    assert "logfire/token" not in result.output
+    assert otlp_receiver.requests == []
+
+
 def test_traces_test_reports_an_unreachable_collector(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

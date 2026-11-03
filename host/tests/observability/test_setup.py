@@ -290,6 +290,27 @@ def test_missing_header_secret_leaves_tracing_off_and_logs_once(
     assert len(warnings) == 1, [str(record["message"]) for record in warnings]
 
 
+def test_setup_after_another_provider_stays_off_and_logs_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, otlp_receiver: OtlpReceiver
+) -> None:
+    from opentelemetry import trace
+    from opentelemetry.sdk.trace import TracerProvider
+
+    # The OTel API keeps the first global provider for the process, so a later
+    # setup() could never reach its own exporters: it must say so and stay off.
+    trace.set_tracer_provider(TracerProvider())
+    arm_observability(monkeypatch, tmp_path, otlp_section(otlp_receiver.url))
+    with loguru_warnings() as warnings:
+        handle = start_observability()
+        emit_span("probe")
+        handle.shutdown()
+    assert handle.exporter == "none"
+    assert otlp_receiver.requests == []
+    messages = [str(record["message"]) for record in warnings]
+    assert len(messages) == 1, messages
+    assert "already installed" in messages[0]
+
+
 # --- D4: endpoints and presets ----------------------------------------------------
 
 
