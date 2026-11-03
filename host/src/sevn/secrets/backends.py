@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib
 import json
 import os
 import tempfile
@@ -76,12 +77,57 @@ def _atomic_write(path: Path, data: bytes) -> None:
     os.chmod(path, 0o600)
 
 
+def _store_errors(module: str, *names: str) -> tuple[type[Exception], ...]:
+    """The named exception classes of ``module``, or none when it is not installed.
+
+    ``secretstorage`` and ``jeepney`` come with ``keyring`` on Linux only.
+    """
+    try:
+        loaded = importlib.import_module(module)
+    except ImportError:
+        return ()
+    found: list[type[Exception]] = []
+    for name in names:
+        value: object = getattr(loaded, name, None)
+        if isinstance(value, type) and issubclass(value, Exception):
+            found.append(value)
+    return tuple(found)
+
+
+# ``keyring``'s Secret Service backend lets these through untranslated: the collection
+# stayed locked (a dismissed or refused unlock), or D-Bus answered with an error.
+_LOCKED_STORE_ERRORS = _store_errors(
+    "secretstorage.exceptions", "LockedException", "PromptDismissedException"
+)
+_FAILED_STORE_ERRORS = _store_errors(
+    "secretstorage.exceptions", "SecretStorageException"
+) + _store_errors("jeepney.wrappers", "DBusErrorResponse")
+
+
+def _translate[T](operation: Callable[[], T], store: str, action: str, locked: str) -> T:
+    """Run one keyring operation; its failures become typed errors that never hold a value."""
+    try:
+        return operation()
+    except keyring.errors.PasswordDeleteError as exc:
+        raise _Missing from exc
+    except (keyring.errors.KeyringLocked, *_LOCKED_STORE_ERRORS) as exc:
+        raise SecretsLocked(locked) from exc
+    except (keyring.errors.KeyringError, RuntimeError, OSError, *_FAILED_STORE_ERRORS) as exc:
+        raise SecretsUnavailable(f"the {store} {action} failed ({type(exc).__name__})") from exc
+
+
 class KeychainBackend:
+    """Secrets in the macOS keychain through ``keyring``.
+
+    A locked keychain raises :class:`SecretsLocked`; any other keyring failure raises
+    :class:`SecretsUnavailable`. Neither message ever contains a value.
+    """
+
     def __init__(self, service: str = "sevn") -> None:
         self._service = service
 
     def set(self, name: str, value: str) -> None:
-        keyring.set_password(self._service, name, value)
+        self._call(lambda: keyring.set_password(self._service, name, value), "write")
         register(name, value)
         if name == _KEYCHAIN_INDEX:
             return
@@ -90,7 +136,7 @@ class KeychainBackend:
         self._store_names(sorted(found))
 
     def get(self, name: str) -> str:
-        value = keyring.get_password(self._service, name)
+        value = self._call(lambda: keyring.get_password(self._service, name), "read")
         if value is None:
             raise SecretNotFound(name)
         register(name, value)
@@ -98,15 +144,15 @@ class KeychainBackend:
 
     def delete(self, name: str) -> None:
         try:
-            keyring.delete_password(self._service, name)
-        except keyring.errors.PasswordDeleteError as exc:
+            self._call(lambda: keyring.delete_password(self._service, name), "delete")
+        except _Missing as exc:
             raise SecretNotFound(name) from exc
         if name == _KEYCHAIN_INDEX:
             return
         self._store_names([item for item in self.names() if item != name])
 
     def names(self) -> list[str]:
-        raw = keyring.get_password(self._service, _KEYCHAIN_INDEX)
+        raw = self._call(lambda: keyring.get_password(self._service, _KEYCHAIN_INDEX), "read")
         if raw is None or raw == "":
             return []
         return _decode_names(raw)
@@ -114,11 +160,17 @@ class KeychainBackend:
     def _store_names(self, names: list[str]) -> None:
         if not names:
             try:
-                keyring.delete_password(self._service, _KEYCHAIN_INDEX)
-            except keyring.errors.PasswordDeleteError:
+                self._call(
+                    lambda: keyring.delete_password(self._service, _KEYCHAIN_INDEX), "delete"
+                )
+            except _Missing:
                 return
             return
-        keyring.set_password(self._service, _KEYCHAIN_INDEX, json.dumps(names))
+        payload = json.dumps(names)
+        self._call(lambda: keyring.set_password(self._service, _KEYCHAIN_INDEX, payload), "write")
+
+    def _call[T](self, operation: Callable[[], T], action: str) -> T:
+        return _translate(operation, "keychain", action, "the keychain is locked")
 
 
 class KeyringAPI(Protocol):
@@ -237,16 +289,12 @@ class SecretServiceBackend:
         return _secret_service_keyring()
 
     def _call[T](self, operation: Callable[[KeyringAPI], T], action: str) -> T:
-        try:
-            return operation(self._ring())
-        except keyring.errors.KeyringLocked as exc:
-            raise SecretsLocked from exc
-        except keyring.errors.PasswordDeleteError as exc:
-            raise _Missing from exc
-        except (keyring.errors.KeyringError, RuntimeError, OSError) as exc:
-            raise SecretsUnavailable(
-                f"the Secret Service {action} failed ({type(exc).__name__})"
-            ) from exc
+        return _translate(
+            lambda: operation(self._ring()),
+            "Secret Service",
+            action,
+            "the Secret Service collection is locked",
+        )
 
 
 class _Missing(Exception):

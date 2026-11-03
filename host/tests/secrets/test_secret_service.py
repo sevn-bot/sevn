@@ -357,6 +357,149 @@ def test_real_keyring_is_used_when_unlocked(
     assert calls, "every real keyring access checks the lock state first"
 
 
+class _RaisingKeyring:
+    """A keyring whose every call raises ``error``."""
+
+    def __init__(self, error: Exception) -> None:
+        self.error = error
+
+    def get_password(self, service: str, username: str) -> str | None:
+        raise self.error
+
+    def set_password(self, service: str, username: str, password: str) -> None:
+        raise self.error
+
+    def delete_password(self, service: str, username: str) -> None:
+        raise self.error
+
+
+def _store_error(kind: str) -> Exception:
+    """The raw ``secretstorage`` / ``jeepney`` error that ``keyring`` lets through."""
+    exceptions = pytest.importorskip("secretstorage.exceptions")
+    if kind == "dbus":
+        wrappers = pytest.importorskip("jeepney.wrappers")
+
+        class ServiceUnknown(wrappers.DBusErrorResponse):
+            def __init__(self) -> None:
+                # The fields DBusErrorResponse reads from the reply message.
+                self.name = "org.freedesktop.DBus.Error.ServiceUnknown"
+                self.data = ("The name is not activatable",)
+
+        return ServiceUnknown()
+    classes = {
+        "locked": exceptions.LockedException,
+        "dismissed": exceptions.PromptDismissedException,
+        "not-available": exceptions.SecretServiceNotAvailableException,
+    }
+    return classes[kind]("raised by the Secret Service")
+
+
+def _operations(backend: Any, value: str) -> list[Callable[[], object]]:
+    return [
+        lambda: backend.get("provider/openai"),
+        lambda: backend.set("provider/openai", value),
+        lambda: backend.delete("provider/openai"),
+        backend.names,
+    ]
+
+
+@pytest.mark.parametrize(
+    ("kind", "code"),
+    [
+        ("locked", "secrets_locked"),
+        ("dismissed", "secrets_locked"),
+        ("not-available", "secrets_unavailable"),
+        ("dbus", "secrets_unavailable"),
+    ],
+)
+def test_secret_service_store_errors_are_typed(tmp_path: Path, kind: str, code: str) -> None:
+    from sevn.secrets.backends import SecretServiceBackend
+    from sevn.secrets.errors import SecretsBackendError
+
+    error = _store_error(kind)
+    backend = SecretServiceBackend(tmp_path / "home", keyring=_RaisingKeyring(error))
+    value = secrets.token_urlsafe(16)
+    for operation in _operations(backend, value):
+        with pytest.raises(SecretsBackendError) as caught:
+            operation()
+        assert caught.value.code == code
+        assert value not in str(caught.value)
+
+
+def _keychain_fails(monkeypatch: pytest.MonkeyPatch, error: Exception) -> None:
+    import keyring
+
+    def fail(*_args: object, **_kwargs: object) -> None:
+        raise error
+
+    for name in ("get_password", "set_password", "delete_password"):
+        monkeypatch.setattr(keyring, name, fail)
+
+
+def _keyring_error(kind: str) -> Exception:
+    import keyring.errors
+
+    if kind == "locked":
+        return keyring.errors.KeyringLocked("Can't get password from keychain: locked")
+    if kind == "init":
+        return keyring.errors.InitError("no keychain")
+    return OSError(5, "Input/output error")
+
+
+@pytest.mark.parametrize(
+    ("kind", "code"),
+    [("locked", "secrets_locked"), ("init", "secrets_unavailable"), ("os", "secrets_unavailable")],
+)
+def test_keychain_errors_are_typed(monkeypatch: pytest.MonkeyPatch, kind: str, code: str) -> None:
+    from sevn.secrets.backends import KeychainBackend
+    from sevn.secrets.errors import SecretsBackendError
+
+    _keychain_fails(monkeypatch, _keyring_error(kind))
+    backend = KeychainBackend(service=f"sevn-test-{secrets.token_hex(4)}")
+    value = secrets.token_urlsafe(16)
+    for operation in _operations(backend, value):
+        with pytest.raises(SecretsBackendError) as caught:
+            operation()
+        assert caught.value.code == code
+        assert value not in str(caught.value)
+
+
+def test_keychain_delete_of_a_missing_secret_is_not_found(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import keyring.errors
+    from sevn.secrets.backends import KeychainBackend
+    from sevn.secrets.errors import SecretNotFound
+
+    _keychain_fails(monkeypatch, keyring.errors.PasswordDeleteError("not found"))
+    with pytest.raises(SecretNotFound):
+        KeychainBackend(service=f"sevn-test-{secrets.token_hex(4)}").delete("provider/openai")
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["secret", "list"],
+        ["secret", "rm", "provider/openai"],
+        ["secret", "migrate", "--to", "age-file"],
+    ],
+    ids=["list", "rm", "migrate"],
+)
+def test_locked_keychain_cli_answers_secrets_locked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, args: list[str]
+) -> None:
+    home = _home(tmp_path, monkeypatch, None)
+    monkeypatch.setattr(sys, "platform", "darwin")
+    _keychain_fails(monkeypatch, _keyring_error("locked"))
+
+    result = _invoke(args)
+    assert result.exit_code == 1, _out(result)
+    assert isinstance(result.exception, SystemExit), result.exception
+    assert "secrets_locked" in _out(result)
+    assert "Traceback" not in _out(result)
+    assert not (home / "secrets.age").exists()
+
+
 # --- startup refusal ---------------------------------------------------------
 
 
