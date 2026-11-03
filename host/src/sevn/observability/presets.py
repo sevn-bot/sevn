@@ -18,6 +18,9 @@ DATADOG_KEY_REF = "secret://datadog/api_key"
 # Observability; ``compute_stats`` makes the intake compute APM trace metrics, which
 # it skips for direct (agentless) traffic, so the service never shows up without it.
 _DATADOG_TRACE_HEADERS = {"dd-otlp-source": "llmobs", "compute_stats": "true"}
+# The header alone routes nothing into LLM (Agent) Observability: Datadog keeps a
+# trace's GenAI spans there only when the trace is marked with this attribute.
+_DATADOG_RESOURCE = {"dd_llmobs_enabled": True}
 
 _AGENT_HTTP = "http://localhost:4318"
 _AGENT_GRPC = "http://localhost:4317"
@@ -38,6 +41,8 @@ class ExportTarget:
     log_headers: dict[str, str] = field(default_factory=dict[str, str])
     metric_headers: dict[str, str] = field(default_factory=dict[str, str])
     loopback: bool = False
+    # Extra resource attributes the backend needs on every exported span.
+    resource_attributes: dict[str, bool] = field(default_factory=dict[str, bool])
 
 
 def resolve(obs: ObservabilitySettings) -> ExportTarget:
@@ -68,6 +73,7 @@ def _agentless(obs: ObservabilitySettings) -> ExportTarget:
         log_headers=dict(common),
         metric_headers=dict(common),
         loopback=target.loopback,
+        resource_attributes=dict(_DATADOG_RESOURCE),
     )
 
 

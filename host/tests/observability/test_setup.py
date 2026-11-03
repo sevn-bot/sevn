@@ -390,6 +390,41 @@ def test_datadog_agentless_preset_sets_site_endpoint_and_key_header(
     assert target.loopback is False
 
 
+def test_datadog_agentless_marks_traces_for_agent_observability(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, otlp_receiver: OtlpReceiver
+) -> None:
+    # Datadog keeps OTLP spans in LLM (Agent) Observability only when the trace is
+    # marked dd_llmobs_enabled; the dd-otlp-source header alone routes nothing there.
+    arm_observability(
+        monkeypatch,
+        tmp_path,
+        f'exporter = "otlp"\npreset = "datadog-agentless"\nendpoint = "{otlp_receiver.url}"',
+    )
+    store_secret("datadog/api_key", "dd-test-" + secrets.token_hex(8))
+    handle = start_observability()
+    emit_span("probe")
+    handle.shutdown()
+    spans = [span for span in otlp_receiver.spans() if span.name == "probe"]
+    assert len(spans) == 1, otlp_receiver.requests
+    assert spans[0].resource["dd_llmobs_enabled"] is True
+    trace_posts = [item for item in otlp_receiver.requests if item.path == "/v1/traces"]
+    assert trace_posts
+    assert {key.lower(): value for key, value in trace_posts[0].headers.items()}[
+        "dd-otlp-source"
+    ] == "llmobs"
+
+
+def test_plain_otlp_does_not_mark_traces_for_agent_observability(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, otlp_receiver: OtlpReceiver
+) -> None:
+    arm_observability(monkeypatch, tmp_path, otlp_section(otlp_receiver.url))
+    handle = start_observability()
+    emit_span("probe")
+    handle.shutdown()
+    resource = next(span.resource for span in otlp_receiver.spans() if span.name == "probe")
+    assert "dd_llmobs_enabled" not in resource
+
+
 def test_datadog_agentless_key_ref_comes_from_headers(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

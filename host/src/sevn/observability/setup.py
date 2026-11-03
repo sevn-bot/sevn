@@ -165,7 +165,7 @@ def _setup_otlp(settings: Settings, identity: HostIdentity) -> ObservabilityHand
     metric_headers = _resolve_headers(target.metric_headers, settings)
     notice = FailureNotice()
     drops = _drops(notice, host)
-    resource = _resource(obs, identity)
+    resource = _resource(obs, identity, target.resource_attributes)
     provider = TracerProvider(resource=resource, sampler=_sampler(obs))
     provider.add_span_processor(_batch(_otlp_span_exporter(target, headers), notice, host, drops))
     close = _install_signals(
@@ -366,9 +366,12 @@ def _install_signals(
     return close
 
 
-def _resource(obs: ObservabilitySettings, identity: HostIdentity) -> Resource:
+def _resource(
+    obs: ObservabilitySettings, identity: HostIdentity, extra: Mapping[str, bool] | None = None
+) -> Resource:
     return Resource.create(
         {
+            **(extra or {}),
             SERVICE_NAME: obs.service_name,
             SERVICE_VERSION: __version__,
             "sevn.host_id": identity.host_id,
