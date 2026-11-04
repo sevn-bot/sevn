@@ -24,6 +24,7 @@ from sevn.domain.ids import new_id
 from sevn.domain.jobs import JobService, job_lock, park_job
 from sevn.domain.session import open_session
 from sevn.log import logger
+from sevn.observability.spans import job_span
 from sevn.protocol.hub import Hub
 from sevn.store.db import utcnow
 from sevn.store.models import Agent as AgentRow
@@ -225,7 +226,9 @@ async def reroute(
         if agent_id is None:
             raise DomainError("invalid_params", "agent_id or new is required")
         target = await _agent_on_bot(bot_id, agent_id)
-    await _requeue(job_id, target.id, start_new=start_new)
+    # The move is a new root job span; the job's next turn joins that trace (D5).
+    with job_span("user", job_id=job_id, bot_id=bot_id):
+        await _requeue(job_id, target.id, start_new=start_new)
     # Requeueing cancelled any turn the job had, so its slot is free again. The
     # moved job then takes a slot like a new lane or a follow-up would in deliver.
     target = await AgentService().get(target.id)
@@ -372,9 +375,19 @@ async def answer_question(
     if not await _claim_question(pending_id, agent_id, answer):
         raise DomainError("pending_resolved", "pending request is resolved")
     await _resume_answered(agent_id, {turn_id})
-    job_id = await queue_on_lane(
-        bot, agent, answer_text, origin="user", intent="answer", path="card", hub=hub
-    )
+    job_id = new_id("job_")
+    # A card answer is a new message: its own root job span (D5).
+    with job_span("user", job_id=job_id, bot_id=bot.id, text=answer_text):
+        await queue_on_lane(
+            bot,
+            agent,
+            answer_text,
+            origin="user",
+            intent="answer",
+            path="card",
+            hub=hub,
+            job_id=job_id,
+        )
     return job_id, agent_id, turn_id
 
 

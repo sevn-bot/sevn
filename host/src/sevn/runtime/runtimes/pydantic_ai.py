@@ -9,6 +9,7 @@ import os
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from typing import cast
 
+from opentelemetry import trace
 from pydantic_ai import (
     Agent,
     AgentRunResultEvent,
@@ -35,6 +36,7 @@ from pydantic_ai.messages import (
     ToolReturnPart,
 )
 from pydantic_ai.models import Model
+from pydantic_ai.models.instrumented import InstrumentationSettings
 from pydantic_ai.usage import RunUsage
 
 from sevn.domain.agents import AgentRecord, sibling_block
@@ -42,6 +44,7 @@ from sevn.domain.bots import BotRecord
 from sevn.log import logger
 from sevn.memory import with_memories
 from sevn.memory.context import memory_snapshot, retain_snapshot
+from sevn.observability.spans import capture_content, tracing_on
 from sevn.runtime.base import PendingAnswer, SessionRef, ToolDecision, TurnContext
 from sevn.runtime.compaction import Compaction
 from sevn.runtime.errors import TurnError
@@ -112,6 +115,9 @@ class PydanticAIRuntime:
             ),
             deps_type=None,
         )
+        instrumentation = _instrumentation()
+        if instrumentation is not None:
+            agent.instrument = instrumentation
         history = _history(turn.message_history)
         deferred = _deferred(turn.approvals)
         # A resumed approval sends no new prompt: its block is already in history.
@@ -251,6 +257,21 @@ def _deferred(decisions: tuple[ToolDecision, ...] | None) -> DeferredToolResults
         else:
             results.approvals[decision.tool_call_id] = ToolDenied("The tool call was denied.")
     return results
+
+
+def _instrumentation() -> InstrumentationSettings | None:
+    """Model and tool spans for this turn on the provider global now (plan 0015 D4, D5).
+
+    Taken per turn, so a provider installed after startup is used. ``None`` while
+    tracing is off keeps Pydantic AI uninstrumented.
+    """
+    if not tracing_on():
+        return None
+    return InstrumentationSettings(
+        tracer_provider=trace.get_tracer_provider(),
+        include_content=capture_content(),
+        version=6,
+    )
 
 
 async def _cede() -> None:
