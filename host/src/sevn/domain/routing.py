@@ -197,7 +197,7 @@ async def deliver(
         await hub.emit("job.queued", job_id, payload)
         logger.info("route decided {intent} via {path}", intent=decision.intent, path=decision.path)
     if not held and not consumed and not decision.ask_user:
-        await _start(agent.id)
+        _start(agent.id)
     return job_id, agent.id
 
 
@@ -234,7 +234,7 @@ async def reroute(
     target = await AgentService().get(target.id)
     held = await _over_cap(bot_id, "new_request" if start_new else "follow_up", target)
     if not held:
-        await _start(target.id)
+        _start(target.id)
     await mark_corrected(decision_id, target.id)
     await hub.emit(
         "route.corrected",
@@ -305,14 +305,14 @@ async def _over_cap(bot_id: str, intent: str, agent: AgentRecord) -> bool:
     return await occupying(bot_id) >= Settings.load().bots.max_parallel_agents
 
 
-async def _start(agent_id: str) -> None:
+def _start(agent_id: str) -> None:
+    """Wake the lane. The request replies now and the turn runs behind it."""
     from sevn.runtime.worker import current
 
     worker = current()
     if worker is None:
         return
     worker.kick(agent_id)
-    await worker.settle(agent_id)
 
 
 async def _steer(agent_id: str, text: str) -> bool:
@@ -453,7 +453,7 @@ async def queue_on_lane(
     )
     await hub.emit("job.queued", job_id, payload)
     if not held:
-        await _start(agent.id)
+        _start(agent.id)
     return job_id
 
 
