@@ -18,14 +18,14 @@ def _script() -> object:
 
 def script_head() -> str:
     """The one head of the migration graph (fails when there are zero or several)."""
-    heads = list(_script().get_heads())  # type: ignore[attr-defined]
+    heads = list(_script().get_heads())
     assert len(heads) == 1, heads
     return str(heads[0])
 
 
 def down_revision_of(revision: str) -> str:
     """The single parent of ``revision``."""
-    found = _script().get_revision(revision)  # type: ignore[attr-defined]
+    found = _script().get_revision(revision)
     parent = found.down_revision
     assert isinstance(parent, str), parent
     return parent
@@ -33,7 +33,7 @@ def down_revision_of(revision: str) -> str:
 
 def revision_ending(suffix: str) -> str:
     """The one revision id ending with ``suffix`` (survives a K-MIG renumber)."""
-    ids = [rev.revision for rev in _script().walk_revisions()]  # type: ignore[attr-defined]
+    ids = [rev.revision for rev in _script().walk_revisions()]
     matches = [rev for rev in ids if rev.endswith(suffix)]
     assert len(matches) == 1, matches
     return str(matches[0])

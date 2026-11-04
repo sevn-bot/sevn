@@ -33,4 +33,4 @@ import pytest
 def test_scope_allows_table(have: str, need: str | None, allowed: bool) -> None:
     from sevn.protocol.errors import scope_allows
 
-    assert scope_allows(have, need) is allowed  # type: ignore[arg-type]
+    assert scope_allows(have, need) is allowed

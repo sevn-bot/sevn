@@ -61,9 +61,7 @@ async def _dispatch(session: Any, method: str, params: dict[str, Any]) -> Any:
 def _remote(host: MemoryHost, *, scope: str, device_id: str) -> Any:
     from sevn.protocol.session import Session
 
-    return Session.for_test(  # type: ignore[call-arg]
-        scope=scope, loopback=False, hub=host.hub, device_id=device_id
-    )
+    return Session.for_test(scope=scope, loopback=False, hub=host.hub, device_id=device_id)
 
 
 # --- devices.* -------------------------------------------------------------------------------
@@ -258,7 +256,7 @@ class _DictStore:
 
 def test_migrations_single_head() -> None:
     completed = subprocess.run(
-        ["make", "db-heads"],  # noqa: S607
+        ["make", "db-heads"],  # noqa: S607 — the repo Makefile target CI runs
         cwd=repo_root(),
         check=False,
         capture_output=True,

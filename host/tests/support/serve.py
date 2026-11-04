@@ -132,7 +132,7 @@ def serve(home: Path, host: str = "127.0.0.1", port: int | None = None) -> Itera
     if host != "127.0.0.1":
         args.append("--allow-remote-bind")
     log = (home / "serve-test.log").open("w", encoding="utf-8")
-    proc = subprocess.Popen(  # noqa: S603
+    proc = subprocess.Popen(  # noqa: S603 — this interpreter running sevn on a test home
         args,
         cwd=repo_root(),
         env=env(home),
@@ -172,7 +172,7 @@ def _wait_ready(served: Served) -> None:
             raise AssertionError((served.home / "serve-test.log").read_text(encoding="utf-8"))
         try:
             request = urllib.request.Request(url, headers={"Host": served.name})
-            with urllib.request.urlopen(request, timeout=0.3) as response:  # noqa: S310
+            with urllib.request.urlopen(request, timeout=0.3) as response:  # noqa: S310 — http to the test server
                 if response.status == 200 and (served.home / "run" / "bind").is_file():
                     return
         except OSError:
@@ -183,7 +183,7 @@ def _wait_ready(served: Served) -> None:
 
 
 def sevn(home: Path, *args: str, timeout: float = 30) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(  # noqa: S603
+    return subprocess.run(  # noqa: S603 — this interpreter running sevn on a test home
         [sys.executable, "-m", "sevn", *args, "--home", str(home)],
         cwd=repo_root(),
         env=env(home),

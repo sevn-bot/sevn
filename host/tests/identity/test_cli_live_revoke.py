@@ -62,7 +62,7 @@ def _env(home: Path) -> dict[str, str]:
 @contextlib.contextmanager
 def _serve(home: Path, port: int) -> Iterator[None]:
     log = (home / "serve-test.log").open("w", encoding="utf-8")
-    proc = subprocess.Popen(  # noqa: S603
+    proc = subprocess.Popen(  # noqa: S603 — this interpreter running sevn on a test home
         [sys.executable, "-m", "sevn", "serve", "--home", str(home), "--port", str(port)],
         cwd=repo_root(),
         env=_env(home),
@@ -157,8 +157,8 @@ async def _scenario(home: Path, port: int) -> None:
         assert (ws.close_code, ws.close_reason) == (4003, "revoked")
 
     listed = await call_method("devices.list", {})
-    rows = {row["id"]: row for row in listed["devices"]}  # type: ignore[union-attr,index]
-    assert rows[device.id]["revoked_at"] is not None  # type: ignore[index]
+    rows = {row["id"]: row for row in listed["devices"]}
+    assert rows[device.id]["revoked_at"] is not None
 
 
 def test_cli_revoke_with_host_running_closes_live_sessions(

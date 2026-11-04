@@ -118,14 +118,14 @@ def test_proxied_loopback_request_is_remote(
         is False
     )
     with running_app(_config(tmp_path), monkeypatch) as (_app, token, client):
-        login = client.get(f"/auth/login?token={token}", headers={header: value})  # type: ignore[attr-defined]
+        login = client.get(f"/auth/login?token={token}", headers={header: value})
         assert login.status_code == 403
         assert login.text.strip() == LOGIN_REFUSED
         assert "sevn_session=" not in login.headers.get("set-cookie", "")
         # A real loopback login, then the same cookie through the proxy: not an owner session.
-        ok = client.get(f"/auth/login?token={token}")  # type: ignore[attr-defined]
+        ok = client.get(f"/auth/login?token={token}")
         assert ok.status_code == 303
-        with client.websocket_connect("/ws", headers={header: value}) as socket:  # type: ignore[attr-defined]
+        with client.websocket_connect("/ws", headers={header: value}) as socket:
             socket.send_json(_HELLO)
             first = socket.receive_json()
         assert first["t"] == "challenge", first
@@ -144,10 +144,10 @@ def test_tailscale_identity_header_is_never_auth(
         client,
     ):
         for headers in (identity, {**identity, "host": TAILNET}):
-            login = client.get("/auth/login", headers=headers)  # type: ignore[attr-defined]
+            login = client.get("/auth/login", headers=headers)
             assert login.status_code == 403
             assert "sevn_session=" not in login.headers.get("set-cookie", "")
-        with client.websocket_connect("/ws", headers=identity) as socket:  # type: ignore[attr-defined]
+        with client.websocket_connect("/ws", headers=identity) as socket:
             socket.send_json(_HELLO)
             first = socket.receive_json()
             assert first["t"] == "challenge", first
@@ -178,7 +178,7 @@ def test_auth_login_refused_when_not_loopback(
         headers["host"] = host_header
     home = _config(tmp_path, f'allowed_hosts = ["{TAILNET}"]\n')
     with running_app(home, monkeypatch, peer=peer) as (_app, token, client):
-        login = client.get(f"/auth/login?token={token}", headers=headers)  # type: ignore[attr-defined]
+        login = client.get(f"/auth/login?token={token}", headers=headers)
         assert login.status_code == 403
         assert login.text.strip() == LOGIN_REFUSED
         assert "sevn_session=" not in login.headers.get("set-cookie", "")
@@ -189,7 +189,7 @@ def test_auth_login_still_works_on_loopback(
 ) -> None:
     """Control for the refusals above (green now, stays green)."""
     with running_app(_config(tmp_path), monkeypatch) as (_app, token, client):
-        login = client.get(f"/auth/login?token={token}")  # type: ignore[attr-defined]
+        login = client.get(f"/auth/login?token={token}")
         assert login.status_code == 303
         assert "sevn_session=" in login.headers["set-cookie"]
 
@@ -209,7 +209,7 @@ def test_http_settings_defaults_and_validation(
     assert defaults.connect_src == []
     assert defaults.public_scheme == "http"
     with pytest.raises(ValidationError):
-        HttpSettings(public_scheme="ftp")  # type: ignore[arg-type]
+        HttpSettings(public_scheme="ftp")
     monkeypatch.setenv("SEVN_HOME", str(tmp_path))
     _config(
         tmp_path,
@@ -233,10 +233,10 @@ def test_allowed_hosts_from_config_and_env_merge(
         client,
     ):
         for host in (TAILNET, "linux.tailnet.ts.net:8443", f"127.0.0.1:{PORT}"):
-            passed = client.get("/auth/login", headers={"host": host})  # type: ignore[attr-defined]
+            passed = client.get("/auth/login", headers={"host": host})
             assert passed.text.strip() != "forbidden host", host
         for host in ("evil.example", f"{TAILNET}.evil.example", "linux.tailnet.ts.net"):
-            denied = client.get("/auth/login", headers={"host": host})  # type: ignore[attr-defined]
+            denied = client.get("/auth/login", headers={"host": host})
             assert denied.status_code == 403, host
             assert denied.text.strip() == "forbidden host", host
 
@@ -247,9 +247,9 @@ def test_allowed_origin_accepted_other_refused(
     other_spa = "https://other.tailnet.ts.net"
     home = _config(tmp_path, f'allowed_origins = ["{other_spa}"]\n')
     with running_app(home, monkeypatch) as (_app, token, client):
-        accepted = client.get(f"/auth/login?token={token}", headers={"origin": other_spa})  # type: ignore[attr-defined]
+        accepted = client.get(f"/auth/login?token={token}", headers={"origin": other_spa})
         assert accepted.status_code == 303
-        with client.websocket_connect("/ws", headers={"origin": other_spa}) as socket:  # type: ignore[attr-defined]
+        with client.websocket_connect("/ws", headers={"origin": other_spa}) as socket:
             socket.send_json(_HELLO)
             socket.send_json({"t": "auth", "token": token})
             assert socket.receive_json()["t"] == "welcome"
@@ -259,12 +259,10 @@ def test_allowed_origin_accepted_other_refused(
             "http://other.tailnet.ts.net",
             f"{other_spa}:8443",
         ):
-            refused = client.get(  # type: ignore[attr-defined]
-                f"/auth/login?token={token}", headers={"origin": origin}
-            )
+            refused = client.get(f"/auth/login?token={token}", headers={"origin": origin})
             assert refused.status_code == 403, origin
             assert refused.text.strip() == "forbidden origin", origin
-            ws = client.get("/ws", headers={"origin": origin, **_UPGRADE})  # type: ignore[attr-defined]
+            ws = client.get("/ws", headers={"origin": origin, **_UPGRADE})
             assert ws.status_code == 403, origin
             assert ws.text.strip() == "forbidden origin", origin
 
@@ -287,7 +285,7 @@ def test_remote_bind_without_allowed_hosts_refused(
     _config(tmp_path, http)
     result = CliRunner().invoke(
         app,
-        ["serve", "--host", "0.0.0.0", "--allow-remote-bind", "--home", str(tmp_path)],  # noqa: S104
+        ["serve", "--host", "0.0.0.0", "--allow-remote-bind", "--home", str(tmp_path)],  # noqa: S104 — asserts the flag, nothing binds
     )
     output = result.output + (result.stderr or "")
     if http == "":
@@ -296,7 +294,7 @@ def test_remote_bind_without_allowed_hosts_refused(
         assert runs == []
     else:
         assert result.exit_code == 0, output
-        assert [run.get("host") for run in runs] == ["0.0.0.0"]  # noqa: S104
+        assert [run.get("host") for run in runs] == ["0.0.0.0"]  # noqa: S104 — the value the fake serve received
 
 
 # --- CSP (D8) --------------------------------------------------------------------------------
@@ -314,7 +312,7 @@ def _directives(policy: str) -> dict[str, list[str]]:
 def test_default_csp_is_unchanged(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Control: with no remote config the SPA keeps 0001's policy (green now, stays green)."""
     with running_app(_config(tmp_path), monkeypatch) as (_app, _token, client):
-        response = client.get("/")  # type: ignore[attr-defined]
+        response = client.get("/")
         assert response.headers["content-security-policy"] == CSP
 
 
@@ -327,7 +325,7 @@ def test_csp_connect_src_lists_allowed_hosts_and_config(
         'connect_src = ["wss://pi.tailnet.ts.net", "ws://100.101.102.104:8787"]\n',
     )
     with running_app(home, monkeypatch) as (_app, _token, client):
-        response = client.get("/")  # type: ignore[attr-defined]
+        response = client.get("/")
         policy = _directives(response.headers["content-security-policy"])
     assert set(policy["connect-src"]) == {
         "'self'",
@@ -361,19 +359,19 @@ def test_guard_order_host_then_origin_then_auth(
 
         monkeypatch.setattr(http, "check_credentials", spy)
         evil = {"origin": "https://evil.example", **{"X-Forwarded-For": PEER}}
-        host_first = client.get("/auth/login?token=bad", headers={"host": "evil.example", **evil})  # type: ignore[attr-defined]
+        host_first = client.get("/auth/login?token=bad", headers={"host": "evil.example", **evil})
         assert (host_first.status_code, host_first.text.strip()) == (403, "forbidden host")
-        origin_next = client.get("/auth/login?token=bad", headers={"host": TAILNET, **evil})  # type: ignore[attr-defined]
+        origin_next = client.get("/auth/login?token=bad", headers={"host": TAILNET, **evil})
         assert (origin_next.status_code, origin_next.text.strip()) == (403, "forbidden origin")
-        ws_origin = client.get("/ws", headers={"host": TAILNET, **evil, **_UPGRADE})  # type: ignore[attr-defined]
+        ws_origin = client.get("/ws", headers={"host": TAILNET, **evil, **_UPGRADE})
         assert (ws_origin.status_code, ws_origin.text.strip()) == (403, "forbidden origin")
         assert calls == [], "no credential lookup before the Host and Origin checks"
-        remote = client.get(  # type: ignore[attr-defined]
+        remote = client.get(
             f"/auth/login?token={token}",
             headers={"host": TAILNET, "origin": f"https://{TAILNET}"},
         )
         assert (remote.status_code, remote.text.strip()) == (403, LOGIN_REFUSED)
         assert calls == [], "a remote login is refused before the token is looked at"
-        local = client.get("/auth/login?token=bad")  # type: ignore[attr-defined]
+        local = client.get("/auth/login?token=bad")
         assert (local.status_code, local.text.strip()) == (401, "unauthorized")
         assert calls == ["bad"]
