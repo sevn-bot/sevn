@@ -45,8 +45,8 @@ def _steps_text(job: dict[str, Any]) -> str:
 
 
 def _make_dry_run(target: str) -> str:
-    completed = subprocess.run(  # noqa: S603
-        ["make", "-n", target],  # noqa: S607
+    completed = subprocess.run(  # noqa: S603 — make -n on a fixed Makefile target, no shell
+        ["make", "-n", target],  # noqa: S607 — the repo Makefile target CI runs
         cwd=_ROOT,
         capture_output=True,
         text=True,
@@ -80,7 +80,7 @@ def test_built_wheel_contains_the_web_app(tmp_path: Path) -> None:
     uv = shutil.which("uv")
     if uv is None:
         pytest.skip("uv is not installed")
-    completed = subprocess.run(  # noqa: S603
+    completed = subprocess.run(  # noqa: S603 — uv from PATH builds this repo's wheel
         [uv, "build", "--package", "sevn", "--wheel", "--out-dir", str(tmp_path)],
         cwd=_ROOT,
         env={**os.environ, "UV_OFFLINE": "1"},
@@ -123,6 +123,8 @@ def test_release_workflow_publishes_wheel_and_sums_on_tags() -> None:
         for step in job.get("steps", []):
             if str(step.get("uses", "")).startswith("astral-sh/setup-uv@"):
                 assert step.get("with", {}).get("enable-cache") is False, step
+            if str(step.get("uses", "")).startswith("actions/setup-node@"):
+                assert step.get("with", {}).get("package-manager-cache") is False, step
 
 
 # --- CI jobs (D12) -----------------------------------------------------------

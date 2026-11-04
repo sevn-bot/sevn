@@ -227,7 +227,7 @@ def _publish_all(server: FileServer, version: str = "1.0.0") -> dict[str, Pin]:
 
 
 def _run(path: Path) -> str:
-    completed = subprocess.run(  # noqa: S603
+    completed = subprocess.run(  # noqa: S603 — a fake runtime this test wrote
         [str(path)], capture_output=True, text=True, timeout=10, check=True
     )
     return completed.stdout.strip()
@@ -737,7 +737,7 @@ def _fill(conn: sqlite3.Connection, table: str, overrides: dict[str, object]) ->
             row[name] = f"{table}-{name}"
     names = ", ".join(row)
     marks = ", ".join("?" for _ in row)
-    conn.execute(f"INSERT INTO {table} ({names}) VALUES ({marks})", list(row.values()))  # noqa: S608
+    conn.execute(f"INSERT INTO {table} ({names}) VALUES ({marks})", list(row.values()))  # noqa: S608 — names come from the migrated schema, values are bound
 
 
 def _turn(home: Path, runtime: str, status: str) -> None:
@@ -952,8 +952,8 @@ class _CapturingSdk:
         return None
 
 
-def _same_file(left: object, right: Path) -> bool:
-    return os.path.realpath(os.fspath(left)) == os.path.realpath(right)  # type: ignore[arg-type]
+def _same_file(left: str | Path, right: Path) -> bool:
+    return os.path.realpath(left) == os.path.realpath(right)
 
 
 @pytest.fixture
@@ -1019,7 +1019,7 @@ def _audit(event: str, args: tuple[object, ...]) -> None:
         return
     for arg in args:
         if isinstance(arg, (str, bytes, os.PathLike)):
-            text = os.fsdecode(arg)  # type: ignore[arg-type]
+            text = os.fsdecode(arg)
             if any(text.startswith(str(root)) for root in _WATCHED):
                 _TOUCHED.append(f"{event} {text}")
 

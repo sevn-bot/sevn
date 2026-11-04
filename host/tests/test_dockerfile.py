@@ -165,8 +165,8 @@ def test_ubuntu_image_is_ubuntu_24_04_with_uv_python() -> None:
     [("image", "deploy/Dockerfile", None), ("image-ubuntu", "deploy/Dockerfile.ubuntu", "-ubuntu")],
 )
 def test_make_image_targets(target: str, dockerfile: str, tag: str | None) -> None:
-    completed = subprocess.run(  # noqa: S603
-        ["make", "-n", target],  # noqa: S607
+    completed = subprocess.run(  # noqa: S603 — make -n on a fixed Makefile target, no shell
+        ["make", "-n", target],  # noqa: S607 — the repo Makefile target CI runs
         cwd=repo_root(),
         capture_output=True,
         text=True,
@@ -191,14 +191,14 @@ def test_live_image_builds_and_serves_health(name: str) -> None:
         pytest.skip("docker is not installed")
     tag = f"sevn-test:{name.lower().replace('.', '-')}"
     root = repo_root()
-    subprocess.run(  # noqa: S603
-        ["docker", "build", "-f", f"deploy/{name}", "-t", tag, "."],  # noqa: S607
+    subprocess.run(  # noqa: S603 — builds a repo Dockerfile under a test tag
+        ["docker", "build", "-f", f"deploy/{name}", "-t", tag, "."],  # noqa: S607 — docker from PATH, as the Makefile and CI run it
         cwd=root,
         check=True,
         timeout=3600,
     )
-    run = subprocess.run(  # noqa: S603
-        ["docker", "run", "-d", "--rm", "-p", "127.0.0.1::8787", tag],  # noqa: S607
+    run = subprocess.run(  # noqa: S603 — runs the image this test built
+        ["docker", "run", "-d", "--rm", "-p", "127.0.0.1::8787", tag],  # noqa: S607 — docker from PATH, as the Makefile and CI run it
         capture_output=True,
         text=True,
         check=True,
@@ -206,8 +206,8 @@ def test_live_image_builds_and_serves_health(name: str) -> None:
     container = run.stdout.strip()
     try:
         port = (
-            subprocess.run(  # noqa: S603
-                ["docker", "port", container, "8787/tcp"],  # noqa: S607
+            subprocess.run(  # noqa: S603 — asks about the container this test started
+                ["docker", "port", container, "8787/tcp"],  # noqa: S607 — docker from PATH, as the Makefile and CI run it
                 capture_output=True,
                 text=True,
                 check=True,
@@ -226,8 +226,8 @@ def test_live_image_builds_and_serves_health(name: str) -> None:
             except OSError:
                 time.sleep(1)
         assert healthy
-        listed = subprocess.run(  # noqa: S603
-            ["docker", "exec", container, "sevn", "runtimes", "list", "--json"],  # noqa: S607
+        listed = subprocess.run(  # noqa: S603 — execs in the container this test started
+            ["docker", "exec", container, "sevn", "runtimes", "list", "--json"],  # noqa: S607 — docker from PATH, as the Makefile and CI run it
             capture_output=True,
             text=True,
             check=True,
@@ -236,4 +236,4 @@ def test_live_image_builds_and_serves_health(name: str) -> None:
         for runtime in ("claude", "opencode", "codex", "cursor-agent"):
             assert body[runtime]["used"] == "managed", runtime
     finally:
-        subprocess.run(["docker", "rm", "-f", "-v", container], check=False)  # noqa: S603, S607
+        subprocess.run(["docker", "rm", "-f", "-v", container], check=False)  # noqa: S603, S607 — removes the container this test started, docker from PATH

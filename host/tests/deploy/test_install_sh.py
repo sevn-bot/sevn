@@ -126,7 +126,7 @@ def sandbox(tmp_path: Path) -> Sandbox:
 
 
 def _run(box: Sandbox, *args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(  # noqa: S603
+    return subprocess.run(  # noqa: S603 — the repo's install.sh with this test's args
         ["/bin/sh", str(_SCRIPT), *args],
         env=box.env,
         cwd=box.root,
@@ -172,7 +172,7 @@ def test_script_is_posix_sh_with_strict_mode() -> None:
     text = _SCRIPT.read_text(encoding="utf-8")
     assert text.startswith("#!/bin/sh\n")
     assert "set -eu" in text
-    completed = subprocess.run(  # noqa: S603
+    completed = subprocess.run(  # noqa: S603 — syntax-checks the repo's install.sh
         ["/bin/sh", "-n", str(_SCRIPT)], capture_output=True, text=True, check=False
     )
     assert completed.returncode == 0, completed.stderr
@@ -182,7 +182,7 @@ def test_shellcheck_clean() -> None:
     binary = shutil.which("shellcheck")
     if binary is None:
         pytest.skip("shellcheck is not installed")
-    completed = subprocess.run(  # noqa: S603
+    completed = subprocess.run(  # noqa: S603 — shellcheck from PATH on the repo's install.sh
         [binary, "-s", "sh", str(_SCRIPT)], capture_output=True, text=True, check=False
     )
     assert completed.returncode == 0, completed.stdout
@@ -345,7 +345,7 @@ def test_live_install_with_a_local_wheel(tmp_path: Path) -> None:
     if uv is None:
         pytest.skip("uv is not installed")
     dist = tmp_path / "dist"
-    subprocess.run(  # noqa: S603
+    subprocess.run(  # noqa: S603 — uv from PATH builds this repo's wheel
         [uv, "build", "--package", "sevn", "--wheel", "--out-dir", str(dist)],
         cwd=repo_root(),
         check=True,
@@ -360,7 +360,7 @@ def test_live_install_with_a_local_wheel(tmp_path: Path) -> None:
         "UV_TOOL_DIR": str(home / ".local" / "share" / "uv" / "tools"),
         "UV_TOOL_BIN_DIR": str(home / ".local" / "bin"),
     }
-    completed = subprocess.run(  # noqa: S603
+    completed = subprocess.run(  # noqa: S603 — the repo's install.sh and the wheel just built
         ["/bin/sh", str(_SCRIPT), "--no-system-deps", "--no-service", "--wheel", str(wheel)],
         env=env,
         stdin=subprocess.DEVNULL,
@@ -371,7 +371,7 @@ def test_live_install_with_a_local_wheel(tmp_path: Path) -> None:
     )
     assert completed.returncode == 0, completed.stderr
     sevn = home / ".local" / "bin" / "sevn"
-    doctor = subprocess.run(  # noqa: S603
+    doctor = subprocess.run(  # noqa: S603 — the sevn this test just installed
         [str(sevn), "doctor", "--json"],
         env={**env, "SEVN_HOME": str(tmp_path / "data")},
         capture_output=True,

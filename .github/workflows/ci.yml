@@ -67,13 +67,20 @@ jobs:
     steps:
       - name: Install the pacman dependencies and uv
         run: |
-          pacman -Syu --noconfirm --needed bubblewrap git libsecret make procps-ng uv nodejs-lts-jod npm
-          npm install -g pnpm@11.8.0
+          pacman -Syu --noconfirm --needed bubblewrap git libsecret make procps-ng uv nodejs-lts-jod
 
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11.8.0
+          run_install: false
+          # Outside root's home: the tests below run as an unprivileged user.
+          dest: /opt/pnpm
 
       - name: Allow unprivileged user namespaces
         run: sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
