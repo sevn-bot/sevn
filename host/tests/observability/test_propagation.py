@@ -219,6 +219,44 @@ def test_loopback_collector_env_passed_to_cli(
 
 
 @pytest.mark.parametrize(
+    ("template", "origin"),
+    [
+        ("http://user:{value}@localhost:4318", "http://localhost:4318"),
+        ("http://{value}@127.0.0.1:4318", "http://127.0.0.1:4318"),
+        ("http://user:{value}@[::1]:4318", "http://[::1]:4318"),
+        ("http://localhost:4318?token={value}", "http://localhost:4318"),
+        ("http://localhost:4318/{value}", "http://localhost:4318"),
+        ("http://localhost:4318/#{value}", "http://localhost:4318"),
+    ],
+)
+@pytest.mark.parametrize("source", ["config", "env"])
+def test_child_endpoint_drops_credentials_in_the_collector_url(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    span_exporter: Any,
+    template: str,
+    origin: str,
+    source: str,
+) -> None:
+    """K-CANARY: a CLI gets only the scheme, host and port of a loopback collector."""
+    _ = span_exporter
+    with canary() as probe:
+        url = template.format(value=probe.value)
+        if source == "config":
+            arm_observability(monkeypatch, tmp_path, otlp_section(url))
+        else:
+            arm_observability(monkeypatch, tmp_path, 'exporter = "otlp"')
+            monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", url)
+        span = _span()
+        try:
+            env = _child_env("claude", span)
+        finally:
+            span.end()
+        assert env["OTEL_EXPORTER_OTLP_ENDPOINT"] == origin
+        assert all(probe.value not in value for value in env.values())
+
+
+@pytest.mark.parametrize(
     "case",
     ["datadog_agentless", "remote_otlp", "logfire_token", "loopback_with_header"],
 )

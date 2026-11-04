@@ -10,6 +10,8 @@ enters a child env.
 
 from __future__ import annotations
 
+from urllib.parse import urlsplit, urlunsplit
+
 from opentelemetry import trace
 from opentelemetry.trace import Span
 
@@ -68,13 +70,19 @@ def _collector_env(runtime: str, settings: Settings) -> dict[str, str]:
     if not target.loopback:
         return {}
     env = {
-        OTLP_ENDPOINT: target.base_endpoint,
+        OTLP_ENDPOINT: _origin(target.base_endpoint),
         OTLP_PROTOCOL: target.protocol,
         SERVICE_NAME: f"sevn-cli-{runtime}",
     }
     if runtime == "claude":
         env[CLAUDE_TELEMETRY] = "1"
     return env
+
+
+def _origin(endpoint: str) -> str:
+    """``endpoint`` as scheme, host and port: the rest of a URL can hold a credential."""
+    parts = urlsplit(endpoint)
+    return urlunsplit((parts.scheme, parts.netloc.rpartition("@")[2], "", "", ""))
 
 
 __all__ = [
