@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from sevn.decisions.base import Attempt, stored_state
 from sevn.domain.ids import new_id
 from sevn.domain.session import open_session
+from sevn.observability.spans import route_span
 from sevn.store.db import utcnow
 from sevn.store.models import DecisionLog
 
@@ -59,6 +60,13 @@ async def record_attempt(state: str, attempt: Attempt) -> None:
         corrected_to=None,
         created_at=_created_at(),
     )
-    async with open_session() as session:
-        session.add(row)
-        await session.commit()
+    with route_span(
+        point=_POINT,
+        path=decision.path,
+        confidence=decision.confidence,
+        accepted=attempt.accepted,
+        decision_id=row_id,
+    ):
+        async with open_session() as session:
+            session.add(row)
+            await session.commit()

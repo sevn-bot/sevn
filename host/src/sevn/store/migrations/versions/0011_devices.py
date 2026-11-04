@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "0011_devices"
-down_revision = "0005_metrics_shares"
+down_revision = "0010_trace_context"
 branch_labels = None
 depends_on = None
 

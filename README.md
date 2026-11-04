@@ -68,6 +68,10 @@ Every shell command, at every level, gets only `PATH` (without the host's own vi
 
 Host sandbox mode defaults to `enforced`. A missing mode file means enforced. An owner can switch it with `host.set_sandbox_mode` only after confirming with the phrase `I understand`. `allow_all` runs every bot as `full` and skips approvals, so shell commands are neither confined nor held for review. The host emits an audit event, and `system.info` reports `caps.allow_all` so clients keep a banner up. Setting the mode back to `enforced` restores each bot's own level. The default config leaves `allow_all` off.
 
+## Observability
+
+The host exports OpenTelemetry traces, logs and metrics to Logfire, a Datadog Agent, Datadog's agentless intake, or any OTLP collector. Each message is one trace, from the `job` span through routing and the turn to each tool call. Export is off until you set `[observability] exporter` in `$SEVN_HOME/config.toml` or store a Logfire token with `sevn secret set logfire/token`. Header values are `secret://` references, secrets are scrubbed from every span and log record, and message text is recorded as size and hash only unless `capture_content` is on. `sevn doctor --check` sends a test export, and `sevn traces test` sends one span with a redacted canary and prints its trace id. Setup recipes, the trace shape and the failure policy are in [docs/observability.md](docs/observability.md).
+
 ## Evals
 
 `decisions.evals_on` defaults to false. `sevn evals run decisions` then prints `evals disabled`, replays nothing, and exports no decision state. When `evals_on` is true, the same command replays the synthetic routing cases in `host/evals/decisions/` and writes a local JSON report. A missing `judge-jev` binary skips the judge. The cases are synthetic messages.

@@ -15,6 +15,7 @@ from sqlalchemy import (
     Integer,
     LargeBinary,
     String,
+    Text,
     TypeDecorator,
 )
 from sqlalchemy.engine.interfaces import Dialect
@@ -234,6 +235,8 @@ class Job(Base):
     # nothing to report (``routine.silent``).
     routine_id: Mapped[str | None] = mapped_column(String, nullable=True)
     silent: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+    # W3C ``traceparent`` of the job's root span; NULL while tracing is off (plan 0015 D5).
+    trace_parent: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class Routine(Base):

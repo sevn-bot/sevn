@@ -33,12 +33,14 @@ probe_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 contracts_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 secret_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 evals_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
+traces_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 app.add_typer(probe_app, name="probe")
 app.add_typer(contracts_app, name="contracts")
 app.add_typer(secret_app, name="secret")
 app.add_typer(evals_app, name="evals")
 devices_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 app.add_typer(devices_app, name="devices")
+app.add_typer(traces_app, name="traces")
 
 _LOOPBACK = frozenset({"127.0.0.1", "localhost", "::1", "[::1]"})
 _ANY_ADDRESS = frozenset({"0.0.0.0", "::", "[::]"})  # noqa: S104 — names, not a bind
@@ -141,8 +143,14 @@ def contracts_export(
 @app.command()
 def doctor(
     as_json: Annotated[bool, typer.Option("--json")] = False,
+    check: Annotated[bool, typer.Option("--check")] = False,
 ) -> None:
-    """Print host paths, the secret backend, decision routing, and Claude login."""
+    """Print host paths, the secret backend, decision routing, and Claude login.
+
+    ``--check`` also sends one test span to the observability exporter.
+    """
+    from sevn.observability.doctor import doctor_fields
+
     settings = _settings()
     paths = Paths.from_env()
     claude_present, claude_login = _run(_claude_login())
@@ -160,6 +168,7 @@ def doctor(
         "allow_cli_fallback": decisions.allow_cli_fallback,
         "decisions_provider": decisions.provider,
     }
+    payload.update(doctor_fields(settings, check=check))
     if as_json:
         typer.echo(json.dumps(payload))
         return
@@ -218,6 +227,18 @@ def evals_run(suite: str) -> None:
         raise typer.Exit(code=1) from exc
     if outcome.disabled:
         typer.echo("evals disabled")
+
+
+@traces_app.command("test")
+def traces_test() -> None:
+    """Send one ``sevn.test`` span with a redacted canary and print its trace id."""
+    from sevn.observability.doctor import send_test_span
+
+    sent = send_test_span(_settings())
+    if not sent.ok:
+        typer.echo(sent.problem, err=True)
+        raise typer.Exit(code=1)
+    typer.echo(sent.trace_id)
 
 
 _PAIR_SCOPES: dict[str, Scope] = {"owner": "owner", "member": "member", "read_only": "read_only"}

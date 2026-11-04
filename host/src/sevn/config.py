@@ -6,7 +6,7 @@ import os
 import tomllib
 from typing import Literal
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -19,6 +19,11 @@ from sevn.paths import Paths
 
 type BackendName = Literal["keychain", "age-file", "env"]
 type DecisionProvider = Literal["jev", "llm", "rules"]
+type ExporterName = Literal["none", "logfire", "otlp"]
+type ExportPreset = Literal["", "datadog-agent", "datadog-agentless"]
+type OtlpProtocol = Literal["http/protobuf", "grpc"]
+
+SECRET_REF_PREFIX = "secret://"  # noqa: S105 — the reference scheme, not a value
 
 
 class ProtocolSettings(BaseModel):
@@ -100,6 +105,46 @@ class DecisionsSettings(BaseModel):
     thresholds: DecisionThresholds = Field(default_factory=DecisionThresholds)
 
 
+class ObservabilitySettings(BaseModel):
+    """OTel export (spec §12, plan 0015 D1). Nothing is exported unless an exporter is on.
+
+    ``exporter = None`` means auto: Logfire when the secret ``logfire/token`` exists,
+    else off. ``headers`` values are ``secret://<name>`` references, resolved only
+    when the exporters are built.
+    """
+
+    exporter: ExporterName | None = None
+    preset: ExportPreset = ""
+    endpoint: str = ""
+    headers: dict[str, str] = Field(default_factory=dict[str, str])
+    protocol: OtlpProtocol = "http/protobuf"
+    capture_content: bool = False
+    sample_ratio: float = Field(default=1.0, ge=0.0, le=1.0)
+    datadog_site: str = "datadoghq.com"
+    service_name: str = "sevnd"
+
+    @field_validator("headers")
+    @classmethod
+    def _headers_are_secret_refs(cls, value: dict[str, str]) -> dict[str, str]:
+        for key, item in value.items():
+            # Name the header only: the refused value may be a credential.
+            if not item.startswith(SECRET_REF_PREFIX) or item == SECRET_REF_PREFIX:
+                raise ValueError(
+                    f"header {key!r} must be a {SECRET_REF_PREFIX}<name> reference; "
+                    "store the value with the secret backend"
+                )
+        return value
+
+    @model_validator(mode="after")
+    def _agentless_is_http(self) -> ObservabilitySettings:
+        if self.preset == "datadog-agentless" and self.protocol == "grpc":
+            raise ValueError(
+                "preset 'datadog-agentless' does not support protocol 'grpc'; "
+                "Datadog's agentless intake accepts http/protobuf only"
+            )
+        return self
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="SEVN_",
@@ -115,6 +160,7 @@ class Settings(BaseSettings):
     memory: MemorySettings = Field(default_factory=MemorySettings)
     decisions: DecisionsSettings = Field(default_factory=DecisionsSettings)
     budgets: BudgetsSettings = Field(default_factory=BudgetsSettings)
+    observability: ObservabilitySettings = Field(default_factory=ObservabilitySettings)
 
     @classmethod
     def settings_customise_sources(
