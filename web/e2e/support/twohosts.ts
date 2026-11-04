@@ -1,6 +1,12 @@
 /** Two `sevn serve` hosts for multi-host e2e specs (plan 0055). Host B is `host-b.sevn.test`. */
 import { type ChildProcess, execFileSync, spawn } from "node:child_process";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -21,9 +27,12 @@ export type Host = {
 
 const repo = path.resolve(import.meta.dirname, "../../..");
 
-function freePort(): Promise<number> {
+type ReservedPort = { port: number; release: () => Promise<void> };
+
+function reservePort(): Promise<ReservedPort> {
   return new Promise((resolve, reject) => {
     const server = createServer();
+    server.on("error", reject);
     server.listen(0, "127.0.0.1", () => {
       const address = server.address();
       if (address === null || typeof address === "string") {
@@ -31,25 +40,56 @@ function freePort(): Promise<number> {
         return;
       }
       const { port } = address;
-      server.close(() => resolve(port));
+      resolve({
+        port,
+        release: () => new Promise<void>((done) => server.close(() => done())),
+      });
     });
   });
 }
 
-async function waitForHealth(port: number): Promise<void> {
-  const url = `http://127.0.0.1:${port}/health`;
+/** A successful token login proves that the responder belongs to this test home. */
+async function waitForHost(
+  child: ChildProcess,
+  home: string,
+  port: number,
+): Promise<string> {
+  const base = `http://127.0.0.1:${port}`;
+  const tokenFile = path.join(home, "run", "token");
   for (let attempt = 0; attempt < 300; attempt += 1) {
-    try {
-      const response = await fetch(url);
-      if (response.ok) {
-        return;
+    if (
+      child.exitCode !== null ||
+      child.signalCode !== null ||
+      child.pid === undefined
+    ) {
+      throw new Error(`sevn serve exited before becoming ready on ${base}`);
+    }
+    if (existsSync(tokenFile)) {
+      const token = readFileSync(tokenFile, "utf8").trim();
+      try {
+        const response = await fetch(
+          `${base}/auth/login?token=${encodeURIComponent(token)}`,
+          {
+            redirect: "manual",
+            signal: AbortSignal.timeout(500),
+          },
+        );
+        if (
+          response.status === 303 &&
+          response.headers.get("set-cookie")?.includes("sevn_session=")
+        ) {
+          // The process may have failed to bind while another listener answered the request.
+          if (child.exitCode === null && child.signalCode === null) {
+            return token;
+          }
+        }
+      } catch {
+        // Still starting; an unrelated listener cannot authenticate this home's token.
       }
-    } catch {
-      // Still starting.
     }
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  throw new Error(`sevn serve did not become healthy on ${url}`);
+  throw new Error(`sevn serve did not authenticate this home on ${base}`);
 }
 
 function env(home: string): NodeJS.ProcessEnv {
@@ -95,10 +135,24 @@ async function startHost(
     ],
     { cwd: repo, detached: true, stdio: "ignore", env: env(home) },
   );
+  child.on("error", () => {
+    // waitForHost observes the missing pid and reports startup failure.
+  });
   child.unref();
-  await waitForHealth(port);
-  const token = readFileSync(path.join(home, "run", "token"), "utf8").trim();
-  return { home, port, base: `http://127.0.0.1:${port}`, token, child };
+  const host = {
+    home,
+    port,
+    base: `http://127.0.0.1:${port}`,
+    token: "",
+    child,
+  };
+  try {
+    host.token = await waitForHost(child, home, port);
+    return host;
+  } catch (error) {
+    stopHost(host);
+    throw error;
+  }
 }
 
 export function stopHost(host: Host | undefined): void {
@@ -136,20 +190,38 @@ export function probe(
 export async function startTwoHosts(
   tag: string,
 ): Promise<{ a: Host; b: Host }> {
-  const portA = await freePort();
-  const portB = await freePort();
-  const nameB = `${TEST_HOSTNAME}:${portB}`;
-  const a = await startHost(
-    `${tag}-a`,
-    portA,
-    `connect_src = ["ws://${nameB}"]\n`,
-  );
-  const b = await startHost(
-    `${tag}-b`,
-    portB,
-    `allowed_hosts = ["${nameB}"]\nallowed_origins = ["http://127.0.0.1:${portA}"]\n`,
-  );
-  return { a, b };
+  let failure: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const reservedA = await reservePort();
+    const reservedB = await reservePort();
+    let a: Host | undefined;
+    let b: Host | undefined;
+    try {
+      // Keep B reserved while A starts, so the two hosts cannot pick the same port.
+      const nameB = `${TEST_HOSTNAME}:${reservedB.port}`;
+      await reservedA.release();
+      a = await startHost(
+        `${tag}-${attempt}-a`,
+        reservedA.port,
+        `connect_src = ["ws://${nameB}"]\n`,
+      );
+      await reservedB.release();
+      b = await startHost(
+        `${tag}-${attempt}-b`,
+        reservedB.port,
+        `allowed_hosts = ["${nameB}"]\nallowed_origins = ["http://127.0.0.1:${reservedA.port}"]\n`,
+      );
+      return { a, b };
+    } catch (error) {
+      failure = error;
+      stopHost(a);
+      stopHost(b);
+    } finally {
+      await reservedA.release();
+      await reservedB.release();
+    }
+  }
+  throw failure;
 }
 
 /** Mint a member ticket on `host` with `sevn pair` and return its short code. */

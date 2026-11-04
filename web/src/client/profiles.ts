@@ -6,7 +6,11 @@
  * IndexedDB store `sevn` / `profiles`; the CryptoKey is stored as-is (structured clone), so
  * the private key never leaves the browser's key store.
  */
-import type { DirectUrlReason } from "./errors.ts";
+import {
+  type DirectUrlReason,
+  HostIdentityChanged,
+  ProtocolError,
+} from "./errors.ts";
 
 export type { DirectUrlReason } from "./errors.ts";
 
@@ -31,6 +35,7 @@ export type HostProfile = {
 
 export type ProfileStore = {
   get: (hostId: string) => Promise<HostProfile | undefined>;
+  /** Atomically reject identity collisions and replace older profiles at this origin. */
   put: (profile: HostProfile) => Promise<void>;
   delete: (hostId: string) => Promise<void>;
   list: () => Promise<HostProfile[]>;
@@ -74,13 +79,10 @@ export function checkDirectUrl(
   }
   const host = parsed.hostname;
   // Browsers resolve `localhost` to loopback without asking DNS.
-  if (host === "localhost") {
+  if (isLoopbackHost(host)) {
     return { ok: true };
   }
   const address = parseAddress(host);
-  if (address !== null && isLoopback(address)) {
-    return { ok: true };
-  }
   if (options.allow_plain_ws === true) {
     return { ok: true };
   }
@@ -101,9 +103,14 @@ export function memoryProfileStore(): ProfileStore {
   const rows = new Map<string, HostProfile>();
   return {
     get: (hostId) => Promise.resolve(rows.get(hostId)),
-    put: (profile) => {
+    put: async (profile) => {
+      assertSameIdentity(rows.get(profile.host_id), profile);
+      for (const old of rows.values()) {
+        if (sameProfileOrigin(old, profile)) {
+          rows.delete(old.host_id);
+        }
+      }
       rows.set(profile.host_id, profile);
-      return Promise.resolve();
     },
     delete: (hostId) => {
       rows.delete(hostId);
@@ -164,13 +171,65 @@ export function openProfileStore(
     get: (hostId) =>
       run<HostProfile | undefined>("readonly", (store) => store.get(hostId)),
     put: async (profile) => {
-      await run("readwrite", (store) => store.put(profile));
+      const db = await database();
+      await new Promise<void>((resolve, reject) => {
+        const transaction = db.transaction(STORE, "readwrite");
+        const store = transaction.objectStore(STORE);
+        const request = store.getAll();
+        let refusal: Error | undefined;
+        request.onsuccess = () => {
+          const profiles = request.result as HostProfile[];
+          try {
+            assertSameIdentity(
+              profiles.find((old) => old.host_id === profile.host_id),
+              profile,
+            );
+          } catch (error) {
+            refusal = error instanceof Error ? error : new Error(String(error));
+            transaction.abort();
+            return;
+          }
+          for (const old of profiles) {
+            if (sameProfileOrigin(old, profile)) {
+              store.delete(old.host_id);
+            }
+          }
+          store.put(profile);
+        };
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = transaction.onabort = () => {
+          reject(
+            refusal ??
+              transaction.error ??
+              new Error("indexedDB profile save failed"),
+          );
+        };
+      });
     },
     delete: async (hostId) => {
       await run("readwrite", (store) => store.delete(hostId));
     },
     list: () => run<HostProfile[]>("readonly", (store) => store.getAll()),
   };
+}
+
+function sameProfileOrigin(left: HostProfile, right: HostProfile): boolean {
+  return new URL(left.direct_url).origin === new URL(right.direct_url).origin;
+}
+
+function assertSameIdentity(
+  existing: HostProfile | undefined,
+  profile: HostProfile,
+): void {
+  if (
+    existing !== undefined &&
+    (existing.host_pubkey !== profile.host_pubkey ||
+      !sameProfileOrigin(existing, profile))
+  ) {
+    throw new HostIdentityChanged(
+      "Host identity conflicts with an existing profile; forget that profile before replacing it",
+    );
+  }
 }
 
 /** Store a profile. Refuses a device key that is extractable or not an Ed25519 private key. */
@@ -202,7 +261,7 @@ export function listProfiles(store: ProfileStore): Promise<HostProfile[]> {
 /**
  * Delete a profile, revoking this device on its host first (`devices.revoke`). An
  * unreachable host does not keep the profile: the revoke is attempted once, then the
- * profile is deleted either way.
+ * profile is deleted. An explicit protocol refusal preserves the profile and key.
  */
 export async function deleteProfile(
   store: ProfileStore,
@@ -215,8 +274,11 @@ export async function deleteProfile(
   }
   try {
     await options.revoke(profile);
-  } catch {
-    // The host is unreachable or refused; the owner can still revoke from the host.
+  } catch (error) {
+    if (error instanceof ProtocolError) {
+      throw error;
+    }
+    // The host is unreachable; the owner can still revoke from the host.
   }
   await store.delete(hostId);
 }
@@ -302,6 +364,12 @@ function parseAddress(host: string): Address | null {
   }
   const bytes = parseIpv4(literal);
   return bytes === null ? null : { v6: false, bytes };
+}
+
+/** Only localhost or a parsed loopback IP literal may bypass the remote handshake. */
+export function isLoopbackHost(host: string): boolean {
+  const address = parseAddress(host);
+  return host === "localhost" || (address !== null && isLoopback(address));
 }
 
 function isLoopback(address: Address): boolean {

@@ -33,7 +33,7 @@ export type HostView = {
   /** True for the host that serves this page. */
   local: boolean;
   reachable: boolean;
-  /** Fleet data answered (false while unreachable or when `fleet.overview` failed). */
+  /** False while unreachable or after `fleet.overview` failed; pending fetches stay available. */
   available: boolean;
   bots: { id: string; name: string }[];
   waiting: FleetWaiting[];
@@ -247,7 +247,7 @@ export function useMultiHost(
       name: "This host",
       local: true,
       reachable: localConnected,
-      available: localConnected && own?.fleetOk === true,
+      available: localConnected && own?.fleetOk !== false,
       bots: own?.bots ?? [],
       waiting: own?.waiting ?? [],
     });
@@ -260,7 +260,7 @@ export function useMultiHost(
         name: profile.name,
         local: false,
         reachable,
-        available: reachable && known?.fleetOk === true,
+        available: reachable && known?.fleetOk !== false,
         bots: known?.bots ?? [],
         waiting: known?.waiting ?? [],
       };
@@ -315,7 +315,7 @@ export function problemText(
     case "blocked":
       return error?.message ?? status;
     case "unauthorized":
-      return "This device is no longer paired with this host";
+      return "This device is no longer paired with this host. Pair with this host or log in to continue";
     case "incompatible":
       return error?.message ?? "Incompatible host";
     default:

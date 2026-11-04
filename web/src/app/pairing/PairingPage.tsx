@@ -17,6 +17,7 @@ export type PairInput = {
   privateNetworks?: string[];
   /** The scanned QR's host key fingerprint, when pairing from a QR. */
   expectedFp?: string;
+  expectedHostId?: string;
 };
 
 export type PairedHost = { host_id: string; name: string };
@@ -55,6 +56,13 @@ export function PairingPage({
     setPaired(null);
     try {
       setPaired(await pair(input));
+      setUrl("");
+      setCode("");
+      setScanned(null);
+      setAllowPlainWs(false);
+      setNetworks("");
+      setShowPlainToggle(false);
+      setShowNetworks(false);
     } catch (caught) {
       if (caught instanceof DirectUrlRefused) {
         setShowPlainToggle(true);
@@ -87,6 +95,7 @@ export function PairingPage({
       allowPlainWs,
       ...privateNetworks(networks),
       expectedFp: link.host_pubkey_fp,
+      expectedHostId: link.host_id,
     });
   }
 
@@ -106,7 +115,12 @@ export function PairingPage({
             code: scanned?.ticket ?? normaliseCode(code),
             allowPlainWs,
             ...privateNetworks(networks),
-            ...(scanned === null ? {} : { expectedFp: scanned.host_pubkey_fp }),
+            ...(scanned === null
+              ? {}
+              : {
+                  expectedFp: scanned.host_pubkey_fp,
+                  expectedHostId: scanned.host_id,
+                }),
           });
         }}
       >

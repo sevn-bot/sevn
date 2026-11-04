@@ -188,7 +188,7 @@ async def complete(frame: PairComplete, *, identity: HostIdentity) -> Paired:
         scope = cast("Scope", row.scope)
         device = Device(
             id=new_id("dev_"),
-            name=clean_name(frame.device_name) or "Device",
+            name=row.name or clean_name(frame.device_name) or "Device",
             platform=clean_name(frame.platform, limit=PLATFORM_LIMIT) or "unknown",
             pubkey_ed25519=b64u(pubkey),
             # D2: stays NULL until plan 0080 uses it.

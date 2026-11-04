@@ -139,7 +139,7 @@ test("a refused device on the serving host says so instead of reconnecting forev
     };
     testing.render(createElement(app.default as never));
     await testing.screen.findByText(
-      "This device is no longer paired with this host",
+      "This device is no longer paired with this host. Pair with this host or log in to continue",
       {},
       { timeout: 4000 },
     );

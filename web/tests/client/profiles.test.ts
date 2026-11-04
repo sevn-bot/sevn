@@ -5,6 +5,7 @@ import {
   makeProfile,
   newHostKey,
   stubSockets,
+  until,
 } from "../support/direct.ts";
 
 /**
@@ -49,6 +50,8 @@ type Keys = { generateDeviceKey: () => Promise<CryptoKeyPair> };
 type Connect = (options: {
   url: string;
   lastSeq?: number;
+  token?: string;
+  onStatus?: (status: string) => void;
   device?: { id: string; key: CryptoKey; hostPubkey: string; hostFp: string };
 }) => Promise<{ close: () => void }>;
 
@@ -295,5 +298,205 @@ test("a device connection refuses a welcome that skipped the challenge", async (
     ).rejects.toThrow("Host identity changed");
   } finally {
     server.stop();
+  }
+});
+
+test("a challenge without credentials fails unauthorized without waiting for timeout", async () => {
+  const mock = await stubSockets();
+  const { connect } = await load<{ connect: Connect }>(clientPath);
+  const { Unauthorized } = await load<{ Unauthorized: new () => Error }>(
+    errorsPath,
+  );
+  const url = "wss://unpaired.example/ws";
+  const server = new mock.Server(url);
+  const sent: Record<string, unknown>[] = [];
+  server.on("connection", (socket) => {
+    socket.on("message", (data) => {
+      const frame = JSON.parse(String(data)) as Record<string, unknown>;
+      sent.push(frame);
+      if (frame.t === "hello") {
+        socket.send(
+          JSON.stringify({
+            t: "challenge",
+            nonce: "nonce",
+            host: "host_remote",
+            host_sig: "sig",
+          }),
+        );
+      }
+    });
+  });
+  try {
+    const statuses: string[] = [];
+    const attempt = connect({
+      url,
+      onStatus: (status) => statuses.push(status),
+    });
+    await expect(attempt).rejects.toBeInstanceOf(Unauthorized);
+    expect(statuses.at(-1)).toBe("unauthorized");
+    expect(sent.map((frame) => frame.t)).toEqual(["hello"]);
+  } finally {
+    server.stop();
+  }
+}, 2000);
+
+test("a DNS hostname beginning with 127 must verify the host challenge", async () => {
+  const mock = await stubSockets();
+  const { connect } = await load<{ connect: Connect }>(clientPath);
+  const url = "wss://127.example.com/ws";
+  const { profile } = await makeProfile({
+    host_id: "host_remote",
+    direct_url: url,
+  });
+  const server = new mock.Server(url);
+  server.on("connection", (socket) => {
+    socket.on("message", (data) => {
+      if ((JSON.parse(String(data)) as { t?: string }).t === "hello") {
+        socket.send(
+          JSON.stringify({ t: "welcome", proto: 1, host_seq: 0, caps: [] }),
+        );
+      }
+    });
+  });
+  try {
+    await expect(
+      connect({
+        url,
+        device: {
+          id: profile.device_id,
+          key: profile.device_key,
+          hostPubkey: profile.host_pubkey,
+          hostFp: profile.host_pubkey_fp,
+        },
+      }),
+    ).rejects.toThrow("Host identity changed");
+  } finally {
+    server.stop();
+  }
+});
+
+test("a refused device revoke preserves the profile and original RPC error", async () => {
+  const profiles = await load<Profiles>(profilesPath);
+  const { ProtocolError } = await load<{
+    ProtocolError: new (code: string, message: string) => Error;
+  }>(errorsPath);
+  const store = profiles.memoryProfileStore();
+  const { profile } = await makeProfile({
+    host_id: "host_readonly",
+    direct_url: "wss://readonly.example/ws",
+  });
+  await profiles.saveProfile(store, profile);
+  const refused = new ProtocolError("forbidden", "owner scope required");
+  await expect(
+    profiles.deleteProfile(store, profile.host_id, {
+      revoke: () => Promise.reject(refused),
+    }),
+  ).rejects.toBe(refused);
+  expect(await store.get(profile.host_id)).toEqual(profile);
+});
+
+test("saving a replacement identity removes obsolete profiles at the same origin", async () => {
+  const profiles = await load<Profiles>(profilesPath);
+  const store = profiles.memoryProfileStore();
+  const { profile: old } = await makeProfile({
+    host_id: "host_old",
+    direct_url: "wss://box.example/ws",
+  });
+  const { profile: other } = await makeProfile({
+    host_id: "host_other",
+    direct_url: "wss://other.example/ws",
+  });
+  const { profile: replacement } = await makeProfile({
+    host_id: "host_new",
+    direct_url: "wss://box.example:443/new-ws",
+  });
+  await profiles.saveProfile(store, old);
+  await profiles.saveProfile(store, other);
+  await profiles.saveProfile(store, replacement);
+  expect(await store.list()).toEqual(
+    expect.arrayContaining([other, replacement]),
+  );
+  expect(await store.list()).toHaveLength(2);
+  expect(await store.get(old.host_id)).toBeUndefined();
+});
+
+test("failed replacement validation preserves the existing origin profile", async () => {
+  const profiles = await load<Profiles>(profilesPath);
+  const store = profiles.memoryProfileStore();
+  const { profile: old } = await makeProfile({
+    host_id: "host_old",
+    direct_url: "wss://box.example/ws",
+  });
+  await profiles.saveProfile(store, old);
+  const extractable = (await crypto.subtle.generateKey(
+    { name: "Ed25519" },
+    true,
+    ["sign", "verify"],
+  )) as CryptoKeyPair;
+  await expect(
+    profiles.saveProfile(store, {
+      ...old,
+      host_id: "host_new",
+      device_key: extractable.privateKey,
+    }),
+  ).rejects.toThrow("extractable");
+  expect(await store.list()).toEqual([old]);
+});
+
+test("an unauthenticated loopback handshake timeout becomes unauthorized", async () => {
+  const mock = await stubSockets();
+  const { connect } = await load<{ connect: Connect }>(clientPath);
+  const url = "ws://127.0.0.1:48787/ws";
+  const server = new mock.Server(url);
+  server.on("connection", (socket) => {
+    socket.on("message", () =>
+      socket.close({ code: 1002, reason: "handshake timeout" }),
+    );
+  });
+  try {
+    const statuses: string[] = [];
+    await expect(
+      connect({ url, onStatus: (status) => statuses.push(status) }),
+    ).rejects.toMatchObject({ name: "Unauthorized" });
+    expect(statuses.at(-1)).toBe("unauthorized");
+  } finally {
+    server.stop();
+  }
+}, 2000);
+
+test("revocation is terminal and does not start another device handshake", async () => {
+  const mock = await stubSockets();
+  const { connect } = await load<{ connect: Connect }>(clientPath);
+  const key = await newHostKey();
+  const url = "wss://revoked.example/ws";
+  const { profile, devicePubkey } = await makeProfile(
+    { host_id: "host_remote", direct_url: url },
+    key,
+  );
+  const host = await directHost(mock, {
+    url,
+    hostId: profile.host_id,
+    key,
+    devicePubkey,
+  });
+  const statuses: string[] = [];
+  const connection = await connect({
+    url,
+    onStatus: (status) => statuses.push(status),
+    device: {
+      id: profile.device_id,
+      key: profile.device_key,
+      hostPubkey: profile.host_pubkey,
+      hostFp: profile.host_pubkey_fp,
+    },
+  });
+  try {
+    host.drop(4003, "revoked");
+    await until(() => statuses.at(-1) === "unauthorized");
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    expect(host.connections).toHaveLength(1);
+  } finally {
+    connection.close();
+    host.stop();
   }
 });

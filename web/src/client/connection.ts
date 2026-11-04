@@ -7,6 +7,7 @@ import {
   Unauthorized,
 } from "./errors.ts";
 import { fingerprint, signAuth, verifyChallenge } from "./keys.ts";
+import { isLoopbackHost } from "./profiles.ts";
 
 const INITIAL_BACKOFF_MS = 500;
 const MAX_BACKOFF_MS = 10_000;
@@ -997,6 +998,11 @@ function start(
     if (frame.t === "challenge") {
       if (device !== undefined) {
         void answerChallenge(from, device, frame);
+      } else {
+        halt(
+          new Unauthorized("Pair with this host or log in to continue"),
+          "unauthorized",
+        );
       }
       return;
     }
@@ -1050,9 +1056,16 @@ function start(
     if (stopped) {
       return;
     }
-    if (code === 4001 || code === 4002) {
-      const error = code === 4001 ? new Unauthorized() : new IncompatibleHost();
-      emitStatus(code === 4001 ? "unauthorized" : "incompatible");
+    if (code === 1002 && !welcomed && device === undefined && !token) {
+      halt(
+        new Unauthorized("Pair with this host or log in to continue"),
+        "unauthorized",
+      );
+      return;
+    }
+    if (code === 4001 || code === 4002 || code === 4003) {
+      const error = code === 4002 ? new IncompatibleHost() : new Unauthorized();
+      emitStatus(code === 4002 ? "incompatible" : "unauthorized");
       fail(error);
       stopped = true;
       return;
@@ -1278,7 +1291,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function dialsLoopback(url: string): boolean {
   try {
     const host = new URL(url).hostname;
-    return host === "localhost" || host === "[::1]" || host.startsWith("127.");
+    return isLoopbackHost(host);
   } catch {
     return false;
   }

@@ -15,6 +15,7 @@ vi.mock("../../src/app/pairing/QrScanner.tsx", () => ({
         type: "button",
         onClick: () => {
           onLink({
+            host_id: "host_lan",
             ticket: "scanned-full-ticket",
             host_pubkey_fp: "scanned-fp",
             direct_url: "ws://192.168.1.20:8787/ws",
@@ -33,6 +34,7 @@ type Input = {
   code: string;
   allowPlainWs: boolean;
   expectedFp?: string;
+  expectedHostId?: string;
 };
 
 afterEach(async () => {
@@ -73,6 +75,7 @@ test("a retry after a refused scan keeps the scanned ticket and key", async () =
   await testing.screen.findByText("Paired with LAN box");
   expect(calls.at(-1)?.code).toBe("scanned-full-ticket");
   expect(calls.at(-1)?.expectedFp).toBe("scanned-fp");
+  expect(calls.at(-1)?.expectedHostId).toBe("host_lan");
 });
 
 test("typing a short code replaces the scanned ticket", async () => {
@@ -86,4 +89,29 @@ test("typing a short code replaces the scanned ticket", async () => {
   await testing.screen.findByText("Paired with LAN box");
   expect(calls.at(-1)?.code).toBe("K7M2Q9XR");
   expect(calls.at(-1)?.expectedFp).toBeUndefined();
+});
+
+test("successful pairing clears scanned identity, ticket, address and plain-ws consent", async () => {
+  const testing = await import("@testing-library/react");
+  const calls: Input[] = [];
+  await scanThenOptIn(calls);
+  testing.screen.getByRole("button", { name: "Pair" }).click();
+  await testing.screen.findByText("Paired with LAN box");
+  expect(
+    (testing.screen.getByLabelText("Host address") as HTMLInputElement).value,
+  ).toBe("");
+  expect(
+    (testing.screen.getByLabelText("Short code") as HTMLInputElement).value,
+  ).toBe("");
+  testing.fireEvent.change(testing.screen.getByLabelText("Host address"), {
+    target: { value: "ws://192.168.1.21:8787/ws" },
+  });
+  testing.fireEvent.change(testing.screen.getByLabelText("Short code"), {
+    target: { value: "ABCD2345" },
+  });
+  testing.screen.getByRole("button", { name: "Pair" }).click();
+  await testing.screen.findByLabelText("Allow plain ws:// for this host");
+  expect(calls.at(-1)).toMatchObject({ code: "ABCD2345", allowPlainWs: false });
+  expect(calls.at(-1)?.expectedFp).toBeUndefined();
+  expect(calls.at(-1)?.expectedHostId).toBeUndefined();
 });

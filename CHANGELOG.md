@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Fix direct-host review findings: verify QR host identities and loopback addresses, prevent profile collisions, reset pairing options between hosts, stop retrying refused or revoked sessions, preserve profiles when revocation is refused, retain fleet data during refresh, honor pairing ticket names, and accept IPv4-mapped loopback peers. Make two-host browser tests verify server ownership before using an allocated port.
+
 - Pair devices and reach several hosts over a tailnet without the edge. `sevn pair` or Settings → Devices issues a one-time ticket (QR or 8-character code, 10-minute TTL, stored only as SHA-256) with a scope; a paired device keeps its own non-extractable Ed25519 key per host and, from outside the host, must answer a host-signed challenge over a fresh nonce and the origin it dialled. A bad signature, an unknown or revoked device, an origin outside `http.allowed_hosts`, or a reused nonce closes with 4001; revoking a device (`devices.revoke` or `sevn devices revoke`) closes its live sessions with 4003 within a second. See `docs/remote-direct.md` for Tailscale `serve`, Headscale, NetBird, ZeroTier, WireGuard and containers.
 
 - A paired device no longer trusts a host that skips the signed challenge, and wrong short codes can no longer lock out pairing by QR code or full ticket: only the guessable short code is rate limited. The serving host's own connection now shows a refusal instead of reconnecting forever, the devices screen offers no Revoke for this browser's own device, and a retry after a refused QR scan keeps the scanned ticket.

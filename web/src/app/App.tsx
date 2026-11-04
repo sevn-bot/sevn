@@ -101,6 +101,7 @@ function OwnerApp() {
   const [status, setStatus] = useState<Status>("connecting");
   const ownProblem = problemText(status, null);
   const [hostId, setHostId] = useState("");
+  const [forgetError, setForgetError] = useState<string | null>(null);
   const [events, setEvents] = useState<ShownEvent[]>([]);
   const [path, setPath] = useState(() => window.location.pathname);
   const connectionRef = useRef<Connection | null>(null);
@@ -133,6 +134,9 @@ function OwnerApp() {
       ...(input.expectedFp === undefined
         ? {}
         : { expectedFp: input.expectedFp }),
+      ...(input.expectedHostId === undefined
+        ? {}
+        : { expectedHostId: input.expectedHostId }),
     });
     reloadProfiles();
     if (sameOrigin(profile.direct_url, socketUrl())) {
@@ -310,7 +314,14 @@ function OwnerApp() {
                 go(botPath(local === false ? pickedHost : null, botId));
               }}
               onForget={(hostId) => {
-                void multiHost.forget(hostId);
+                setForgetError(null);
+                void multiHost.forget(hostId).catch((error: unknown) => {
+                  setForgetError(
+                    error instanceof Error
+                      ? error.message
+                      : "Could not forget host",
+                  );
+                });
               }}
             />
           </aside>
@@ -326,6 +337,11 @@ function OwnerApp() {
           >
             Ping
           </button>
+          {forgetError !== null ? (
+            <p role="alert" className="text-red-300">
+              {forgetError}
+            </p>
+          ) : null}
           {page}
           <ul className="space-y-1 font-mono text-sm">
             {events.map((event) => (

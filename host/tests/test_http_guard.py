@@ -375,3 +375,53 @@ def test_guard_order_host_then_origin_then_auth(
         local = client.get("/auth/login?token=bad")
         assert (local.status_code, local.text.strip()) == (401, "unauthorized")
         assert calls == ["bad"]
+
+
+@pytest.mark.parametrize("literal", ["::ffff:127.0.0.1", "::ffff:7f00:1"])
+@pytest.mark.parametrize("hostname", ["127.0.0.1", "localhost"])
+def test_ipv4_mapped_loopback_peer_can_log_in_and_authenticate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, literal: str, hostname: str
+) -> None:
+    from sevn.http import is_loopback
+    from starlette.datastructures import Headers
+
+    host = f"{hostname}:{PORT}"
+    assert is_loopback(Headers({"host": host}), literal, PORT)
+    with running_app(_config(tmp_path), monkeypatch, peer=(literal, 41000)) as (
+        _app,
+        token,
+        client,
+    ):
+        login = client.get(f"/auth/login?token={token}", headers={"host": host})
+        assert login.status_code == 303
+        with client.websocket_connect("/ws", headers={"host": host}) as socket:
+            socket.send_json(_HELLO)
+            socket.send_json({"t": "auth", "token": token})
+            assert socket.receive_json()["t"] == "welcome"
+
+
+@pytest.mark.parametrize(
+    ("peer", "extra"),
+    [
+        ("::ffff:192.168.1.2", {}),
+        ("::ffff:127.0.0.1", {"x-forwarded-for": "192.168.1.2"}),
+        ("::ffff:127.0.0.1", {"x-forwarded-for": ""}),
+    ],
+    ids=["mapped-remote", "mapped-proxy", "mapped-empty-proxy"],
+)
+def test_mapped_peer_still_requires_loopback_and_no_proxy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, peer: str, extra: dict[str, str]
+) -> None:
+    from sevn.http import is_loopback
+    from starlette.datastructures import Headers
+
+    headers = {"host": f"127.0.0.1:{PORT}", **extra}
+    assert not is_loopback(Headers(headers), peer, PORT)
+    with running_app(_config(tmp_path), monkeypatch, peer=(peer, 41000)) as (
+        _app,
+        token,
+        client,
+    ):
+        login = client.get(f"/auth/login?token={token}", headers=headers)
+        assert (login.status_code, login.text.strip()) == (403, LOGIN_REFUSED)
+        assert "sevn_session=" not in login.headers.get("set-cookie", "")

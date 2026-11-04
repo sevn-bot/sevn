@@ -71,6 +71,8 @@ export type PairOptions = {
   store: ProfileStore;
   /** The QR's `k=`: the paired host's key must have this fingerprint. */
   expectedFp?: string;
+  /** The QR's `h=`: the paired host must have this identity. */
+  expectedHostId?: string;
   allowPlainWs?: boolean;
   privateNetworks?: string[];
   /** How long to wait for `paired` (default 15 s). */
@@ -119,7 +121,9 @@ export async function pairDevice(options: PairOptions): Promise<HostProfile> {
   const hostFp = await fingerprint(paired.host_pubkey).catch(() => null);
   if (
     hostFp === null ||
-    (options.expectedFp !== undefined && hostFp !== options.expectedFp)
+    (options.expectedFp !== undefined && hostFp !== options.expectedFp) ||
+    (options.expectedHostId !== undefined &&
+      paired.host_id !== options.expectedHostId)
   ) {
     throw new HostIdentityChanged();
   }

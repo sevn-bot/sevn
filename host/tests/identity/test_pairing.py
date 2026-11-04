@@ -377,7 +377,7 @@ async def test_complete_stores_device_and_returns_paired(
         listed = await call(owner, "devices.list", {})
         rows = {row["id"]: row for row in listed["r"]["devices"]}
         stored = rows[paired.device_id]
-        assert stored["name"] == "Pixel"
+        assert stored["name"] == "Kitchen phone"
         assert stored["platform"] == "android"
         assert stored["scope"] == "member"
         assert stored["revoked_at"] is None
@@ -449,7 +449,9 @@ def test_cli_pair_prints_uri_and_code(tmp_path: Path, monkeypatch: pytest.Monkey
     asyncio.run(_with_host(tmp_path, monkeypatch, lambda _host: _noop()))
     from sevn.cli import app
 
-    result = CliRunner().invoke(app, ["pair", "--scope", "member", "--home", str(tmp_path)])
+    result = CliRunner().invoke(
+        app, ["pair", "--scope", "member", "--name", "Kitchen phone", "--home", str(tmp_path)]
+    )
     assert result.exit_code == 0, result.output
     uri = re.search(r"sevn://pair\?\S+", result.output)
     assert uri is not None, result.output
@@ -462,6 +464,10 @@ def test_cli_pair_prints_uri_and_code(tmp_path: Path, monkeypatch: pytest.Monkey
     async def _complete(host: MemoryHost) -> None:
         paired = await complete(host, complete_frame(codes[0], new_device()))
         assert paired.scope == "member"
+        owner = await owner_client(host)
+        listed = await call(owner, "devices.list", {})
+        row = next(item for item in listed["r"]["devices"] if item["id"] == paired.device_id)
+        assert row["name"] == "Kitchen phone"
         await _expect_refused(host, ticket, "unauthorized", BAD_TICKET)
 
     asyncio.run(_with_host(tmp_path, monkeypatch, _complete))

@@ -623,6 +623,8 @@ def is_loopback(headers: Headers, peer: str | None, port: int) -> bool:
         address = ipaddress.ip_address(peer)
     except ValueError:
         return False
+    if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped is not None:
+        address = address.ipv4_mapped
     if not address.is_loopback:
         return False
     host = headers.get("host")

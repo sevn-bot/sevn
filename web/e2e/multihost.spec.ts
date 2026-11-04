@@ -1,145 +1,15 @@
-import { type ChildProcess, execFileSync, spawn } from "node:child_process";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { createServer } from "node:net";
-import { tmpdir } from "node:os";
-import path from "node:path";
 import { expect, test } from "@playwright/test";
+import {
+  type Host,
+  probe,
+  RESOLVER_ARGS,
+  shortCode,
+  startTwoHosts,
+  stopHost,
+  TEST_HOSTNAME,
+} from "./support/twohosts.ts";
 
-/**
- * Plan 0055 W1.6: two `sevn serve` hosts, one SPA.
- *
- * Host B is reached as `host-b.sevn.test` (Chromium maps it to 127.0.0.1), so its Host
- * header is not loopback and every session must pass pairing and the D3 handshake — the
- * same shape as `tailscale serve`.
- */
-const TEST_HOSTNAME = "host-b.sevn.test";
-const CROCKFORD_CODE = /\b[0-9A-HJKMNP-TV-Z]{8}\b/;
-
-test.use({
-  launchOptions: {
-    args: [`--host-resolver-rules=MAP *.sevn.test 127.0.0.1`],
-  },
-});
-
-type Host = {
-  home: string;
-  port: number;
-  base: string;
-  token: string;
-  child: ChildProcess;
-};
-
-const repo = path.resolve(import.meta.dirname, "../..");
-
-function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const server = createServer();
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      if (address === null || typeof address === "string") {
-        reject(new Error("no port"));
-        return;
-      }
-      const { port } = address;
-      server.close(() => resolve(port));
-    });
-  });
-}
-
-async function waitForHealth(port: number): Promise<void> {
-  const url = `http://127.0.0.1:${port}/health`;
-  for (let attempt = 0; attempt < 300; attempt += 1) {
-    try {
-      const response = await fetch(url);
-      if (response.ok) {
-        return;
-      }
-    } catch {
-      // Still starting.
-    }
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-  throw new Error(`sevn serve did not become healthy on ${url}`);
-}
-
-function env(home: string): NodeJS.ProcessEnv {
-  const clean = { ...process.env };
-  delete clean.SEVN_DEV;
-  delete clean.SEVN_ALLOWED_HOSTS;
-  return {
-    ...clean,
-    SEVN_HOME: home,
-    SEVN_WEB_DIST: path.join(repo, "web", "dist"),
-    SEVN_SECRETS__BACKEND: "age-file",
-    SEVN_TEST_MODEL: "echo",
-    SEVN_WORKSPACES: path.join(home, "workspaces"),
-  };
-}
-
-async function startHost(
-  name: string,
-  port: number,
-  http: string,
-): Promise<Host> {
-  const home = path.join(tmpdir(), `sevn-0055-${name}-${process.pid}`);
-  rmSync(home, { recursive: true, force: true });
-  mkdirSync(home, { recursive: true });
-  writeFileSync(
-    path.join(home, "config.toml"),
-    `[secrets]\nbackend = "age-file"\n\n[http]\nport = ${port}\n${http}`,
-    "utf8",
-  );
-  const child = spawn(
-    "uv",
-    [
-      "run",
-      "sevn",
-      "serve",
-      "--home",
-      home,
-      "--host",
-      "127.0.0.1",
-      "--port",
-      String(port),
-    ],
-    { cwd: repo, detached: true, stdio: "ignore", env: env(home) },
-  );
-  child.unref();
-  await waitForHealth(port);
-  const token = readFileSync(path.join(home, "run", "token"), "utf8").trim();
-  return { home, port, base: `http://127.0.0.1:${port}`, token, child };
-}
-
-function stopHost(host: Host | undefined): void {
-  if (host === undefined) {
-    return;
-  }
-  try {
-    if (host.child.pid !== undefined) {
-      process.kill(-host.child.pid, "SIGTERM");
-    }
-  } catch {
-    // Already gone.
-  }
-  rmSync(host.home, { recursive: true, force: true });
-}
-
-function sevn(host: Host, args: string[]): string {
-  return execFileSync("uv", ["run", "sevn", ...args, "--home", host.home], {
-    cwd: repo,
-    env: env(host.home),
-    encoding: "utf8",
-  });
-}
-
-function probe(
-  host: Host,
-  method: string,
-  params: Record<string, unknown>,
-): Record<string, unknown> {
-  const out = sevn(host, ["probe", "call", method, JSON.stringify(params)]);
-  return JSON.parse(out) as Record<string, unknown>;
-}
+test.use({ launchOptions: { args: RESOLVER_ARGS } });
 
 test.describe("direct multi-host", () => {
   test.setTimeout(90_000);
@@ -148,15 +18,9 @@ test.describe("direct multi-host", () => {
   let hostB: Host | undefined;
 
   test.beforeAll(async () => {
-    const portA = await freePort();
-    const portB = await freePort();
-    const nameB = `${TEST_HOSTNAME}:${portB}`;
-    hostA = await startHost("a", portA, `connect_src = ["ws://${nameB}"]\n`);
-    hostB = await startHost(
-      "b",
-      portB,
-      `allowed_hosts = ["${nameB}"]\nallowed_origins = ["http://127.0.0.1:${portA}"]\n`,
-    );
+    const hosts = await startTwoHosts("pair-revoke");
+    hostA = hosts.a;
+    hostB = hosts.b;
     probe(hostA, "bots.create", { name: "Alpha on A", op_id: "op_e2e_a" });
     probe(hostB, "bots.create", { name: "Beta on B", op_id: "op_e2e_b" });
   });
@@ -172,13 +36,7 @@ test.describe("direct multi-host", () => {
     if (hostA === undefined || hostB === undefined) {
       throw new Error("hosts did not start");
     }
-    const minted = sevn(hostB, ["pair", "--scope", "member"]);
-    const withoutUri = minted
-      .split("\n")
-      .filter((line) => !line.includes("sevn://"))
-      .join("\n");
-    const code = CROCKFORD_CODE.exec(withoutUri)?.[0];
-    expect(code, minted).toBeDefined();
+    const code = shortCode(hostB);
 
     await page.goto(
       `${hostA.base}/auth/login?token=${encodeURIComponent(hostA.token)}`,
@@ -216,5 +74,110 @@ test.describe("direct multi-host", () => {
       { timeout: 10_000 },
     );
     await expect(regionA.getByRole("img", { name: "reachable" })).toBeVisible();
+  });
+
+  test("IndexedDB preserves conflicting profiles and replaces an obsolete origin after re-pairing", async ({
+    page,
+  }) => {
+    if (hostA === undefined || hostB === undefined) {
+      throw new Error("hosts did not start");
+    }
+    const hostId = String(probe(hostB, "system.info", {}).host_id);
+    const url = `ws://${TEST_HOSTNAME}:${hostB.port}/ws`;
+    await page.goto(
+      `${hostA.base}/auth/login?token=${encodeURIComponent(hostA.token)}`,
+    );
+    await page.evaluate(
+      async ({ hostId, url }) => {
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+          const request = indexedDB.open("sevn", 1);
+          request.onupgradeneeded = () =>
+            request.result.createObjectStore("profiles", {
+              keyPath: "host_id",
+            });
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+        const device = (await crypto.subtle.generateKey(
+          { name: "Ed25519" },
+          false,
+          ["sign", "verify"],
+        )) as CryptoKeyPair;
+        const common = {
+          name: "Saved profile",
+          host_pubkey: "invalid-fixture-key",
+          host_pubkey_fp: "fixture-fingerprint",
+          transport: "direct",
+          allow_plain_ws: true,
+          device_id: "dev_fixture",
+          device_key: device.privateKey,
+          scope: "member",
+        };
+        await new Promise<void>((resolve, reject) => {
+          const transaction = db.transaction("profiles", "readwrite");
+          const store = transaction.objectStore("profiles");
+          store.put({ ...common, host_id: "host_obsolete", direct_url: url });
+          store.put({
+            ...common,
+            host_id: hostId,
+            direct_url: "wss://unrelated.example/ws",
+          });
+          transaction.oncomplete = () => resolve();
+          transaction.onerror = () => reject(transaction.error);
+        });
+        db.close();
+      },
+      { hostId, url },
+    );
+    await page.goto(`${hostA.base}/pairing`);
+    await page.getByLabel("Host address").fill(url);
+    await page.getByLabel("Short code").fill(shortCode(hostB));
+    await page.getByRole("button", { name: "Pair" }).click();
+    await page.getByLabel("Allow plain ws:// for this host").check();
+    await page.getByRole("button", { name: "Pair" }).click();
+    await expect(
+      page.getByText(/Host identity conflicts with an existing profile/),
+    ).toBeVisible();
+    const inspect = async (removeCollision: boolean) =>
+      page.evaluate(
+        async ({ hostId, removeCollision }) => {
+          const db = await new Promise<IDBDatabase>((resolve, reject) => {
+            const request = indexedDB.open("sevn", 1);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+          });
+          const rows = await new Promise<
+            { host_id: string; direct_url: string }[]
+          >((resolve, reject) => {
+            const transaction = db.transaction("profiles", "readwrite");
+            const store = transaction.objectStore("profiles");
+            const request = store.getAll();
+            if (removeCollision) {
+              store.delete(hostId);
+            }
+            transaction.oncomplete = () => resolve(request.result);
+            transaction.onerror = () => reject(transaction.error);
+          });
+          db.close();
+          return rows.map(({ host_id, direct_url }) => ({
+            host_id,
+            direct_url,
+          }));
+        },
+        { hostId, removeCollision },
+      );
+    expect(await inspect(true)).toEqual(
+      expect.arrayContaining([
+        { host_id: "host_obsolete", direct_url: url },
+        { host_id: hostId, direct_url: "wss://unrelated.example/ws" },
+      ]),
+    );
+    // A refused pairing spends its ticket; a fresh ticket now replaces the obsolete identity.
+    await page.getByLabel("Short code").fill(shortCode(hostB));
+    await page.getByRole("button", { name: "Pair" }).click();
+    await expect(page.getByText(/^Paired with /)).toBeVisible();
+    expect(await inspect(false)).toEqual([
+      { host_id: hostId, direct_url: url },
+    ]);
   });
 });

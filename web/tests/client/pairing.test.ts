@@ -4,6 +4,7 @@ import {
   type Frame,
   fingerprintOf,
   type HostProfile,
+  makeProfile,
   newHostKey,
   stubSockets,
   unb64u,
@@ -22,6 +23,7 @@ import {
  *   `CspBlocked(origin)`, `HostIdentityChanged`, `Unauthorized`.
  */
 type ProfileStore = {
+  put: (profile: HostProfile) => Promise<void>;
   get: (hostId: string) => Promise<HostProfile | undefined>;
   list: () => Promise<HostProfile[]>;
 };
@@ -39,6 +41,7 @@ type Pairing = {
     platform?: string;
     store: ProfileStore;
     expectedFp?: string;
+    expectedHostId?: string;
     allowPlainWs?: boolean;
   }) => Promise<HostProfile>;
 };
@@ -276,3 +279,68 @@ test("a refused ticket rejects Unauthorized and stores nothing", async () => {
     host.stop();
   }
 });
+
+test("the paired host id must match the QR even when the fingerprint matches", async () => {
+  const { pairDevice } = await load<Pairing>(pairingPath);
+  const key = await newHostKey();
+  const url = "wss://linux.tailnet.ts.net/ws";
+  const host = await pairingHost(url, () => ({
+    t: "paired",
+    device_id: "dev_new",
+    host_id: "host_wrong",
+    host_pubkey: key.pubkey,
+    scope: "member",
+  }));
+  const store = await memoryStore();
+  try {
+    await expect(
+      pairDevice({
+        url,
+        ticket: "ABCD2345",
+        deviceName: "Phone",
+        store,
+        expectedFp: key.fp,
+        expectedHostId: "host_linux",
+      }),
+    ).rejects.toThrow("Host identity changed");
+    expect(await store.list()).toEqual([]);
+  } finally {
+    host.stop();
+  }
+});
+
+test.each(["origin", "key"])(
+  "pairing cannot overwrite a known host id with a different %s",
+  async (changed) => {
+    const { pairDevice } = await load<Pairing>(pairingPath);
+    const key = await newHostKey();
+    const { profile } = await makeProfile(
+      { host_id: "host_linux", direct_url: "wss://known.example/ws" },
+      key,
+    );
+    const url =
+      changed === "origin" ? "wss://other.example/ws" : profile.direct_url;
+    const returned = changed === "key" ? await newHostKey() : key;
+    const host = await pairingHost(url, () => ({
+      t: "paired",
+      device_id: "dev_new",
+      host_id: profile.host_id,
+      host_pubkey: returned.pubkey,
+      scope: "owner",
+    }));
+    const store = await memoryStore();
+    await store.put(profile);
+    try {
+      await expect(
+        pairDevice({ url, ticket: "ABCD2345", deviceName: "Phone", store }),
+      ).rejects.toMatchObject({
+        name: "HostIdentityChanged",
+        message:
+          "Host identity conflicts with an existing profile; forget that profile before replacing it",
+      });
+      expect(await store.list()).toEqual([profile]);
+    } finally {
+      host.stop();
+    }
+  },
+);
