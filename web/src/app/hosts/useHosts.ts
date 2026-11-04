@@ -247,7 +247,7 @@ export function useMultiHost(
       name: "This host",
       local: true,
       reachable: localConnected,
-      available: localConnected && own?.fleetOk !== false,
+      available: localConnected && own?.fleetOk === true,
       bots: own?.bots ?? [],
       waiting: own?.waiting ?? [],
     });
@@ -260,7 +260,7 @@ export function useMultiHost(
         name: profile.name,
         local: false,
         reachable,
-        available: reachable && known?.fleetOk !== false,
+        available: reachable && known?.fleetOk === true,
         bots: known?.bots ?? [],
         waiting: known?.waiting ?? [],
       };
@@ -302,7 +302,7 @@ const HOST_IDENTITY_CHANGED = "Host identity changed — re-pair to continue";
 const ALLOWED_HOSTS_HINT =
   "The host may also not list this address in http.allowed_hosts.";
 
-function problemText(
+export function problemText(
   status: HostStatus,
   error: Error | null | undefined,
 ): string | undefined {

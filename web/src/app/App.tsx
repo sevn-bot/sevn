@@ -19,6 +19,7 @@ import { HostSidebar } from "./hosts/HostSidebar.tsx";
 import { Inbox } from "./hosts/Inbox.tsx";
 import {
   type HostView,
+  problemText,
   profileStore,
   sameOrigin,
   useMultiHost,
@@ -98,6 +99,7 @@ export default function App() {
 
 function OwnerApp() {
   const [status, setStatus] = useState<Status>("connecting");
+  const ownProblem = problemText(status, null);
   const [hostId, setHostId] = useState("");
   const [events, setEvents] = useState<ShownEvent[]>([]);
   const [path, setPath] = useState(() => window.location.pathname);
@@ -162,6 +164,11 @@ function OwnerApp() {
           url: socketUrl(),
           lastSeq: 0,
           ...(device === undefined ? {} : { device }),
+          onStatus: (next) => {
+            if (alive) {
+              setStatus(next);
+            }
+          },
         });
       })
       .then(
@@ -172,11 +179,6 @@ function OwnerApp() {
           }
           current = connection;
           connectionRef.current = connection;
-          connection.onStatus((next) => {
-            if (alive) {
-              setStatus(next);
-            }
-          });
           connection.onEvent((event) => {
             if (!alive) {
               return;
@@ -194,7 +196,12 @@ function OwnerApp() {
         },
         () => {
           if (alive) {
-            setStatus("reconnecting");
+            // A refusal already set its status: the connection stopped and will not redial.
+            setStatus((current) =>
+              problemText(current, null) === undefined
+                ? "reconnecting"
+                : current,
+            );
           }
         },
       );
@@ -255,6 +262,11 @@ function OwnerApp() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <header className="flex flex-wrap items-baseline gap-3 border-b border-zinc-800 px-4 py-3">
         <p>{status}</p>
+        {ownProblem !== undefined ? (
+          <p role="alert" className="text-sm text-red-300">
+            {ownProblem}
+          </p>
+        ) : null}
         {hostId !== "" ? <p className="font-mono text-sm">{hostId}</p> : null}
         <nav aria-label="Settings" className="ml-auto flex gap-3 text-sm">
           <button

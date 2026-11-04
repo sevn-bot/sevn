@@ -2,10 +2,16 @@
 
 A ticket is 32 random bytes (base64url) with an 8-character Crockford short code;
 both are one credential and either use spends it. Only SHA-256 digests of the
-ticket and of the code are stored. A ticket lives 10 minutes, is bound to this
-host's id, and burns after 5 failed attempts. Every failed attempt counts
-against every unexpired ticket, and 20 failures in a rolling hour refuse every
-attempt on the host until the hour has passed.
+ticket and of the code are stored. A ticket lives 10 minutes and is bound to this
+host's id.
+
+Only the short code can be guessed, so only it is rate limited. ``pair.complete``
+is reachable before authentication, so a limit on the full ticket would let anyone
+who can reach the port lock the owner out. A wrong code counts against every
+unexpired ticket's code, which stops working after 5 failures, and 20 failures in a
+rolling hour refuse every code on the host until the hour has passed. A valid full
+ticket (the QR code or link) still pairs after that, and a wrong one counts for
+nothing.
 
 All time reads go through this module's ``utcnow`` so tests can move the clock.
 """
@@ -151,10 +157,11 @@ def default_direct_url(http: HttpSettings) -> str | None:
 async def complete(frame: PairComplete, *, identity: HostIdentity) -> Paired:
     """Spend the ticket and store the device. Raises ``PairingError`` on refusal."""
     now = utcnow()
+    is_code = _CODE.fullmatch(frame.ticket.strip().upper()) is not None
     async with open_session() as session:
         stale = delete(PairingAttempt).where(PairingAttempt.created_at < now - _WINDOW)
         await session.execute(stale)
-        if await _recent_failures(session, now) >= HOST_FAILURES_PER_HOUR:
+        if is_code and await _recent_failures(session, now) >= HOST_FAILURES_PER_HOUR:
             await session.commit()
             logger.warning("pairing refused: host attempt limit reached")
             raise PairingError("rate_limited", _RATE_LIMITED)
@@ -173,7 +180,8 @@ async def complete(frame: PairComplete, *, identity: HostIdentity) -> Paired:
             )
             claimed = result.rowcount == 1
         if row is None or not claimed:
-            await _record_failure(session, identity.host_id, now)
+            if is_code:
+                await _record_failure(session, identity.host_id, now)
             await session.commit()
             logger.warning("pairing refused: invalid ticket")
             raise PairingError("unauthorized", _BAD_TICKET)
@@ -208,18 +216,20 @@ async def _find(
 ) -> PairingTicket | None:
     value = presented.strip()
     code = value.upper()
-    if _CODE.fullmatch(code):
-        match = PairingTicket.code_hash == _digest(code)
-    else:
-        match = PairingTicket.ticket_hash == _digest(value)
-    rows = await session.scalars(
+    query = (
         select(PairingTicket)
-        .where(match)
         .where(PairingTicket.host_id == host_id)
         .where(PairingTicket.used_at.is_(None))
-        .where(PairingTicket.failures < TICKET_FAILURES)
         .order_by(PairingTicket.created_at.desc())
     )
+    if _CODE.fullmatch(code):
+        query = query.where(
+            PairingTicket.code_hash == _digest(code),
+            PairingTicket.failures < TICKET_FAILURES,
+        )
+    else:
+        query = query.where(PairingTicket.ticket_hash == _digest(value))
+    rows = await session.scalars(query)
     for row in rows:
         if row.expires_at > now:
             return row

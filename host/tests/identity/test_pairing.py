@@ -60,13 +60,6 @@ def _move_clock(monkeypatch: pytest.MonkeyPatch, offset: timedelta) -> None:
     monkeypatch.setattr(pairing, "utcnow", lambda: base + offset)
 
 
-def _near_miss(ticket: str) -> str:
-    """The same ticket with one character changed (counts against that ticket in any layout)."""
-    index = len(ticket) - 5
-    swapped = "A" if ticket[index] != "A" else "B"
-    return ticket[:index] + swapped + ticket[index + 1 :]
-
-
 async def _expect_refused(host: MemoryHost, ticket: str, code: str, message: str) -> None:
     from sevn.contracts.errors import ProtocolError
 
@@ -91,7 +84,7 @@ async def test_start_refuses_read_only(tmp_path: Path, monkeypatch: pytest.Monke
     from sevn.protocol.session import Session
 
     async with _host(tmp_path, monkeypatch) as host:
-        session = Session.for_test(scope="read_only", loopback=True, hub=host.hub)  # type: ignore[call-arg]
+        session = Session.for_test(scope="read_only", loopback=True, hub=host.hub)
         res = await _dispatch(session, "pairing.start", {"op_id": op_id()})
         assert res.e is not None
         assert res.e.code == "forbidden"
@@ -106,7 +99,7 @@ async def test_member_may_start_pairing_but_not_an_owner_ticket(
     from sevn.protocol.session import Session
 
     async with _host(tmp_path, monkeypatch) as host:
-        member = Session.for_test(  # type: ignore[call-arg]
+        member = Session.for_test(
             scope="member", loopback=False, hub=host.hub, device_id="dev_remote_member"
         )
         started = await _dispatch(member, "pairing.start", {"scope": "member", "op_id": op_id()})
@@ -126,7 +119,7 @@ async def test_owner_ticket_needs_loopback_owner(
     from sevn.protocol.session import Session
 
     async with _host(tmp_path, monkeypatch) as host:
-        remote_owner = Session.for_test(  # type: ignore[call-arg]
+        remote_owner = Session.for_test(
             scope="owner", loopback=False, hub=host.hub, device_id="dev_remote_owner"
         )
         refused = await _dispatch(
@@ -285,36 +278,80 @@ async def test_qr_uri_without_remote_host_has_no_direct_url(
 # --- rate limits -----------------------------------------------------------------------------
 
 
+def _wrong_code(right: str) -> str:
+    """A well-formed short code that is not ``right``."""
+    from sevn.identity.pairing import CROCKFORD
+
+    while True:
+        code = "".join(secrets.choice(CROCKFORD) for _ in range(8))
+        if code != right:
+            return code
+
+
 @pytest.mark.parametrize(("failures", "burned"), [(4, False), (5, True)])
-async def test_five_failures_burn_ticket(
+async def test_five_wrong_codes_burn_the_code(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failures: int, burned: bool
 ) -> None:
     async with _host(tmp_path, monkeypatch) as host:
         owner = await owner_client(host)
         started = await start_pairing(owner)
         for _ in range(failures):
-            await _expect_refused(host, _near_miss(started["ticket"]), "unauthorized", BAD_TICKET)
+            await _expect_refused(
+                host, _wrong_code(started["short_code"]), "unauthorized", BAD_TICKET
+            )
         if burned:
-            await _expect_refused(host, started["ticket"], "unauthorized", BAD_TICKET)
+            await _expect_refused(host, started["short_code"], "unauthorized", BAD_TICKET)
         else:
-            paired = await complete(host, complete_frame(started["ticket"], new_device()))
+            paired = await complete(host, complete_frame(started["short_code"], new_device()))
             assert paired.device_id.startswith("dev_")
 
 
-async def test_host_rate_limit_20_per_hour(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_wrong_codes_do_not_lock_out_the_full_ticket(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Anyone who can reach the port can send wrong codes; the owner's QR must still pair."""
+    async with _host(tmp_path, monkeypatch) as host:
+        owner = await owner_client(host)
+        started = await start_pairing(owner)
+        for _ in range(5):
+            await _expect_refused(
+                host, _wrong_code(started["short_code"]), "unauthorized", BAD_TICKET
+            )
+        paired = await complete(host, complete_frame(started["ticket"], new_device()))
+        assert paired.device_id.startswith("dev_")
+
+
+async def test_wrong_full_tickets_count_for_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A 256-bit value cannot be guessed, so a miss neither burns a code nor trips the limit."""
+    async with _host(tmp_path, monkeypatch) as host:
+        owner = await owner_client(host)
+        started = await start_pairing(owner)
+        for _ in range(25):
+            await _expect_refused(host, secrets.token_urlsafe(32), "unauthorized", BAD_TICKET)
+        paired = await complete(host, complete_frame(started["short_code"], new_device()))
+        assert paired.device_id.startswith("dev_")
+
+
+async def test_host_rate_limit_20_wrong_codes_per_hour(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     async with _host(tmp_path, monkeypatch) as host:
         owner = await owner_client(host)
         for _ in range(19):
-            await _expect_refused(host, secrets.token_urlsafe(32), "unauthorized", BAD_TICKET)
+            await _expect_refused(host, _wrong_code(""), "unauthorized", BAD_TICKET)
         fresh = await start_pairing(owner)
-        await complete(host, complete_frame(fresh["ticket"], new_device()))
-        await _expect_refused(host, secrets.token_urlsafe(32), "unauthorized", BAD_TICKET)
-        # 20 failures this hour: even a valid ticket is refused now.
+        await complete(host, complete_frame(fresh["short_code"], new_device()))
+        await _expect_refused(host, _wrong_code(""), "unauthorized", BAD_TICKET)
+        # 20 failures this hour: even a valid code is refused now, but not the full ticket.
         blocked = await start_pairing(owner)
-        await _expect_refused(host, blocked["ticket"], "rate_limited", RATE_LIMITED)
+        await _expect_refused(host, blocked["short_code"], "rate_limited", RATE_LIMITED)
+        paired = await complete(host, complete_frame(blocked["ticket"], new_device()))
+        assert paired.device_id.startswith("dev_")
         _move_clock(monkeypatch, timedelta(minutes=61))
         later = await start_pairing(owner)
-        paired = await complete(host, complete_frame(later["ticket"], new_device()))
+        paired = await complete(host, complete_frame(later["short_code"], new_device()))
         assert paired.device_id.startswith("dev_")
 
 
@@ -450,4 +487,4 @@ def _rows(db: Path, table: str) -> list[tuple[object, ...]]:
         ).fetchone()
         if present is None:
             raise AssertionError(f"table {table} is missing")
-        return connection.execute(f"SELECT * FROM {table}").fetchall()  # noqa: S608
+        return connection.execute(f"SELECT * FROM {table}").fetchall()  # noqa: S608 — table names from this test

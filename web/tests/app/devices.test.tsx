@@ -145,3 +145,36 @@ test("the devices list shows each device and revokes a live one", async () => {
     testing.cleanup();
   }
 });
+
+test("the devices list offers no Revoke for this browser's own device", async () => {
+  const now = new Date().toISOString();
+  const row = (id: string, name: string) => ({
+    id,
+    name,
+    platform: "web",
+    scope: "member",
+    created_at: now,
+    last_seen: now,
+    revoked_at: null,
+  });
+  const harness = await startHarness({
+    "devices.list": {
+      devices: [row("dev_self", "This browser"), row("dev_phone", "Phone")],
+    },
+    "devices.self": row("dev_self", "This browser"),
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const DevicesList = await loadComponent(listPath, "DevicesList");
+    testing.render(createElement(DevicesList));
+    await testing.screen.findByText("this device");
+    const buttons = await testing.screen.findAllByRole("button", {
+      name: "Revoke",
+    });
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0]?.closest("li")?.textContent).toContain("Phone");
+  } finally {
+    harness.stop();
+    testing.cleanup();
+  }
+});

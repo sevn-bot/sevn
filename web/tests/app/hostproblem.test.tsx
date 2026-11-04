@@ -115,3 +115,36 @@ test("a failed host signature names http.allowed_hosts next to the re-pair messa
     local?.stop();
   }
 });
+
+test("a refused device on the serving host says so instead of reconnecting forever", async () => {
+  const mock = await stubSockets();
+  const url = "ws://localhost:3000/ws";
+  const made = await makeProfile({ host_id: "host_local", direct_url: url });
+  const server = new mock.Server(url);
+  server.on("connection", (socket) => {
+    socket.on("message", (data) => {
+      if ((JSON.parse(String(data)) as Frame).t === "hello") {
+        socket.close({ code: 4001, reason: "unauthorized" });
+      }
+    });
+  });
+  const testing = await import("@testing-library/react");
+  try {
+    const { profileStore } = (await import(
+      "../../src/app/hosts/useHosts.ts"
+    )) as { profileStore: () => { put: (p: HostProfile) => Promise<void> } };
+    await profileStore().put(made.profile);
+    const app = (await import("../../src/app/App.tsx")) as {
+      default: () => unknown;
+    };
+    testing.render(createElement(app.default as never));
+    await testing.screen.findByText(
+      "This device is no longer paired with this host",
+      {},
+      { timeout: 4000 },
+    );
+    expect(testing.screen.getByText("unauthorized")).toBeTruthy();
+  } finally {
+    server.stop();
+  }
+});

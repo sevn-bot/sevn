@@ -37,6 +37,8 @@ export function PairingPage({
 }) {
   const [url, setUrl] = useState("");
   const [code, setCode] = useState("");
+  // A scanned QR stays the credential for a retry (say, after the plain ws:// opt-in).
+  const [scanned, setScanned] = useState<PairLink | null>(null);
   const [allowPlainWs, setAllowPlainWs] = useState(false);
   const [showPlainToggle, setShowPlainToggle] = useState(false);
   const [showNetworks, setShowNetworks] = useState(false);
@@ -78,6 +80,7 @@ export function PairingPage({
       return;
     }
     setUrl(target);
+    setScanned(link);
     void run({
       url: target,
       code: link.ticket,
@@ -100,9 +103,10 @@ export function PairingPage({
           event.preventDefault();
           void run({
             url: socketAddress(url),
-            code: normaliseCode(code),
+            code: scanned?.ticket ?? normaliseCode(code),
             allowPlainWs,
             ...privateNetworks(networks),
+            ...(scanned === null ? {} : { expectedFp: scanned.host_pubkey_fp }),
           });
         }}
       >
@@ -122,10 +126,11 @@ export function PairingPage({
           Short code
           <input
             className="mt-1 block w-full rounded bg-zinc-900 px-2 py-1 font-mono uppercase"
-            placeholder="XXXX-XXXX"
+            placeholder={scanned === null ? "XXXX-XXXX" : "From the QR code"}
             autoComplete="off"
             value={code}
             onChange={(event) => {
+              setScanned(null);
               setCode(event.target.value);
             }}
           />

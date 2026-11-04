@@ -16,6 +16,8 @@ export function DevicesList() {
 
 function DevicesListView() {
   const list = useCall("devices.list", {});
+  // Absent on the host's own loopback session, which is not a paired device.
+  const self = useCall("devices.self", {});
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const devices = list.data?.devices ?? [];
@@ -59,6 +61,9 @@ function DevicesListView() {
               </span>
               {device.revoked_at !== null ? (
                 <span className="ml-auto text-red-300">revoked</span>
+              ) : device.id === self.data?.id ? (
+                // This key is the browser's only way in: revoking it locks this browser out.
+                <span className="ml-auto text-zinc-400">this device</span>
               ) : (
                 <button
                   type="button"

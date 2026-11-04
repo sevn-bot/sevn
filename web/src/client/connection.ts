@@ -595,6 +595,8 @@ export type ConnectOptions = {
   token?: string;
   lastSeq?: number;
   device?: DeviceAuth;
+  /** Called from the first status on, so a refusal before `welcome` is seen too. */
+  onStatus?: (status: Status) => void;
 };
 
 type Pending = {
@@ -706,7 +708,12 @@ function start(
   const buffered = new Map<number, ProtocolEvent>();
   let pending = new Map<string, Pending>();
   const eventHandlers: Array<(event: ProtocolEvent) => void> = [];
-  const statusHandlers: Array<(next: Status) => void> = [];
+  const statusHandlers: Array<(next: Status) => void> =
+    options.onStatus === undefined ? [] : [options.onStatus];
+  // D6: a paired device trusts a socket only once its challenge verified against the pinned
+  // key. A loopback dial reaches this machine's own host, which skips the challenge (D4).
+  const challengeRequired = device !== undefined && !dialsLoopback(url);
+  let verified: WebSocket | null = null;
   const tickHandlers = new Map<
     string,
     Array<(data: Record<string, unknown>) => void>
@@ -901,6 +908,7 @@ function start(
     if (stopped || socket !== target) {
       return;
     }
+    verified = target;
     target.send(JSON.stringify({ t: "auth", device_sig: deviceSig }));
   }
 
@@ -989,6 +997,12 @@ function start(
     if (frame.t === "challenge") {
       if (device !== undefined) {
         void answerChallenge(from, device, frame);
+      }
+      return;
+    }
+    if (challengeRequired && verified !== from) {
+      if (frame.t === "welcome") {
+        halt(new HostIdentityChanged(), "identity_changed");
       }
       return;
     }
@@ -1261,6 +1275,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /** The WebSocket URL's origin as dialled (`hello.origin`, signed in the handshake). */
+function dialsLoopback(url: string): boolean {
+  try {
+    const host = new URL(url).hostname;
+    return host === "localhost" || host === "[::1]" || host.startsWith("127.");
+  } catch {
+    return false;
+  }
+}
+
 function originOf(url: string): string {
   try {
     return new URL(url).origin;

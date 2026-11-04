@@ -262,3 +262,38 @@ test("deleting a profile of an unreachable host still deletes it", async () => {
   expect(tried).toBe(1);
   expect(await store.get("host_gone")).toBeUndefined();
 });
+
+test("a device connection refuses a welcome that skipped the challenge", async () => {
+  const mock = await stubSockets();
+  const { connect } = await load<{ connect: Connect }>(clientPath);
+  const url = "ws://100.101.102.103:8787/ws";
+  const { profile } = await makeProfile({
+    host_id: "host_linux",
+    direct_url: url,
+  });
+  const server = new mock.Server(url);
+  server.on("connection", (socket) => {
+    socket.on("message", (data) => {
+      if ((JSON.parse(String(data)) as { t?: string }).t === "hello") {
+        socket.send(
+          JSON.stringify({ t: "welcome", proto: 1, host_seq: 0, caps: [] }),
+        );
+      }
+    });
+  });
+  try {
+    await expect(
+      connect({
+        url,
+        device: {
+          id: profile.device_id,
+          key: profile.device_key,
+          hostPubkey: profile.host_pubkey,
+          hostFp: profile.host_pubkey_fp,
+        },
+      }),
+    ).rejects.toThrow("Host identity changed");
+  } finally {
+    server.stop();
+  }
+});
