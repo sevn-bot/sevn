@@ -21,3 +21,9 @@ agents:
   reviewer:
     modelChain:
     - opencode-go/deepseek-v4.1-flash
+review:
+  coverage:
+    # Stopgap: mergeCraft records no native read from OpenCode, so a review that
+    # read the diff can still score 0 hunks and end inconclusive. Drop this once
+    # the upstream fix is pinned.
+    onIncomplete: warn

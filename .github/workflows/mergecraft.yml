@@ -2,8 +2,10 @@
 #
 # Reviewer: OpenCode Go subscription, model opencode-go/deepseek-v4.1-flash.
 # That is the primary rung in alexhawat/mergeCraft's own review workflow.
-# The action pin below is the v0.1.0a4 release commit; its action.yml pins the
-# container image by digest.
+# The action pin below is manifest commit 9e4318a on mergeCraft main, the same
+# commit mergeCraft's own review runs. It is newer than v0.1.0a4 and carries the
+# fix that keeps inline review comments from being rejected with a 422. Its
+# action.yml pins the container image by digest.
 #
 # Trigger is pull_request, not pull_request_target. This job is not a required
 # ruleset, and pull_request keeps repository secrets out of fork runs. The
@@ -55,7 +57,7 @@ jobs:
 
       - name: Run mergeCraft
         if: env.HAS_OPENCODE_GO == 'true'
-        uses: alexhawat/mergeCraft@7080e962c2259757a34b9f745602f093e4ee3378 # v0.1.0a4
+        uses: alexhawat/mergeCraft@9e4318a81c47ad20313966105e9d0038e415198f # main manifest 9e4318a (image built from d103e90c)
         with:
           prompt: >
             ${{ github.event_name == 'pull_request'
@@ -69,7 +71,7 @@ jobs:
           timeout: 40m
         env:
           # Keep equal to the uses: commit above. The container cannot read it.
-          MERGECRAFT_ACTION_SHA: 7080e962c2259757a34b9f745602f093e4ee3378
+          MERGECRAFT_ACTION_SHA: 9e4318a81c47ad20313966105e9d0038e415198f
           LLM_PROVIDER_9: opencode-go
           OPENCODE_GO_API_KEY: ${{ secrets.LLM_PROVIDER_9_API_KEY }}
 
