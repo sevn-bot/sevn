@@ -143,10 +143,8 @@ class KeychainBackend:
         return value
 
     def delete(self, name: str) -> None:
-        try:
-            self._call(lambda: keyring.delete_password(self._service, name), "delete")
-        except _Missing as exc:
-            raise SecretNotFound(name) from exc
+        if not self._delete_item(name):
+            raise SecretNotFound(name)
         if name == _KEYCHAIN_INDEX:
             return
         self._store_names([item for item in self.names() if item != name])
@@ -159,15 +157,25 @@ class KeychainBackend:
 
     def _store_names(self, names: list[str]) -> None:
         if not names:
-            try:
-                self._call(
-                    lambda: keyring.delete_password(self._service, _KEYCHAIN_INDEX), "delete"
-                )
-            except _Missing:
-                return
+            self._delete_item(_KEYCHAIN_INDEX)
             return
         payload = json.dumps(names)
         self._call(lambda: keyring.set_password(self._service, _KEYCHAIN_INDEX, payload), "write")
+
+    def _delete_item(self, name: str) -> bool:
+        """Delete one keychain item; ``False`` means it was not there.
+
+        ``keyring``'s macOS backend raises the same error for a missing item and for a locked
+        keychain, so a read tells them apart: it fails on a locked keychain and finds nothing
+        when the item is gone.
+        """
+        try:
+            self._call(lambda: keyring.delete_password(self._service, name), "delete")
+        except _Missing as exc:
+            if self._call(lambda: keyring.get_password(self._service, name), "read") is None:
+                return False
+            raise SecretsUnavailable("the keychain delete failed") from exc
+        return True
 
     def _call[T](self, operation: Callable[[], T], action: str) -> T:
         return _translate(operation, "keychain", action, "the keychain is locked")

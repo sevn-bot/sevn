@@ -454,12 +454,21 @@ def test_secret_service_store_errors_are_typed(tmp_path: Path, kind: str, code: 
 
 def _keychain_fails(monkeypatch: pytest.MonkeyPatch, error: Exception) -> None:
     import keyring
+    import keyring.errors
 
     def fail(*_args: object, **_kwargs: object) -> None:
         raise error
 
-    for name in ("get_password", "set_password", "delete_password"):
-        monkeypatch.setattr(keyring, name, fail)
+    def fail_delete(*_args: object, **_kwargs: object) -> None:
+        # keyring's macOS backend never raises KeyringLocked from a delete: every failure of
+        # one, a locked keychain included, is a PasswordDeleteError.
+        if isinstance(error, keyring.errors.KeyringLocked):
+            raise keyring.errors.PasswordDeleteError("Can't delete password in keychain")
+        raise error
+
+    monkeypatch.setattr(keyring, "get_password", fail)
+    monkeypatch.setattr(keyring, "set_password", fail)
+    monkeypatch.setattr(keyring, "delete_password", fail_delete)
 
 
 def _keyring_error(kind: str) -> Exception:
@@ -490,16 +499,105 @@ def test_keychain_errors_are_typed(monkeypatch: pytest.MonkeyPatch, kind: str, c
         assert value not in str(caught.value)
 
 
+class _Keychain:
+    """Items in memory, with keyring's macOS answer to a delete that fails."""
+
+    def __init__(self, monkeypatch: pytest.MonkeyPatch, undeletable: set[str]) -> None:
+        import keyring
+
+        self.items: dict[str, str] = {}
+        self._undeletable = undeletable
+        monkeypatch.setattr(keyring, "get_password", self._get)
+        monkeypatch.setattr(keyring, "set_password", self._set)
+        monkeypatch.setattr(keyring, "delete_password", self._delete)
+
+    def _get(self, _service: str, name: str) -> str | None:
+        return self.items.get(name)
+
+    def _set(self, _service: str, name: str, value: str) -> None:
+        self.items[name] = value
+
+    def _delete(self, _service: str, name: str) -> None:
+        import keyring.errors
+
+        if name in self._undeletable or name not in self.items:
+            raise keyring.errors.PasswordDeleteError("Can't delete password in keychain")
+        del self.items[name]
+
+
 def test_keychain_delete_of_a_missing_secret_is_not_found(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import keyring.errors
     from sevn.secrets.backends import KeychainBackend
     from sevn.secrets.errors import SecretNotFound
 
-    _keychain_fails(monkeypatch, keyring.errors.PasswordDeleteError("not found"))
+    _Keychain(monkeypatch, set())
     with pytest.raises(SecretNotFound):
         KeychainBackend(service=f"sevn-test-{secrets.token_hex(4)}").delete("provider/openai")
+
+
+def test_keychain_delete_that_leaves_the_secret_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from sevn.secrets.backends import KeychainBackend
+    from sevn.secrets.errors import SecretsUnavailable
+
+    _Keychain(monkeypatch, {"provider/openai"})
+    backend = KeychainBackend(service=f"sevn-test-{secrets.token_hex(4)}")
+    value = secrets.token_urlsafe(16)
+    backend.set("provider/openai", value)
+    with pytest.raises(SecretsUnavailable) as caught:
+        backend.delete("provider/openai")
+    assert caught.value.code == "secrets_unavailable"
+    assert value not in str(caught.value)
+    assert backend.get("provider/openai") == value
+    assert backend.names() == ["provider/openai"]
+
+
+def test_keychain_index_delete_that_fails_is_reported(monkeypatch: pytest.MonkeyPatch) -> None:
+    from sevn.secrets.backends import _KEYCHAIN_INDEX, KeychainBackend
+    from sevn.secrets.errors import SecretsUnavailable
+
+    _Keychain(monkeypatch, {_KEYCHAIN_INDEX})
+    backend = KeychainBackend(service=f"sevn-test-{secrets.token_hex(4)}")
+    backend.set("provider/openai", secrets.token_urlsafe(16))
+    with pytest.raises(SecretsUnavailable):
+        backend.delete("provider/openai")
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="keyring's macOS backend needs macOS")
+@pytest.mark.parametrize(
+    ("delete_status", "read_status", "expected"),
+    [
+        (-128, -128, "SecretsLocked"),
+        (-25300, -25300, "SecretNotFound"),
+        (-25293, 0, "SecretsUnavailable"),
+    ],
+    ids=["denied", "missing", "delete-fails-read-works"],
+)
+def test_keychain_delete_through_keyring_macos_backend(
+    monkeypatch: pytest.MonkeyPatch, delete_status: int, read_status: int, expected: str
+) -> None:
+    """Runs keyring's own error mapping, with its calls into the Security framework replaced."""
+    from keyring.backends import macOS
+    from keyring.backends.macOS import api
+    from sevn.secrets.backends import KeychainBackend
+    from sevn.secrets.errors import SecretNotFound, SecretsBackendError
+
+    def delete(*_args: object) -> None:
+        api.Error.raise_for_status(delete_status)
+
+    def find(*_args: object) -> str:
+        api.Error.raise_for_status(read_status)
+        return secrets.token_urlsafe(16)
+
+    monkeypatch.setattr(api, "delete_generic_password", delete)
+    monkeypatch.setattr(api, "find_generic_password", find)
+    monkeypatch.setattr("keyring.core._keyring_backend", macOS.Keyring())
+
+    with pytest.raises((SecretsBackendError, SecretNotFound)) as caught:
+        KeychainBackend(service=f"sevn-test-{secrets.token_hex(4)}").delete("provider/openai")
+    assert type(caught.value).__name__ == expected
 
 
 @pytest.mark.parametrize(
