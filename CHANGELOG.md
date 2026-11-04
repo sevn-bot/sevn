@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `sevn secret set` pins `secrets.backend = "secret-service"` when it stores the first secret in the keyring, so a later start with a locked keyring refuses instead of starting on a fresh age file. A failed `sevn secret migrate --to age-file` removes the `secrets.age` and age key it created. Secret Service calls check the collection's lock state first and answer `secrets_locked` instead of waiting on a desktop unlock prompt. The macOS keychain backend and raw `secretstorage` and D-Bus errors now answer `secrets_locked` or `secrets_unavailable` too, instead of `internal` errors or a traceback. `install.sh` passes `DEBIAN_FRONTEND=noninteractive` to `apt-get` through `sudo`, and the release workflow no longer restores the uv cache.
 
+- `messages.send` replies once the job is queued instead of holding the response while the turn runs, so a busy host answers sooner and the session can read its next frame.
 - mergeCraft reviews run mergeCraft main at 9e4318a, so inline review comments are posted again instead of dropped.
 - mergeCraft reports incomplete diff coverage as a warning for now, because it can miss reads the reviewer did make and fail the review job.
 
