@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 - mergeCraft reviews run mergeCraft main at 9e4318a, so inline review comments are posted again instead of dropped.
+- mergeCraft reports incomplete diff coverage as a warning for now, because it can miss reads the reviewer did make and fail the review job.
 
 - Close shell option-abbreviation approval bypasses, redact tool results before model history, serialize message publication, support confined Git commands in linked worktrees, refresh resolved routing chips and sandbox warnings, coalesce event replay, and retain confirmed sandbox settings after failed updates.
 
