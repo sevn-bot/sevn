@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- `messages.send` replies once the job is queued instead of holding the response while the turn runs, so a busy host answers sooner and the session can read its next frame.
 - mergeCraft reviews run mergeCraft main at 9e4318a, so inline review comments are posted again instead of dropped.
 - mergeCraft reports incomplete diff coverage as a warning for now, because it can miss reads the reviewer did make and fail the review job.
 
