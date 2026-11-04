@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- `messages.send` replies once the job is queued instead of holding the response while the turn runs, so a busy host answers sooner and the session can read its next frame.
+
 - Close shell option-abbreviation approval bypasses, redact tool results before model history, serialize message publication, support confined Git commands in linked worktrees, refresh resolved routing chips and sandbox warnings, coalesce event replay, and retain confirmed sandbox settings after failed updates.
 
 - Fix lane cancellation, crash retry message identity, purge ordering, reroute labels, connection retries, compaction fallback, and confined Git worktree creation.

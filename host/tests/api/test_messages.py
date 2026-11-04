@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-from fakes.models import function_model
+from fakes.models import TurnGate, function_model
 from support.chat import (
     assert_prefixed_id,
     connected,
@@ -76,6 +76,29 @@ async def test_send_creates_job_and_agent_when_none_open(
         assert [row["id"] for row in agents] == [agent_id]
         stored = await host.outbox.since(0)
         assert any(row.type == "job.queued" for row in stored)
+
+
+async def test_send_replies_without_waiting_for_the_turn(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sevn.runtime import worker as worker_module
+    from sevn.runtime.models import use_model
+    from sevn.runtime.worker import bind
+
+    load_modules("sevn.api.bots", "sevn.api.messages")
+    gate = TurnGate()
+    use_model(function_model([{"kind": "text", "text": "ok"}], gate=gate))
+    # settle gives up after this many loop turns. Out of reach, a reply held on it times out.
+    monkeypatch.setattr(worker_module, "_SETTLE_TURNS", 10**9)
+    async with connected(tmp_path, monkeypatch) as (host, client):
+        bind(host.hub)
+        bot = await _create_bot(client)
+        body = await _send(client, bot["id"], "hi")
+        await gate.until(lambda: gate.active == 1, timeout_s=10)
+        jobs = fetch_all(tmp_path, "SELECT status FROM jobs")
+        assert [row["status"] for row in jobs] == ["started"]
+        gate.release_all.set()
+        await _wait_done(tmp_path, str(body["job_id"]))
 
 
 async def test_send_follow_up_goes_to_latest_open_agent(
