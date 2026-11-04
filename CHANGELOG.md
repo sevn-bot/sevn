@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Paired devices with the `member` scope currently get owner rights, including sending messages, answering approvals and administering devices. The stored scope stays `member`, so a later release can narrow it without re-pairing; `read_only` devices are refused every owner-only method, an `owner` ticket needs a loopback owner session, and the last owner device cannot be revoked remotely.
 
+- `messages.send` replies once the job is queued instead of holding the response while the turn runs, so a busy host answers sooner and the session can read its next frame.
+- mergeCraft reviews run mergeCraft main at 9e4318a, so inline review comments are posted again instead of dropped.
+- mergeCraft reports incomplete diff coverage as a warning for now, because it can miss reads the reviewer did make and fail the review job.
+
 - Close shell option-abbreviation approval bypasses, redact tool results before model history, serialize message publication, support confined Git commands in linked worktrees, refresh resolved routing chips and sandbox warnings, coalesce event replay, and retain confirmed sandbox settings after failed updates.
 
 - Fix lane cancellation, crash retry message identity, purge ordering, reroute labels, connection retries, compaction fallback, and confined Git worktree creation.
