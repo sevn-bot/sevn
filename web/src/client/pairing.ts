@@ -17,6 +17,7 @@ import {
   checkDirectUrl,
   type DeviceScope,
   type HostProfile,
+  isLoopbackHost,
   type ProfileStore,
   saveProfile,
 } from "./profiles.ts";
@@ -158,6 +159,7 @@ function exchange(url: string, complete: Complete): Promise<PairedFrame> {
   const origin = originOf(url);
   return new Promise<PairedFrame>((resolve, reject) => {
     let settled = false;
+    let challenged = false;
     let socket: WebSocket | null = null;
     const onViolation = (event: Event): void => {
       // Browsers that do not throw from the constructor report the connect-src block here.
@@ -232,6 +234,17 @@ function exchange(url: string, complete: Complete): Promise<PairedFrame> {
     });
     opened.addEventListener("message", (event) => {
       const frame = parseFrame(event);
+      if (frame?.t === "challenge") {
+        challenged = true;
+      }
+      if (frame?.t === "welcome") {
+        finish(
+          new Error(
+            "This browser is already logged in locally; open the host’s home page",
+          ),
+        );
+        return;
+      }
       if (frame === null || frame.t !== "paired") {
         return;
       }
@@ -243,7 +256,13 @@ function exchange(url: string, complete: Complete): Promise<PairedFrame> {
       finish(
         code === 4001
           ? new Unauthorized("the host refused this pairing code")
-          : new Error("pairing failed: the connection closed"),
+          : code === 1002 &&
+              !challenged &&
+              isLoopbackHost(new URL(url).hostname)
+            ? new Error(
+                "This host requires a local login: run sevn serve --open, or pair using its remote address",
+              )
+            : new Error("pairing failed: the connection closed"),
       );
     });
   });

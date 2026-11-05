@@ -42,7 +42,7 @@ type Profiles = {
     store: ProfileStore,
     hostId: string,
     options: { revoke: (profile: HostProfile) => Promise<void> },
-  ) => Promise<void>;
+  ) => Promise<string | undefined>;
 };
 
 type Keys = { generateDeviceKey: () => Promise<CryptoKeyPair> };
@@ -375,7 +375,7 @@ test("a DNS hostname beginning with 127 must verify the host challenge", async (
   }
 });
 
-test("a refused device revoke preserves the profile and original RPC error", async () => {
+test("a last-owner revoke refusal preserves the profile and original RPC error", async () => {
   const profiles = await load<Profiles>(profilesPath);
   const { ProtocolError } = await load<{
     ProtocolError: new (code: string, message: string) => Error;
@@ -386,7 +386,10 @@ test("a refused device revoke preserves the profile and original RPC error", asy
     direct_url: "wss://readonly.example/ws",
   });
   await profiles.saveProfile(store, profile);
-  const refused = new ProtocolError("forbidden", "owner scope required");
+  const refused = new ProtocolError(
+    "last_owner",
+    "cannot revoke the last owner",
+  );
   await expect(
     profiles.deleteProfile(store, profile.host_id, {
       revoke: () => Promise.reject(refused),
@@ -500,3 +503,26 @@ test("revocation is terminal and does not start another device handshake", async
     host.stop();
   }
 });
+
+test.each(["forbidden", "not_found"])(
+  "a %s revoke refusal allows local removal with a warning",
+  async (code) => {
+    const profiles = await load<Profiles>(profilesPath);
+    const { ProtocolError } = await load<{
+      ProtocolError: new (code: string, message: string) => Error;
+    }>(errorsPath);
+    const store = profiles.memoryProfileStore();
+    const { profile } = await makeProfile({
+      host_id: "host_readonly",
+      direct_url: "wss://readonly.example/ws",
+      scope: "read_only",
+    });
+    await profiles.saveProfile(store, profile);
+    const warning = await profiles.deleteProfile(store, profile.host_id, {
+      revoke: () => Promise.reject(new ProtocolError(code, "revoke refused")),
+    });
+    expect(warning).toContain("forgotten locally");
+    expect(warning).toContain("revoke refused");
+    expect(await store.get(profile.host_id)).toBeUndefined();
+  },
+);

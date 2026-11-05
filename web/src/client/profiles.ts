@@ -261,26 +261,32 @@ export function listProfiles(store: ProfileStore): Promise<HostProfile[]> {
 /**
  * Delete a profile, revoking this device on its host first (`devices.revoke`). An
  * unreachable host does not keep the profile: the revoke is attempted once, then the
- * profile is deleted. An explicit protocol refusal preserves the profile and key.
+ * profile is deleted. A last-owner refusal preserves the profile and key; other
+ * refusals allow local removal and return a warning for the caller to display.
  */
 export async function deleteProfile(
   store: ProfileStore,
   hostId: string,
   options: { revoke: (profile: HostProfile) => Promise<void> },
-): Promise<void> {
+): Promise<string | undefined> {
   const profile = await store.get(hostId);
   if (profile === undefined) {
     return;
   }
+  let warning: string | undefined;
   try {
     await options.revoke(profile);
   } catch (error) {
     if (error instanceof ProtocolError) {
-      throw error;
+      if (error.code === "last_owner") {
+        throw error;
+      }
+      warning = `Host forgotten locally, but remote revocation was refused: ${error.message}`;
     }
     // The host is unreachable; the owner can still revoke from the host.
   }
   await store.delete(hostId);
+  return warning;
 }
 
 type Address = { v6: boolean; bytes: number[] };

@@ -82,7 +82,7 @@ export type MultiHost = {
   /** Paired profiles other than the serving host. */
   remotes: HostProfile[];
   views: HostView[];
-  forget: (hostId: string) => Promise<void>;
+  forget: (hostId: string) => Promise<string | undefined>;
   /** A paired host's client, once its connection has been up at least once; else null. */
   client: (hostId: string) => HostClient | null;
 };
@@ -222,8 +222,8 @@ export function useMultiHost(
   }, [multi, localConnected, localId]);
 
   const forget = useCallback(
-    async (hostId: string): Promise<void> => {
-      await deleteProfile(profileStore(), hostId, {
+    async (hostId: string): Promise<string | undefined> => {
+      const warning = await deleteProfile(profileStore(), hostId, {
         revoke: async (profile) => {
           const hosts = hostsRef.current;
           if (hosts === null) {
@@ -235,6 +235,7 @@ export function useMultiHost(
         },
       });
       reload();
+      return warning;
     },
     [reload],
   );

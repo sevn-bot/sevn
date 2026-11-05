@@ -124,57 +124,59 @@ test("parsePairUri reads host, fingerprint, ticket and direct URL", async () => 
   );
 });
 
-test("pairing sends pair.complete after hello and stores a non-extractable profile", async () => {
-  const { pairDevice } = await load<Pairing>(pairingPath);
-  const key = await newHostKey();
-  const url = "wss://linux.tailnet.ts.net/ws";
-  const host = await pairingHost(url, () => ({
-    t: "paired",
-    device_id: "dev_new_phone",
-    host_id: "host_linux",
-    host_pubkey: key.pubkey,
-    scope: "member",
-  }));
-  const store = await memoryStore();
-  try {
-    const profile = await pairDevice({
-      url,
-      ticket: "ABCD2345",
-      deviceName: "Phone",
-      platform: "web",
-      store,
-      expectedFp: key.fp,
-    });
-    expect(host.frames.map((frame) => frame.t)).toEqual([
-      "hello",
-      "pair.complete",
-    ]);
-    expect(host.frames[0]?.origin).toBe("wss://linux.tailnet.ts.net");
-    const complete = host.frames[1] ?? {};
-    expect(complete.ticket).toBe("ABCD2345");
-    expect(complete.device_name).toBe("Phone");
-    expect(complete.platform).toBe("web");
-    const pubkey = String(complete.device_pubkey_ed25519);
-    expect(unb64u(pubkey).length).toBe(32);
-    expect(profile).toMatchObject({
-      host_id: "host_linux",
+test.each(["wss://linux.tailnet.ts.net/ws", "ws://127.0.0.1:8787/ws"])(
+  "pairing at %s stores a non-extractable profile (including Docker)",
+  async (url) => {
+    const { pairDevice } = await load<Pairing>(pairingPath);
+    const key = await newHostKey();
+    const host = await pairingHost(url, () => ({
+      t: "paired",
       device_id: "dev_new_phone",
-      scope: "member",
-      transport: "direct",
-      direct_url: url,
+      host_id: "host_linux",
       host_pubkey: key.pubkey,
-      host_pubkey_fp: await fingerprintOf(unb64u(key.pubkey)),
-      allow_plain_ws: false,
-    });
-    expect(profile.device_key.extractable).toBe(false);
-    await expect(
-      crypto.subtle.exportKey("pkcs8", profile.device_key),
-    ).rejects.toThrow();
-    expect(await store.get("host_linux")).toEqual(profile);
-  } finally {
-    host.stop();
-  }
-});
+      scope: "member",
+    }));
+    const store = await memoryStore();
+    try {
+      const profile = await pairDevice({
+        url,
+        ticket: "ABCD2345",
+        deviceName: "Phone",
+        platform: "web",
+        store,
+        expectedFp: key.fp,
+      });
+      expect(host.frames.map((frame) => frame.t)).toEqual([
+        "hello",
+        "pair.complete",
+      ]);
+      expect(host.frames[0]?.origin).toBe(new URL(url).origin);
+      const complete = host.frames[1] ?? {};
+      expect(complete.ticket).toBe("ABCD2345");
+      expect(complete.device_name).toBe("Phone");
+      expect(complete.platform).toBe("web");
+      const pubkey = String(complete.device_pubkey_ed25519);
+      expect(unb64u(pubkey).length).toBe(32);
+      expect(profile).toMatchObject({
+        host_id: "host_linux",
+        device_id: "dev_new_phone",
+        scope: "member",
+        transport: "direct",
+        direct_url: url,
+        host_pubkey: key.pubkey,
+        host_pubkey_fp: await fingerprintOf(unb64u(key.pubkey)),
+        allow_plain_ws: false,
+      });
+      expect(profile.device_key.extractable).toBe(false);
+      await expect(
+        crypto.subtle.exportKey("pkcs8", profile.device_key),
+      ).rejects.toThrow();
+      expect(await store.get("host_linux")).toEqual(profile);
+    } finally {
+      host.stop();
+    }
+  },
+);
 
 test("a paired host whose key does not match the QR fingerprint is refused", async () => {
   const { pairDevice } = await load<Pairing>(pairingPath);
@@ -341,6 +343,41 @@ test.each(["origin", "key"])(
       expect(await store.list()).toEqual([profile]);
     } finally {
       host.stop();
+    }
+  },
+);
+
+test.each([
+  "ws://localhost:8787/ws",
+  "ws://127.0.0.1/ws",
+  "ws://[::1]/ws",
+  "wss://[::ffff:127.0.0.1]/ws",
+])(
+  "a native loopback pairing refusal at %s explains how to log in",
+  async (url) => {
+    const mock = await stubSockets();
+    const server = new mock.Server(url);
+    server.on("connection", (socket) => {
+      socket.on("message", (data) => {
+        if ((JSON.parse(String(data)) as Frame).t === "pair.complete") {
+          socket.close({ code: 1002, reason: "protocol error" });
+        }
+      });
+    });
+    try {
+      const pairing = await load<Pairing>(pairingPath);
+      const store = await memoryStore();
+      await expect(
+        pairing.pairDevice({
+          url,
+          ticket: "code",
+          deviceName: "Browser",
+          store,
+        }),
+      ).rejects.toThrow("sevn serve --open");
+      expect(await store.list()).toEqual([]);
+    } finally {
+      server.stop();
     }
   },
 );

@@ -315,13 +315,18 @@ function OwnerApp() {
               }}
               onForget={(hostId) => {
                 setForgetError(null);
-                void multiHost.forget(hostId).catch((error: unknown) => {
-                  setForgetError(
-                    error instanceof Error
-                      ? error.message
-                      : "Could not forget host",
-                  );
-                });
+                void multiHost
+                  .forget(hostId)
+                  .then((warning) => {
+                    setForgetError(warning ?? null);
+                  })
+                  .catch((error: unknown) => {
+                    setForgetError(
+                      error instanceof Error
+                        ? error.message
+                        : "Could not forget host",
+                    );
+                  });
               }}
             />
           </aside>

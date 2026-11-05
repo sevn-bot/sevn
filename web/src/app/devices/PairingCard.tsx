@@ -44,8 +44,10 @@ export function PairingCard() {
           <select
             className="mt-1 block rounded bg-zinc-900 px-2 py-1"
             value={scope}
+            disabled={starting}
             onChange={(event) => {
               setScope(toScope(event.target.value));
+              setTicket(null);
             }}
           >
             {SCOPES.map((option) => (

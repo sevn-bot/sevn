@@ -1,6 +1,7 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import type { DeviceRecord } from "../../client/connection.ts";
+import { ProtocolError } from "../../client/errors.ts";
 import { createQueryClient, useCall } from "../../client/hooks.ts";
 import { call } from "../../client/index.ts";
 
@@ -21,6 +22,9 @@ function DevicesListView() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const devices = list.data?.devices ?? [];
+  const selfKnown =
+    self.isSuccess ||
+    (self.error instanceof ProtocolError && self.error.code === "not_found");
 
   async function revoke(device: DeviceRecord): Promise<void> {
     setBusy(device.id);
@@ -67,7 +71,7 @@ function DevicesListView() {
               ) : (
                 <button
                   type="button"
-                  disabled={busy === device.id}
+                  disabled={!selfKnown || busy === device.id}
                   className="ml-auto rounded border border-red-800 px-2 py-0.5 text-red-200 disabled:opacity-40"
                   onClick={() => {
                     void revoke(device);

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Keep pairing scopes consistent with displayed tickets, disable device revocation until the browser's identity is known, and let read-only profiles be forgotten with a remote-revocation warning. Native loopback pairing refusals now explain how to log in, while Docker pairing through localhost remains supported.
+
 - Fix direct-host review findings: verify QR host identities and loopback addresses, prevent profile collisions, reset pairing options between hosts, stop retrying refused or revoked sessions, preserve profiles when revocation is refused, retain fleet data during refresh, honor pairing ticket names, and accept IPv4-mapped loopback peers. Make two-host browser tests verify server ownership before using an allocated port.
 
 - Pair devices and reach several hosts over a tailnet without the edge. `sevn pair` or Settings → Devices issues a one-time ticket (QR or 8-character code, 10-minute TTL, stored only as SHA-256) with a scope; a paired device keeps its own non-extractable Ed25519 key per host and, from outside the host, must answer a host-signed challenge over a fresh nonce and the origin it dialled. A bad signature, an unknown or revoked device, an origin outside `http.allowed_hosts`, or a reused nonce closes with 4001; revoking a device (`devices.revoke` or `sevn devices revoke`) closes its live sessions with 4003 within a second. See `docs/remote-direct.md` for Tailscale `serve`, Headscale, NetBird, ZeroTier, WireGuard and containers.

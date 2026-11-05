@@ -1,6 +1,11 @@
 import { createElement } from "react";
 import { expect, test } from "vitest";
-import { requestParams, startHarness } from "../chat/host.ts";
+import {
+  noReply,
+  requestParams,
+  rpcError,
+  startHarness,
+} from "../chat/host.ts";
 import { loadComponent } from "../support/components.ts";
 
 /**
@@ -57,6 +62,13 @@ test("the pairing card starts a ticket with the chosen scope and shows QR, code 
       "K7M2Q9XR",
     );
     await testing.screen.findByText(/^Expires in (10:00|9:5\d)$/);
+    await testing.screen.findByText(/An owner device/);
+    testing.fireEvent.change(scope, { target: { value: "member" } });
+    expect(testing.screen.queryByTestId("pairing-code")).toBeNull();
+    expect(
+      testing.screen.queryByRole("img", { name: "Pairing QR code" }),
+    ).toBeNull();
+    expect(testing.screen.queryByText(/An owner device/)).toBeNull();
   } finally {
     harness.stop();
     testing.cleanup();
@@ -107,6 +119,7 @@ test("the devices list shows each device and revokes a live one", async () => {
         },
       ],
     },
+    "devices.self": rpcError("not_found", "this session has no paired device"),
     "devices.revoke": {
       id: "dev_phone",
       name: "Phone",
@@ -131,10 +144,11 @@ test("the devices list shows each device and revokes a live one", async () => {
         name: "Revoke",
       }),
     ).toBeNull();
-    testing
+    const revoke = testing
       .within(phone as HTMLElement)
-      .getByRole("button", { name: "Revoke" })
-      .click();
+      .getByRole("button", { name: "Revoke" }) as HTMLButtonElement;
+    await testing.waitFor(() => expect(revoke.disabled).toBe(false));
+    revoke.click();
     await testing.waitFor(() => {
       expect(requestParams(harness.requests, "devices.revoke")[0]?.id).toBe(
         "dev_phone",
@@ -173,6 +187,64 @@ test("the devices list offers no Revoke for this browser's own device", async ()
     });
     expect(buttons).toHaveLength(1);
     expect(buttons[0]?.closest("li")?.textContent).toContain("Phone");
+  } finally {
+    harness.stop();
+    testing.cleanup();
+  }
+});
+
+test.each([noReply, rpcError("internal", "identity lookup failed")])(
+  "revoke stays disabled while this device is unknown",
+  async (selfReply) => {
+    const harness = await startHarness({
+      "devices.list": {
+        devices: [
+          {
+            id: "dev_self",
+            name: "This browser",
+            platform: "web",
+            scope: "owner",
+            created_at: new Date().toISOString(),
+            last_seen: null,
+            revoked_at: null,
+          },
+        ],
+      },
+      "devices.self": selfReply,
+    });
+    const testing = await import("@testing-library/react");
+    try {
+      const DevicesList = await loadComponent(listPath, "DevicesList");
+      testing.render(createElement(DevicesList));
+      const button = (await testing.screen.findByRole("button", {
+        name: "Revoke",
+      })) as HTMLButtonElement;
+      expect(button.disabled).toBe(true);
+      button.click();
+      expect(requestParams(harness.requests, "devices.revoke")).toEqual([]);
+    } finally {
+      harness.stop();
+      testing.cleanup();
+    }
+  },
+);
+
+test("scope cannot change while a pairing ticket is being created", async () => {
+  const harness = await startHarness({ "pairing.start": noReply });
+  const testing = await import("@testing-library/react");
+  try {
+    const PairingCard = await loadComponent(cardPath, "PairingCard");
+    testing.render(createElement(PairingCard));
+    const scope = (await testing.screen.findByLabelText(
+      "Scope",
+    )) as HTMLSelectElement;
+    testing.fireEvent.change(scope, { target: { value: "owner" } });
+    (
+      await testing.screen.findByRole("button", { name: "Start pairing" })
+    ).click();
+    await testing.waitFor(() => expect(scope.disabled).toBe(true));
+    expect(scope.value).toBe("owner");
+    await testing.screen.findByText(/An owner device/);
   } finally {
     harness.stop();
     testing.cleanup();

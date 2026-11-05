@@ -109,9 +109,10 @@ Approvals view. Say the Mac serves the web app and you want to add `linux.tailne
   `wss://linux.tailnet.ts.net/ws` and the short code.
 
 **Forget** in the sidebar removes a paired host. It revokes this device on that host first when
-the host answers. If the host refuses revocation (for example, this is its last owner device),
-the app shows the refusal and keeps the profile and key. If the host cannot be reached, it
-removes the local profile; revoke the device on the host when it is available again.
+the host answers. If this is its last owner device, the app shows the refusal and keeps the
+profile and key. Other refusals (including a read-only device lacking permission to revoke)
+allow local removal with a warning that remote revocation failed. If the host cannot be
+reached, it removes the local profile; revoke the device on the host when it is available again.
 
 ## Headscale
 
