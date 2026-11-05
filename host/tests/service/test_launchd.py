@@ -289,3 +289,25 @@ def test_unchanged_install_restarts_only_a_running_service(
     assert bool(kicks) is restarted, mac_host.runner.argvs()
     if not restarted:
         assert mac_host.runner.find("launchctl", "kickstart") == []
+
+
+@pytest.mark.parametrize("returncode", [1, 5])
+def test_uninstall_preserves_definition_when_stop_fails(mac_host: MacHost, returncode: int) -> None:
+    assert invoke(["service", "install"]).exit_code == 0
+    original = mac_host.plist_path.read_bytes()
+    mac_host.runner.calls.clear()
+    mac_host.runner.on("launchctl", "bootout", returncode=returncode, stderr="stop failed")
+
+    result = invoke(["service", "uninstall"])
+
+    assert result.exit_code == 1, combined(result)
+    assert "stop failed" in combined(result)
+    assert mac_host.plist_path.read_bytes() == original
+
+
+def test_uninstall_removes_already_unloaded_agent(mac_host: MacHost) -> None:
+    assert invoke(["service", "install"]).exit_code == 0
+    mac_host.runner.on("launchctl", "bootout", returncode=3, stderr="No such process")
+    result = invoke(["service", "uninstall"])
+    assert result.exit_code == 0, combined(result)
+    assert not mac_host.plist_path.exists()

@@ -366,3 +366,27 @@ def test_unchanged_install_restarts_only_a_running_service(
     if not restarted:
         assert linux_host.runner.find("systemctl", "--user", "restart") == []
         assert linux_host.runner.find("systemctl", "--user", "start") == []
+
+
+@pytest.mark.parametrize("returncode", [1, 5])
+def test_uninstall_preserves_definition_when_stop_fails(
+    linux_host: LinuxHost, returncode: int
+) -> None:
+    assert invoke(["service", "install"]).exit_code == 0
+    original = linux_host.unit_path.read_bytes()
+    linux_host.runner.calls.clear()
+    linux_host.runner.on(
+        "systemctl",
+        "--user",
+        "disable",
+        "--now",
+        _UNIT,
+        returncode=returncode,
+        stderr="stop failed",
+    )
+
+    result = invoke(["service", "uninstall"])
+
+    assert result.exit_code == 1, combined(result)
+    assert "stop failed" in combined(result)
+    assert linux_host.unit_path.read_bytes() == original

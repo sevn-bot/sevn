@@ -107,8 +107,12 @@ class LaunchdService:
     def uninstall(self) -> UninstallResult:
         if not os.path.lexists(self.plist):
             return UninstallResult(path=self.plist, removed=False)
-        # A failure here means the agent was not loaded, which is fine.
-        execute(["launchctl", "bootout", self.target], timeout=_TIMEOUT)
+        argv = ["launchctl", "bootout", self.target]
+        result = execute(argv, timeout=_TIMEOUT)
+        # launchctl uses ESRCH (3) when the agent is already unloaded. Other
+        # failures must preserve the plist so the user can retry the uninstall.
+        if not result.ok and result.returncode != 3:
+            raise command_failure(argv, result.stderr, result.returncode)
         self.plist.unlink(missing_ok=True)
         return UninstallResult(path=self.plist, removed=True)
 

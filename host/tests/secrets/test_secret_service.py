@@ -1047,3 +1047,34 @@ def test_tests_never_see_the_real_session_bus() -> None:
 @pytest.mark.session_bus
 def test_session_bus_marker_keeps_the_real_variable() -> None:
     assert os.environ.get("DBUS_SESSION_BUS_ADDRESS") == _BUS_AT_IMPORT
+
+
+@pytest.mark.parametrize("corrupt", ["ciphertext", "identity"])
+@pytest.mark.parametrize("source", ["age-file", "secret-service"])
+def test_migrate_reports_corrupt_age_without_traceback_or_changes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    fake_keyring: FakeKeyring,
+    corrupt: str,
+    source: str,
+) -> None:
+    home = _home(tmp_path, monkeypatch, source)
+    _probe_returns(monkeypatch, "unlocked")
+    _seed_age_home(home)
+    backend = _age(home)
+    secrets_file, identity_file = backend.files
+    damaged = secrets_file if corrupt == "ciphertext" else identity_file
+    damaged.write_text("invalid age data")
+    before = {
+        path: path.read_bytes() for path in (secrets_file, identity_file, home / "config.toml")
+    }
+    target = "secret-service" if source == "age-file" else "age-file"
+
+    result = _invoke(["secret", "migrate", "--to", target])
+
+    assert result.exit_code == 1, _out(result)
+    assert "ValueError" in _out(result)
+    assert "invalid age data" not in _out(result)
+    assert "Traceback" not in _out(result)
+    assert isinstance(result.exception, SystemExit)
+    assert {path: path.read_bytes() for path in before} == before

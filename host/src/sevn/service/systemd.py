@@ -141,14 +141,13 @@ class SystemdService:
     def uninstall(self) -> UninstallResult:
         if not self._installed():
             return UninstallResult(path=self.unit, removed=False)
-        warnings: list[str] = []
         argv = ["systemctl", "--user", "disable", "--now", UNIT_NAME]
         result = execute(argv, timeout=_TIMEOUT)
         if not result.ok:
-            warnings.append(command_failure(argv, result.stderr, result.returncode).message)
+            raise command_failure(argv, result.stderr, result.returncode)
         self.unit.unlink(missing_ok=True)
         self._systemctl("daemon-reload")
-        return UninstallResult(path=self.unit, removed=True, warnings=tuple(warnings))
+        return UninstallResult(path=self.unit, removed=True)
 
     def status(self) -> ServiceStatus:
         if not self._installed():
