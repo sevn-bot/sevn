@@ -22,6 +22,10 @@ type Handler = Callable[["Ctx", BaseModel], Awaitable[BaseModel]]
 class Ctx(Protocol):
     scope: Scope
     hub: Hub
+    # Plan 0055: a loopback owner session (token or cookie), and the paired device a
+    # non-loopback session authenticated as (``None`` for loopback sessions).
+    loopback: bool
+    device_id: str | None
 
     def deliver(self, frame: str) -> None: ...
 

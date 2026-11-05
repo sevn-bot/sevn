@@ -38,6 +38,7 @@ from support.chat import (
     poll_rows,
     request,
 )
+from support.migrations import script_head
 from support.repo import repo_root
 from support.spans import (
     attribute_text,
@@ -615,7 +616,8 @@ def test_migrations_single_head() -> None:
     )
     assert completed.returncode == 0, completed.stderr
     lines = [line for line in completed.stdout.splitlines() if line.strip()]
-    assert lines == [f"{_HEAD} (head)"], completed.stdout
+    # K-MIG: the graph's one head, not a literal id the next migration would break.
+    assert lines == [f"{script_head()} (head)"], completed.stdout
 
 
 def test_migration_file_chains_from_the_previous_head() -> None:
@@ -683,4 +685,4 @@ def test_upgrade_from_previous_head(tmp_path: Path) -> None:
     assert "trace_parent" in columns
     assert columns["trace_parent"][2].upper() == "TEXT"
     assert columns["trace_parent"][3] == 0
-    assert version == (_HEAD,)
+    assert version == (script_head(),)

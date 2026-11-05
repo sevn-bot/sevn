@@ -3,18 +3,23 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import hmac
+import ipaddress
 import os
 import secrets
+import socket
+import stat
 import webbrowser
-from collections.abc import AsyncGenerator, Awaitable, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable, Generator, Mapping
 from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
 from typing import cast
 
-from fastapi import FastAPI
+import uvicorn
+from fastapi import FastAPI, Request
 from starlette.datastructures import Headers
 from starlette.exceptions import HTTPException
 from starlette.responses import JSONResponse, PlainTextResponse, RedirectResponse, Response
@@ -24,17 +29,19 @@ from starlette.websockets import WebSocket
 
 import sevn.api.agents as agent_api
 import sevn.api.bots as bot_api
+import sevn.api.devices as device_api
 import sevn.api.fleet as fleet_api
 import sevn.api.memories as memory_api
 import sevn.api.messages as message_api
 import sevn.api.models as model_api
+import sevn.api.pairing as pairing_api
 import sevn.api.pending as pending_api
 import sevn.api.routines as routine_api
 import sevn.api.shares as share_api
 import sevn.sandbox.policy as sandbox_policy
 import sevn.system as system
-from sevn import __version__
-from sevn.config import Settings
+from sevn import __version__, control
+from sevn.config import HttpSettings, Settings
 from sevn.domain.agents import expire_agents
 from sevn.domain.errors import DomainError
 from sevn.domain.routines import run_due
@@ -97,6 +104,11 @@ _REGISTERED = (
     share_api.shares_create,
     share_api.shares_list,
     share_api.shares_revoke,
+    pairing_api.pairing_start,
+    device_api.devices_list,
+    device_api.devices_rename,
+    device_api.devices_revoke,
+    device_api.devices_self,
 )
 
 _ROUTINE_TICK_S = 30
@@ -107,6 +119,7 @@ CSP = (
 )
 _FORBIDDEN_ORIGIN = "forbidden origin"
 _FORBIDDEN_HOST = "forbidden host"
+_LOGIN_LOOPBACK_ONLY = "login is loopback only"
 _DEV_ORIGIN = "http://localhost:5173"
 _DEV_HOST = "localhost:5173"
 
@@ -173,7 +186,11 @@ def create_app(settings: Settings) -> ASGIApp:
         return {"status": "ok", "version": __version__, "host_id": hub.identity.host_id}
 
     @app.get("/auth/login")
-    async def login(token: str = "") -> Response:
+    async def login(request: Request, token: str = "") -> Response:
+        # Plan 0055 D4: only a loopback request may trade the token for a cookie. This runs
+        # after the Host and Origin guard and before the token is looked at.
+        if not _loopback_request(request.scope, request.headers, state.runtime.port):
+            return PlainTextResponse(_LOGIN_LOOPBACK_ONLY, status_code=403)
         if not check_credentials(token, state.token):
             return PlainTextResponse("unauthorized", status_code=401)
         response = RedirectResponse(url="/", status_code=303)
@@ -201,7 +218,7 @@ def create_app(settings: Settings) -> ASGIApp:
 
     dist = web_dist_path()
     if dist.is_dir():
-        app.mount("/", _Spa(directory=str(dist)), name="spa")
+        app.mount("/", _Spa(directory=str(dist), http=settings.http), name="spa")
     return app
 
 
@@ -298,6 +315,7 @@ async def _host_lifespan(app: ASGIApp) -> AsyncGenerator[None]:
     state.oplog = oplog
     await _retain(outbox, oplog)
     browser: asyncio.Task[None] | None = None
+    control_server: _ControlServer | None = None
     expiry: asyncio.Task[None] | None = None
     routines: asyncio.Task[None] | None = None
     worker: Worker | None = None
@@ -324,10 +342,13 @@ async def _host_lifespan(app: ASGIApp) -> AsyncGenerator[None]:
             state.runtime.port,
         )
         register("loopback/token", state.token)
+        control_server = await _ControlServer.start(app, paths)
         if state.runtime.open_browser:
             browser = asyncio.create_task(_open_browser(state))
         yield
     finally:
+        if control_server is not None:
+            await control_server.stop()
         retention.cancel()
         with suppress(asyncio.CancelledError):
             await retention
@@ -374,6 +395,8 @@ class OriginGuard:
             Headers(scope=scope),
             self._state.runtime.port,
             server=scope.get("server"),
+            http=self._state.settings.http,
+            control=from_control_socket(scope),
         )
         if message is None:
             await self._app(scope, receive, send)
@@ -386,8 +409,9 @@ class OriginGuard:
 
 
 class _Spa(StaticFiles):
-    def __init__(self, directory: str) -> None:
+    def __init__(self, directory: str, http: HttpSettings) -> None:
         super().__init__(directory=directory, html=True)
+        self._http = http
 
     async def get_response(self, path: str, scope: Scope) -> Response:
         try:
@@ -399,7 +423,7 @@ class _Spa(StaticFiles):
             response = await super().get_response("index.html", scope)
         if response.status_code == 404 and _client_route(path):
             response = await super().get_response("index.html", scope)
-        response.headers["Content-Security-Policy"] = CSP
+        response.headers["Content-Security-Policy"] = content_security_policy(self._http)
         # A share link carries its secret in the path; keep it out of Referer.
         response.headers["Referrer-Policy"] = "no-referrer"
         return response
@@ -411,21 +435,32 @@ def _client_route(path: str) -> bool:
     return "." not in name
 
 
-def refusal(headers: Headers, port: int, *, server: object = None) -> str | None:
+def refusal(
+    headers: Headers,
+    port: int,
+    *,
+    server: object = None,
+    http: HttpSettings | None = None,
+    control: bool = False,
+) -> str | None:
     """Return a 403 body, or ``None`` when the request may proceed.
 
-    Host is checked first. This function does not read tokens or cookies.
+    Host is checked first, then Origin (same-origin, or an exact ``http.allowed_origins``
+    entry). This function does not read tokens or cookies. A request on the unix control
+    socket skips the Host check: no browser can dial it, so there is no rebinding to stop.
     """
+    settings = http if http is not None else HttpSettings()
+    names = _allowed_hosts(port, settings)
     host = headers.get("host")
-    presented = host.strip() if host is not None else ""
-    if presented not in _allowed_hosts(port) and not _testclient_socket(presented, server):
+    presented = host.strip().lower() if host is not None else ""
+    if not control and presented not in names and not _testclient_socket(presented, server):
         return _FORBIDDEN_HOST
     origin = headers.get("origin")
     if origin is None or origin.strip() == "":
         return None
     origin = origin.strip()
-    names = _allowed_hosts(port)
     allowed = {f"http://{item}" for item in names} | {f"https://{item}" for item in names}
+    allowed.update(entry.strip() for entry in settings.allowed_origins if entry.strip())
     if os.environ.get("SEVN_DEV") == "1":
         allowed.add(_DEV_ORIGIN)
     if origin not in allowed:
@@ -433,17 +468,35 @@ def refusal(headers: Headers, port: int, *, server: object = None) -> str | None
     return None
 
 
-def _allowed_hosts(port: int) -> set[str]:
+def _allowed_hosts(port: int, http: HttpSettings) -> set[str]:
+    """Host values the guard accepts: loopback with the bound port, plus the merged list."""
     hosts = {f"127.0.0.1:{port}", f"localhost:{port}", f"[::1]:{port}"}
     # Vite forwards the browser Host. D8 already allows this origin when SEVN_DEV=1.
     if os.environ.get("SEVN_DEV") == "1":
         hosts.add(_DEV_HOST)
-    extra = os.environ.get("SEVN_ALLOWED_HOSTS", "")
-    for item in extra.split(","):
-        cleaned = item.strip()
-        if cleaned:
-            hosts.add(cleaned)
+    hosts.update(http.merged_allowed_hosts())
     return hosts
+
+
+# Characters that would end a CSP source or directive. An entry holding one is dropped.
+_CSP_UNSAFE = frozenset(" \t\r\n;,'\"")
+
+
+def content_security_policy(http: HttpSettings) -> str:
+    """The SPA's CSP (plan 0055 D8).
+
+    ``connect-src`` is ``'self'``, then ``wss://`` for every allowed host, then
+    ``http.connect_src``. With neither set it is exactly ``CSP``.
+    """
+    sources = ["'self'"]
+    candidates = [f"wss://{name}" for name in http.merged_allowed_hosts()]
+    candidates.extend(entry.strip() for entry in http.connect_src)
+    for source in candidates:
+        if source and source not in sources and not _CSP_UNSAFE.intersection(source):
+            sources.append(source)
+    if len(sources) == 1:
+        return CSP
+    return CSP.replace("connect-src 'self'", "connect-src " + " ".join(sources), 1)
 
 
 def _testclient_socket(host: str, server: object) -> bool:
@@ -518,8 +571,190 @@ async def _serve_socket(websocket: WebSocket, state: AppState) -> None:
         token=state.token,
         queue_limit=state.settings.protocol.session_queue_limit,
         cookie=cookie,
+        loopback=_loopback_request(websocket.scope, websocket.headers, state.runtime.port),
+        allowed_hosts=sorted(_allowed_hosts(state.runtime.port, state.settings.http)),
     )
     await session.run()
+
+
+# Headers a reverse proxy (``tailscale serve`` among them) adds. Any one of them makes
+# the request non-loopback, even with an empty value. Only their presence is checked;
+# none of them is ever read, and never as identity (plan 0055 D4, W0.3).
+_PROXY_HEADERS = (
+    "forwarded",
+    "x-forwarded-for",
+    "x-forwarded-host",
+    "x-forwarded-proto",
+    "x-real-ip",
+    "tailscale-user-login",
+    "tailscale-user-name",
+    "tailscale-user-profile-pic",
+    "tailscale-headers-info",
+)
+
+
+def _proxied(headers: Headers) -> bool:
+    return any(name in headers for name in _PROXY_HEADERS)
+
+
+def _loopback_request(scope: Mapping[str, object], headers: Headers, port: int) -> bool:
+    """D4 for either listener: the control socket, or the TCP rule in ``is_loopback``."""
+    if from_control_socket(scope):
+        return not _proxied(headers)
+    client = scope.get("client")
+    peer: str | None = None
+    if isinstance(client, tuple | list):
+        items = cast("tuple[object, ...] | list[object]", client)
+        if items and isinstance(items[0], str):
+            peer = items[0]
+    return is_loopback(headers, peer, port)
+
+
+def is_loopback(headers: Headers, peer: str | None, port: int) -> bool:
+    """Whether a request is a loopback owner request (plan 0055 D4).
+
+    True only when the peer address is loopback, ``Host`` names ``127.0.0.1``,
+    ``localhost`` or ``[::1]`` with the bound ``port``, and no proxy header is present.
+    ``tailscale serve`` connects from 127.0.0.1, so the proxy headers decide that case.
+    """
+    if peer is None:
+        return False
+    try:
+        address = ipaddress.ip_address(peer)
+    except ValueError:
+        return False
+    if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped is not None:
+        address = address.ipv4_mapped
+    if not address.is_loopback:
+        return False
+    host = headers.get("host")
+    if host is None:
+        return False
+    local = {f"127.0.0.1:{port}", f"localhost:{port}", f"[::1]:{port}"}
+    if host.strip().lower() not in local:
+        return False
+    return not _proxied(headers)
+
+
+# Set on the ASGI scope by ``_ControlListener`` only. Uvicorn builds every TCP scope itself,
+# so a client cannot add this key; nothing else in the host sets it.
+_CONTROL_SCOPE_KEY = "sevn.control"
+
+
+def from_control_socket(scope: Mapping[str, object]) -> bool:
+    """Whether the request arrived on the host's unix control socket."""
+    return scope.get(_CONTROL_SCOPE_KEY) is True
+
+
+class _ControlListener:
+    """The app as served on the control socket: it marks each request as such."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self._app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] in {"http", "websocket"}:
+            scope = {**scope, _CONTROL_SCOPE_KEY: True}
+        await self._app(scope, receive, send)
+
+
+class _QuietServer(uvicorn.Server):
+    """The main server owns the process signals; this one never touches them."""
+
+    @contextlib.contextmanager
+    def capture_signals(self) -> Generator[None]:
+        yield
+
+
+class _ControlServer:
+    """The app on ``<home>/run/control.sock`` (0600), next to the TCP listener (WV F1-F2).
+
+    It shares the app (state, hub) and runs no lifespan of its own. Only connections
+    on it can be loopback without the TCP rule's peer and Host checks.
+    """
+
+    def __init__(
+        self, server: uvicorn.Server, task: asyncio.Task[None], path: Path, run: Path
+    ) -> None:
+        self._server = server
+        self._task = task
+        self._path = path
+        self._run = run
+
+    @classmethod
+    async def start(cls, app: ASGIApp, paths: Paths) -> _ControlServer | None:
+        try:
+            path = await asyncio.to_thread(control.server_path, paths.home, paths.run)
+            sock = await asyncio.to_thread(_bind_control, path, paths.run)
+        except (OSError, control.ControlPathError) as exc:
+            logger.error("control socket unavailable: {}", exc)
+            return None
+        config = uvicorn.Config(
+            _ControlListener(app),
+            lifespan="off",
+            log_config=None,
+            access_log=False,
+            proxy_headers=False,
+            timeout_graceful_shutdown=2,
+        )
+        server = _QuietServer(config)
+        task = asyncio.create_task(server.serve(sockets=[sock]))
+        return cls(server, task, path, paths.run)
+
+    async def stop(self) -> None:
+        self._server.should_exit = True
+        try:
+            await asyncio.wait_for(asyncio.shield(self._task), 5)
+        except TimeoutError:
+            self._task.cancel()
+        except Exception:  # noqa: BLE001 — shutdown must still remove the socket
+            logger.exception("control socket server failed")
+        with suppress(asyncio.CancelledError, Exception):
+            await self._task
+        await asyncio.to_thread(_remove_control, self._path, self._run)
+
+
+def _bind_control(path: Path, run: Path) -> socket.socket:
+    """Bind the unix socket 0600; replace only a stale socket, never another file.
+
+    ``run`` holds the token and the pointer and is made 0700 here too, so the socket is
+    never bound before its directory is private (clients refuse it otherwise, WV F4).
+    """
+    run.mkdir(mode=0o700, parents=True, exist_ok=True)
+    run.chmod(0o700)
+    if not control.trusted_dir(path.parent):
+        raise control.ControlPathError(f"{path.parent} is not private to this user")
+    with suppress(FileNotFoundError):
+        if not stat.S_ISSOCK(path.lstat().st_mode):
+            raise control.ControlPathError(f"{path} exists and is not a socket")
+        path.unlink()
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        sock.bind(str(path))
+        os.chmod(path, 0o600)
+    except OSError:
+        sock.close()
+        raise
+    pointer = run / control.POINTER_NAME
+    if path == run / control.SOCKET_NAME:
+        pointer.unlink(missing_ok=True)
+    else:
+        descriptor = os.open(pointer, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        try:
+            os.write(descriptor, (str(path) + "\n").encode("utf-8"))
+        finally:
+            os.close(descriptor)
+    return sock
+
+
+def _remove_control(path: Path, run: Path) -> None:
+    with suppress(OSError):
+        if stat.S_ISSOCK(path.lstat().st_mode):
+            path.unlink()
+    if path != run / control.SOCKET_NAME:
+        (run / control.POINTER_NAME).unlink(missing_ok=True)
+        with suppress(OSError):
+            path.parent.rmdir()
 
 
 async def _reject_websocket(send: Send, message: str) -> None:

@@ -55,6 +55,7 @@ def running_app(
     dev: str | None = None,
     allowed_hosts: str | None = None,
     base_url: str = "http://127.0.0.1:8787",
+    peer: tuple[str, int] = ("127.0.0.1", 50000),
 ) -> Iterator[tuple[object, str, object]]:
     tmp_path.mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("SEVN_HOME", str(tmp_path))
@@ -86,7 +87,9 @@ def running_app(
     from sevn.http import create_app
 
     app = create_app(Settings(home=tmp_path))
-    client = _LoopbackClient(app, base_url=base_url, follow_redirects=False)
+    # ``peer`` is the ASGI ``scope["client"]``. Plan 0055 D4 reads it: a loopback
+    # session needs a loopback peer, so the default is 127.0.0.1, not "testclient".
+    client = _LoopbackClient(app, base_url=base_url, follow_redirects=False, client=peer)
     client.timeout = httpx.Timeout(5.0)
     client.__enter__()
     try:

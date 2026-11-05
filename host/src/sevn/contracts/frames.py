@@ -40,6 +40,8 @@ class Hello(_Frame):
     device: str
     last_seq: int
     caps: list[str]
+    # The WebSocket URL's origin as the client dialled it (plan 0055 D3).
+    origin: str | None = None
 
 
 class Challenge(_Frame):
@@ -57,6 +59,27 @@ class AuthToken(_Frame):
 class AuthDevice(_Frame):
     t: Literal["auth"]
     device_sig: str
+
+
+class PairComplete(_Frame):
+    """A new device proves a one-time pairing ticket (plan 0055 D1)."""
+
+    t: Literal["pair.complete"]
+    ticket: str
+    device_pubkey_ed25519: str
+    device_pubkey_x25519: str | None = None
+    device_name: str
+    platform: str
+
+
+class Paired(_Frame):
+    """The host stored the device; it reconnects and authenticates next."""
+
+    t: Literal["paired"]
+    device_id: str
+    host_id: str
+    host_pubkey: str
+    scope: Literal["owner", "member", "read_only"]
 
 
 class Welcome(_Frame):
@@ -130,6 +153,8 @@ Frame = Annotated[
     | Annotated[Challenge, Tag("challenge")]
     | Annotated[AuthToken, Tag("auth_token")]
     | Annotated[AuthDevice, Tag("auth_device")]
+    | Annotated[PairComplete, Tag("pair.complete")]
+    | Annotated[Paired, Tag("paired")]
     | Annotated[Welcome, Tag("welcome")]
     | Annotated[Req, Tag("req")]
     | Annotated[Res, Tag("res")]
@@ -143,6 +168,8 @@ FRAME_MODELS: tuple[type[BaseModel], ...] = (
     Challenge,
     AuthToken,
     AuthDevice,
+    PairComplete,
+    Paired,
     Welcome,
     Req,
     Res,

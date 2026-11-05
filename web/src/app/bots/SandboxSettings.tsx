@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { useCall } from "../../client/hooks.ts";
-import { call } from "../../client/index.ts";
+import { useCall, useHostClient } from "../../client/hooks.ts";
 
 type AccessName = "workspace" | "full" | "isolated";
 type NetworkFlag = "on" | "off";
@@ -37,6 +36,7 @@ function SandboxForm({
   network: NetworkFlag;
   onSaved: () => void;
 }) {
+  const host = useHostClient();
   const [level, setLevel] = useState(access);
   const [net, setNet] = useState(network);
   const [saving, setSaving] = useState(false);
@@ -56,7 +56,8 @@ function SandboxForm({
     }
     setSaving(true);
     setError("");
-    void call("bots.update", { bot_id: botId, access: next })
+    void host
+      .call("bots.update", { bot_id: botId, access: next })
       .then(() => {
         setLevel(next);
         onSaved();
@@ -75,7 +76,8 @@ function SandboxForm({
     }
     setSaving(true);
     setError("");
-    void call("bots.update", { bot_id: botId, network: next })
+    void host
+      .call("bots.update", { bot_id: botId, network: next })
       .then(() => {
         setNet(next);
         onSaved();

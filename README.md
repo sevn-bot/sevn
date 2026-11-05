@@ -87,7 +87,13 @@ make dev
 
 `make setup` installs the Python workspace, the web app, and the git hooks. `make dev` runs `sevn serve` with `SEVN_DEV=1` and Vite, which proxies `/ws` and `/auth` to the host (default `127.0.0.1:8787`).
 
-The container image is `deploy/Dockerfile`. It listens on `0.0.0.0:8787` with `SEVN_HOME=/data`. Set `SEVN_ALLOWED_HOSTS` to every non-loopback `Host` the Origin guard should accept before clients use `/ws` or `/auth`. Publishing the port on loopback looks like `-e SEVN_ALLOWED_HOSTS=127.0.0.1:8787`. `/health` is not guarded.
+The container image is `deploy/Dockerfile`. It runs `sevn serve` on `0.0.0.0:8787` with `SEVN_HOME=/data`. That bind refuses to start until `SEVN_ALLOWED_HOSTS` (or `http.allowed_hosts`) lists every `Host` clients will use, for example `-e SEVN_ALLOWED_HOSTS=127.0.0.1:8787` when you publish the port on loopback. Inside Docker the browser's peer address is the bridge gateway, not loopback, so `/auth/login` returns 403 there by design. Pair the browser instead: run `docker exec <container> sevn pair --scope owner`, open `http://127.0.0.1:8787/pairing`, and enter `ws://127.0.0.1:8787/ws` and the short code. The web app then reconnects with its device key. `/health` is not guarded.
+
+## Remote access over a tailnet
+
+A browser on another machine or a phone can reach the host directly over Tailscale, Headscale, NetBird, ZeroTier or WireGuard, with no relay. Each browser pairs with each host once. Start pairing with `sevn pair` or **Settings → Devices**, then enter the short code or scan the QR code on **Add a host**. After that the browser signs every connection with its own device key, and the host gives it the scope you chose (`owner`, `member` or `read_only`). Revoking a device in Settings → Devices cuts it off within a second. One web app can show several hosts: a sidebar grouped by host, one Inbox and one Approvals view.
+
+With Tailscale, run `tailscale serve --bg --https=443 http://127.0.0.1:8787` and set `http.allowed_hosts = ["mac.tailnet.ts.net"]` and `http.public_scheme = "https"`. A request that comes through `tailscale serve`, or through any proxy that adds a forwarding header, is not treated as local. It has to pass the device handshake, `/auth/login` refuses it, and `Tailscale-User-Login` is never used as identity. A proxy that rewrites `Host` to a loopback name and adds no forwarding header looks like a local client; such a request still needs the loopback token or cookie. Phones, and iOS Safari in particular, need this `wss://` form. [docs/remote-direct.md](docs/remote-direct.md) covers the full recipes: several hosts in one web app (`http.allowed_origins`, `http.connect_src`), Headscale, NetBird, ZeroTier and WireGuard (`--allow-remote-bind` plus the overlay subnet in each client's private networks), and containers.
 
 ## Commands
 

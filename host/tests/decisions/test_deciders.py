@@ -24,6 +24,7 @@ from support.botcore import (
     upgrade_home,
 )
 from support.canary import canary
+from support.migrations import script_head
 from support.repo import repo_root
 
 _FEATURE_PREFIXES = (
@@ -884,7 +885,8 @@ def test_migrations_single_head() -> None:
         text=True,
     )
     assert completed.returncode == 0, completed.stderr
-    assert "0010_trace_context" in completed.stdout
+    # K-MIG: the graph's one head, not a literal id the next migration would break.
+    assert script_head() in completed.stdout
 
 
 def test_upgrade_from_previous_head(tmp_path: Path) -> None:
