@@ -35,12 +35,14 @@ from claude_agent_sdk.types import (
     RateLimitEvent,
     SystemPromptPreset,
 )
+from opentelemetry import trace
 
 from sevn.domain.agents import AgentRecord, sibling_block
 from sevn.domain.bots import BotService
 from sevn.domain.ids import new_id
 from sevn.domain.session import open_session
 from sevn.log import logger
+from sevn.observability.propagate import child_env
 from sevn.protocol.hub import Hub
 from sevn.runtime import installs
 from sevn.runtime.base import PendingAnswer, SessionRef, TurnContext
@@ -238,7 +240,8 @@ class ClaudeRuntime:
             can_use_tool=_can_use_tool,
             system_prompt=build_instructions(bot, siblings=siblings),
             model=_claude_model(bot.model),
-            env=blanked_env(),
+            # The turn span is current here, so Claude Code nests under it (plan 0015 D6).
+            env={**blanked_env(), **child_env("claude", trace.get_current_span())},
         )
         return SessionRef(agent_id=agent.id, session_ref=agent.runtime_session_ref)
 

@@ -152,8 +152,10 @@ def test_doctor_text_output_lists_linux_keys(linux_doctor: Path) -> None:
     assert "linger: off" in result.stdout
 
 
-def test_doctor_marks_a_locked_secret_service(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize("check", [False, True])
+@pytest.mark.parametrize("state", ["locked", "unavailable"])
+def test_doctor_reports_inaccessible_secrets_for_host_and_observability(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, check: bool, state: str
 ) -> None:
     from sevn.secrets.backends import use_keyring
 
@@ -162,14 +164,18 @@ def test_doctor_marks_a_locked_secret_service(
     monkeypatch.setenv("DBUS_SESSION_BUS_ADDRESS", "unix:path=/run/user/1000/bus")
     _patch_probes(monkeypatch, {name: _constant(value) for name, value in _PROBES.items()})
     monkeypatch.setattr("sevn.runtime.installs.resolve", _fake_resolve)
-    monkeypatch.setattr("sevn.secrets.probe_secret_service", _constant("locked"))
-    ring = FakeKeyring(locked=True)
+    monkeypatch.setattr("sevn.secrets.probe_secret_service", _constant(state))
+    ring = FakeKeyring(locked=state == "locked", unavailable=state == "unavailable")
     use_keyring(ring)
     try:
-        body = _json(_doctor("--json"))
+        body = _json(_doctor("--json", *(["--check"] if check else [])))
     finally:
         use_keyring(None)
-    assert body["secrets_backend"] == "secret-service (locked)"
+    assert body["secrets_backend"] == f"secret-service ({state})"
+    assert body["observability_exporter"] == f"secrets_{state}"
+    assert body["observability_content"] == "off"
+    if check:
+        assert body["observability_check"] == f"secrets_{state}"
 
 
 @pytest.mark.parametrize("platform", ["linux", "darwin"])

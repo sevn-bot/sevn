@@ -3,7 +3,8 @@
 ``canary()`` mints a secret, stores it in the active secret backend, and registers
 it with the redaction registry. ``assert_absent`` scans the captures this plan
 hooks: loguru sinks, the events / op_log / messages / turns tables, FunctionModel
-and FakeClaudeClient requests, and frames delivered to sessions.
+and FakeClaudeClient requests, frames delivered to sessions, and (plan 0015) every
+byte a loopback OTLP receiver (``support.spans``) recorded.
 """
 
 from __future__ import annotations
@@ -23,10 +24,12 @@ CAPTURES: tuple[str, ...] = (
     "function_model",
     "fake_claude",
     "second_session",
+    "otlp",
 )
 
 _model_requests: list[dict[str, object]] = []
 _claude_requests: list[str] = []
+_otlp_payloads: list[bytes] = []
 
 
 def note_model_request(payload: Mapping[str, object]) -> None:
@@ -37,6 +40,11 @@ def note_model_request(payload: Mapping[str, object]) -> None:
 def note_claude_request(payload: str) -> None:
     """Record one FakeClaudeClient prompt or connect payload."""
     _claude_requests.append(payload)
+
+
+def note_otlp(payload: bytes) -> None:
+    """Record one body or header block an OTLP receiver fixture saw."""
+    _otlp_payloads.append(bytes(payload))
 
 
 def model_request_payloads() -> list[dict[str, object]]:
@@ -61,6 +69,7 @@ class Canary:
         self._restore_fanout: Callable[[], None] | None = None
         self._model_start = 0
         self._claude_start = 0
+        self._otlp_start = 0
         self._closed = False
 
     def __enter__(self) -> Canary:
@@ -123,6 +132,7 @@ class Canary:
         _active = self
         self._model_start = len(_model_requests)
         self._claude_start = len(_claude_requests)
+        self._otlp_start = len(_otlp_payloads)
         self._install_log_sink()
         self._install_fanout_hook()
 
@@ -170,6 +180,9 @@ class Canary:
         }
         model_blob = json.dumps(_model_requests[self._model_start :], default=str)
         claude_blob = "\n".join(_claude_requests[self._claude_start :])
+        # latin-1 maps every byte to one character, so an ASCII canary inside a
+        # protobuf or gzip-decoded body is still a substring.
+        otlp_blob = "\n".join(item.decode("latin-1") for item in _otlp_payloads[self._otlp_start :])
         frames = "\n".join(self._frames)
         logs = "\n".join(self._logs)
         bodies = {
@@ -181,6 +194,7 @@ class Canary:
             "function_model": model_blob,
             "fake_claude": claude_blob,
             "second_session": frames,
+            "otlp": otlp_blob,
         }
         found: list[tuple[str, str]] = []
         for name in CAPTURES:

@@ -170,7 +170,7 @@ jobs:
 
       - name: Run and wait for /health
         run: |
-          docker run -d --name sevn-ci -p 127.0.0.1:8787:8787 sevn:ci
+          docker run -d --name sevn-ci -p 127.0.0.1:8787:8787 -e SEVN_ALLOWED_HOSTS=127.0.0.1:8787 sevn:ci
           for _ in $(seq 1 60); do
             if curl -fsS http://127.0.0.1:8787/health; then exit 0; fi
             sleep 2

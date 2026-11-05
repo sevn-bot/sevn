@@ -77,6 +77,8 @@ def test_allowed_hosts_come_from_the_env_file() -> None:
     value = _env(_sevn()).get("SEVN_ALLOWED_HOSTS")
     assert value is not None
     assert re.fullmatch(r"\$\{SEVN_ALLOWED_HOSTS[^}]*\}", value), value
+    # The image binds all interfaces; the merged host guard requires explicit names.
+    assert value == "${SEVN_ALLOWED_HOSTS:-127.0.0.1:8787,localhost:8787}"
 
 
 def _tailscale() -> dict[str, Any]:

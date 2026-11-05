@@ -1,13 +1,24 @@
 import { QueryClient, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { createContext, useContext, useEffect } from "react";
 import {
   call,
+  type HostClient,
   type MethodName,
   type MethodParams,
   onEvent,
   onTick,
   type ProtocolEvent,
 } from "./connection.ts";
+
+/** The serving host: the app's module-level connection. */
+export const servingHostClient: HostClient = { call, onEvent, onTick };
+
+/** The host a subtree talks to; the serving host unless a provider says otherwise. */
+export const HostClientContext = createContext<HostClient>(servingHostClient);
+
+export function useHostClient(): HostClient {
+  return useContext(HostClientContext);
+}
 
 export function createQueryClient(): QueryClient {
   return new QueryClient({
@@ -28,9 +39,10 @@ export function useCall<M extends MethodName>(
   method: M,
   params: MethodParams[M],
 ) {
+  const host = useHostClient();
   return useQuery({
     queryKey: [method, params],
-    queryFn: () => call(method, params),
+    queryFn: () => host.call(method, params),
   });
 }
 
@@ -40,6 +52,7 @@ function tickKey(kind: string): readonly ["tick", string] {
 
 export function useTicks(kind: string): Record<string, unknown>[] {
   const client = useQueryClient();
+  const host = useHostClient();
   const query = useQuery({
     queryKey: tickKey(kind),
     queryFn: () =>
@@ -53,13 +66,13 @@ export function useTicks(kind: string): Record<string, unknown>[] {
     refetchOnWindowFocus: false,
   });
   useEffect(() => {
-    return onTick(kind, (data) => {
+    return host.onTick(kind, (data) => {
       client.setQueryData<Record<string, unknown>[]>(
         tickKey(kind),
         (current) => [...(current ?? []), data],
       );
     });
-  }, [client, kind]);
+  }, [client, host, kind]);
   return query.data ?? [];
 }
 
@@ -67,6 +80,7 @@ const eventsKey = ["events"] as const;
 
 export function useEvents(): ProtocolEvent[] {
   const client = useQueryClient();
+  const host = useHostClient();
   const query = useQuery({
     queryKey: eventsKey,
     queryFn: () =>
@@ -78,12 +92,12 @@ export function useEvents(): ProtocolEvent[] {
     refetchOnWindowFocus: false,
   });
   useEffect(() => {
-    return onEvent((event) => {
+    return host.onEvent((event) => {
       client.setQueryData<ProtocolEvent[]>(eventsKey, (current) => [
         ...(current ?? []),
         event,
       ]);
     });
-  }, [client]);
+  }, [client, host]);
   return query.data ?? [];
 }

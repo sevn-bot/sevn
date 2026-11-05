@@ -20,6 +20,9 @@ importers:
       tailwindcss:
         specifier: ^4.3.3
         version: 4.3.3
+      uqr:
+        specifier: 0.1.2
+        version: 0.1.2
     devDependencies:
       '@biomejs/biome':
         specifier: ^2.5.15
@@ -928,6 +931,9 @@ packages:
     resolution: {integrity: sha512-XtuDWVdqTLr3NAxm2ly9/hU6kUsJOgGh1RASzMBbsw6aWCOaQzHdW+QQDfdERjfJ2V5vL5pRPa4RetO9UfivDg==}
     engines: {node: '>=22.19.0'}
 
+  uqr@0.1.2:
+    resolution: {integrity: sha512-MJu7ypHq6QasgF5YRTjqscSzQp/W11zoUk6kvmlH+fmWEs63Y0Eib13hYFwAzagRJcVY8WVnlV+eBDUGMJ5IbA==}
+
   vite@8.3.4:
     resolution: {integrity: sha512-IftLE8phJhdNRIGNEV4JCCvfNScoZQVfcXaN8TQropWGJtOHcu+iAB9pHcuGvmEb/kddw0LBe/jS8ztdC6xdiQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -1697,6 +1703,8 @@ snapshots:
   undici-types@7.24.6: {}
 
   undici@8.12.2: {}
+
+  uqr@0.1.2: {}
 
   vite@8.3.4(@types/node@24.19.2)(jiti@2.7.0):
     dependencies:

@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from sevn.contracts.kinds import AccessName, ApprovalPolicy, NetworkFlag, RuntimeName
 from sevn.domain.agents import AgentRecord
@@ -16,6 +17,7 @@ from sevn.domain.jobs import MessageRecord
 from sevn.domain.pending import PendingRecord
 from sevn.domain.routines import RoutineRecord
 from sevn.domain.shares import ShareRecord
+from sevn.identity.devices import DeviceRecord
 from sevn.memory.store import MemoryRecord
 
 
@@ -337,6 +339,67 @@ class SharesRevokeParams(BaseModel):
     op_id: str | None = None
 
 
+class PairingStartParams(BaseModel):
+    """Mint a one-time pairing ticket (plan 0055 D1). Owner only."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = None
+    scope: Literal["owner", "member", "read_only"] = "member"
+    direct_url: str | None = None
+    op_id: str | None = None
+
+    @field_validator("direct_url")
+    @classmethod
+    def _websocket_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        scheme, sep, rest = value.partition("://")
+        if sep == "" or scheme not in {"ws", "wss"} or rest.split("/", 1)[0] == "":
+            raise ValueError("direct_url must be a ws:// or wss:// URL")
+        return value
+
+
+class PairingStartResult(BaseModel):
+    """The ticket, its short code and the QR URI are shown once, to this response."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ticket: str
+    qr_uri: str
+    short_code: str
+    expires_at: datetime
+
+
+class DevicesListParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class DevicesListResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    devices: list[DeviceRecord]
+
+
+class DevicesRenameParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    name: str
+    op_id: str | None = None
+
+
+class DevicesRevokeParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    op_id: str | None = None
+
+
+class DevicesSelfParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
 class FleetBriefParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -485,6 +548,11 @@ METHODS: dict[str, MethodSpec] = {
         _spec("shares.create", SharesCreateParams, SharesCreateResult, mutating=True),
         _spec("shares.list", SharesListParams, SharesListResult, mutating=False),
         _spec("shares.revoke", SharesRevokeParams, ShareRecord, mutating=True),
+        _spec("pairing.start", PairingStartParams, PairingStartResult, mutating=True),
+        _spec("devices.list", DevicesListParams, DevicesListResult, mutating=False),
+        _spec("devices.rename", DevicesRenameParams, DeviceRecord, mutating=True),
+        _spec("devices.revoke", DevicesRevokeParams, DeviceRecord, mutating=True),
+        _spec("devices.self", DevicesSelfParams, DeviceRecord, mutating=False),
         _spec("routines.list", RoutinesListParams, RoutinesListResult, mutating=False),
         _spec("routines.create", RoutinesCreateParams, RoutineRecord, mutating=True),
         _spec("routines.update", RoutinesUpdateParams, RoutineRecord, mutating=True),

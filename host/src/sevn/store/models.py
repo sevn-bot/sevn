@@ -15,6 +15,7 @@ from sqlalchemy import (
     Integer,
     LargeBinary,
     String,
+    Text,
     TypeDecorator,
 )
 from sqlalchemy.engine.interfaces import Dialect
@@ -234,6 +235,8 @@ class Job(Base):
     # nothing to report (``routine.silent``).
     routine_id: Mapped[str | None] = mapped_column(String, nullable=True)
     silent: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+    # W3C ``traceparent`` of the job's root span; NULL while tracing is off (plan 0015 D5).
+    trace_parent: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class Routine(Base):
@@ -507,3 +510,51 @@ class AgentLock(Base):
     )
     acquired_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class Device(Base):
+    """A paired device (plan 0055 D2). Its scope is chosen by the owner at pairing."""
+
+    __tablename__ = "devices"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    platform: Mapped[str] = mapped_column(String, nullable=False)
+    pubkey_ed25519: Mapped[str] = mapped_column(String, nullable=False)
+    pubkey_x25519: Mapped[str | None] = mapped_column(String, nullable=True)
+    scope: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(_IsoDateTime, nullable=False)
+    last_seen: Mapped[datetime | None] = mapped_column(_IsoDateTime, nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(_IsoDateTime, nullable=True)
+
+
+class PairingTicket(Base):
+    """A one-time pairing ticket (plan 0055 D1). Only SHA-256 digests are stored."""
+
+    __tablename__ = "pairing_tickets"
+    __table_args__ = (
+        Index("ix_pairing_tickets_ticket_hash", "ticket_hash", unique=True),
+        Index("ix_pairing_tickets_code_hash", "code_hash"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    host_id: Mapped[str] = mapped_column(String, nullable=False)
+    ticket_hash: Mapped[str] = mapped_column(String, nullable=False)
+    code_hash: Mapped[str] = mapped_column(String, nullable=False)
+    scope: Mapped[str] = mapped_column(String, nullable=False)
+    name: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(_IsoDateTime, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(_IsoDateTime, nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(_IsoDateTime, nullable=True)
+    failures: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+
+
+class PairingAttempt(Base):
+    """One ``pair.complete`` attempt, for the per-host hourly failure limit."""
+
+    __tablename__ = "pairing_attempts"
+    __table_args__ = (Index("ix_pairing_attempts_created_at", "created_at"),)
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    ok: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(_IsoDateTime, nullable=False)

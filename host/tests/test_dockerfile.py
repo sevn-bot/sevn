@@ -198,7 +198,17 @@ def test_live_image_builds_and_serves_health(name: str) -> None:
         timeout=3600,
     )
     run = subprocess.run(  # noqa: S603 — runs the image this test built
-        ["docker", "run", "-d", "--rm", "-p", "127.0.0.1::8787", tag],  # noqa: S607 — docker from PATH, as the Makefile and CI run it
+        [  # noqa: S607 — docker from PATH, as the Makefile and CI run it
+            "docker",
+            "run",
+            "-d",
+            "--rm",
+            "-p",
+            "127.0.0.1::8787",
+            "-e",
+            "SEVN_ALLOWED_HOSTS=127.0.0.1:8787",
+            tag,
+        ],
         capture_output=True,
         text=True,
         check=True,

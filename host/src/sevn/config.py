@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import os
 import tomllib
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -19,6 +20,11 @@ from sevn.paths import Paths
 
 type BackendName = Literal["keychain", "age-file", "env", "secret-service"]
 type DecisionProvider = Literal["jev", "llm", "rules"]
+type ExporterName = Literal["none", "logfire", "otlp"]
+type ExportPreset = Literal["", "datadog-agent", "datadog-agentless"]
+type OtlpProtocol = Literal["http/protobuf", "grpc"]
+
+SECRET_REF_PREFIX = "secret://"  # noqa: S105 — the reference scheme, not a value
 
 
 class ProtocolSettings(BaseModel):
@@ -32,6 +38,27 @@ class SecretsSettings(BaseModel):
 class HttpSettings(BaseModel):
     host: str = "127.0.0.1"
     port: int = 8787
+    # Plan 0055 D5: extra Host names (``host`` or ``host:port``), e.g. a tailnet name.
+    allowed_hosts: list[str] = Field(default_factory=list)
+    # ``https`` when a proxy such as ``tailscale serve`` terminates TLS in front of sevn.
+    public_scheme: Literal["http", "https"] = "http"
+    # Exact origins of web clients served by other hosts (``https://linux.tailnet.ts.net``).
+    allowed_origins: list[str] = Field(default_factory=list)
+    # Extra CSP ``connect-src`` sources: other hosts this SPA dials (plan 0055 D8).
+    connect_src: list[str] = Field(default_factory=list)
+
+    def merged_allowed_hosts(self) -> list[str]:
+        """``allowed_hosts`` then ``SEVN_ALLOWED_HOSTS`` (comma-separated), lower-cased, deduped.
+
+        The one list the Host guard, the WebSocket session and the pairing URL share.
+        """
+        raw = [*self.allowed_hosts, *os.environ.get("SEVN_ALLOWED_HOSTS", "").split(",")]
+        merged: list[str] = []
+        for item in raw:
+            cleaned = item.strip().lower()
+            if cleaned and cleaned not in merged:
+                merged.append(cleaned)
+        return merged
 
 
 class RuntimeSettings(BaseModel):
@@ -117,6 +144,46 @@ class RuntimesSettings(BaseModel):
                 return RuntimeInstallSettings()
 
 
+class ObservabilitySettings(BaseModel):
+    """OTel export (spec §12, plan 0015 D1). Nothing is exported unless an exporter is on.
+
+    ``exporter = None`` means auto: Logfire when the secret ``logfire/token`` exists,
+    else off. ``headers`` values are ``secret://<name>`` references, resolved only
+    when the exporters are built.
+    """
+
+    exporter: ExporterName | None = None
+    preset: ExportPreset = ""
+    endpoint: str = ""
+    headers: dict[str, str] = Field(default_factory=dict[str, str])
+    protocol: OtlpProtocol = "http/protobuf"
+    capture_content: bool = False
+    sample_ratio: float = Field(default=1.0, ge=0.0, le=1.0)
+    datadog_site: str = "datadoghq.com"
+    service_name: str = "sevnd"
+
+    @field_validator("headers")
+    @classmethod
+    def _headers_are_secret_refs(cls, value: dict[str, str]) -> dict[str, str]:
+        for key, item in value.items():
+            # Name the header only: the refused value may be a credential.
+            if not item.startswith(SECRET_REF_PREFIX) or item == SECRET_REF_PREFIX:
+                raise ValueError(
+                    f"header {key!r} must be a {SECRET_REF_PREFIX}<name> reference; "
+                    "store the value with the secret backend"
+                )
+        return value
+
+    @model_validator(mode="after")
+    def _agentless_is_http(self) -> ObservabilitySettings:
+        if self.preset == "datadog-agentless" and self.protocol == "grpc":
+            raise ValueError(
+                "preset 'datadog-agentless' does not support protocol 'grpc'; "
+                "Datadog's agentless intake accepts http/protobuf only"
+            )
+        return self
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="SEVN_",
@@ -133,6 +200,8 @@ class Settings(BaseSettings):
     decisions: DecisionsSettings = Field(default_factory=DecisionsSettings)
     budgets: BudgetsSettings = Field(default_factory=BudgetsSettings)
     runtimes: RuntimesSettings = Field(default_factory=RuntimesSettings)
+
+    observability: ObservabilitySettings = Field(default_factory=ObservabilitySettings)
 
     @classmethod
     def settings_customise_sources(

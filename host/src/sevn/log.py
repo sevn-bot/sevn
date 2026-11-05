@@ -1,4 +1,4 @@
-"""loguru setup, stdlib interception, and secret redaction."""
+"""loguru setup, stdlib interception, secret redaction, and trace ids on records."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from loguru import logger
+from opentelemetry import trace
 
 from sevn.secrets.registry import registered_secrets
 
@@ -94,6 +95,25 @@ def redact(record: Record) -> None:
     extra[_EXCEPTION_KEY] = _exception_text(record, secrets)
 
 
+def add_trace_ids(record: Record) -> None:
+    """Put the current span's ``trace_id`` / ``span_id`` (hex) on ``record["extra"]``.
+
+    Outside a recording or remote span the keys are left out (plan 0015 D8).
+    """
+    context = trace.get_current_span().get_span_context()
+    if not context.is_valid:
+        return
+    extra = record["extra"]
+    extra["trace_id"] = f"{context.trace_id:032x}"
+    extra["span_id"] = f"{context.span_id:016x}"
+
+
+def patch_record(record: Record) -> None:
+    """The record patcher: redaction always runs first, then the trace ids."""
+    redact(record)
+    add_trace_ids(record)
+
+
 def _json_format(record: Record) -> str:
     extra = record["extra"]
     visible = {key: value for key, value in extra.items() if key not in _HIDDEN_EXTRA}
@@ -147,10 +167,10 @@ def _install_intercept(level: str) -> None:
 
 
 def setup(level: str, json_file: Path) -> None:
-    """Install stderr, a rotating JSON file, interception, and the redaction patcher."""
+    """Install stderr, a rotating JSON file, interception, and the record patcher."""
     logger.remove()
     _managed_sinks.clear()
-    logger.configure(patcher=redact)
+    logger.configure(patcher=patch_record)
     json_file.parent.mkdir(parents=True, exist_ok=True)
     if sys.stderr.isatty():
         stderr_id = logger.add(
@@ -184,4 +204,12 @@ def setup(level: str, json_file: Path) -> None:
     _install_intercept(level)
 
 
-__all__ = ["InterceptHandler", "logger", "redact", "redact_string", "setup"]
+__all__ = [
+    "InterceptHandler",
+    "add_trace_ids",
+    "logger",
+    "patch_record",
+    "redact",
+    "redact_string",
+    "setup",
+]

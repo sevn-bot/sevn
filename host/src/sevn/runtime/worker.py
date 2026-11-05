@@ -13,6 +13,7 @@ from sevn.domain.errors import DomainError
 from sevn.domain.jobs import job_lock, park_job
 from sevn.domain.session import open_session
 from sevn.log import logger
+from sevn.observability.spans import detached_context
 from sevn.protocol.hub import Hub
 from sevn.runtime.base import Runtime, ToolDecision
 from sevn.runtime.runtimes.claude import ClaudeRuntime, installed_client
@@ -133,7 +134,7 @@ class Worker:
         self._again.add(agent_id)
         task = self._tasks.get(agent_id)
         if task is None or task.done():
-            started = asyncio.create_task(self._pump(agent_id))
+            started = asyncio.create_task(self._pump(agent_id), context=detached_context())
             started.add_done_callback(_log_task)
             self._tasks[agent_id] = started
 
@@ -156,7 +157,9 @@ class Worker:
         """Continue an approved turn without holding the request that answered it."""
         if self._closed or agent_id in self._cancelling_agents:
             return
-        task = asyncio.create_task(self.resume(agent_id, turn_id, decisions))
+        task = asyncio.create_task(
+            self.resume(agent_id, turn_id, decisions), context=detached_context()
+        )
         self._resumes.add(task)
         task.add_done_callback(self._resumes.discard)
 

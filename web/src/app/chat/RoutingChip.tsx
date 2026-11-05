@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { call } from "../../client/index.ts";
+import type { HostClient } from "../../client/connection.ts";
+import { useHostClient } from "../../client/hooks.ts";
 import { MoveDialog } from "./MoveDialog.tsx";
 
 type LaneRef = {
@@ -18,6 +19,7 @@ export function RoutingChip({
   title: string;
   agents: readonly LaneRef[];
 }) {
+  const host = useHostClient();
   const [open, setOpen] = useState(false);
   const label = routingLabel(intent, title);
   if (label === null) {
@@ -39,7 +41,7 @@ export function RoutingChip({
         type="button"
         className="rounded border border-zinc-700 px-2 py-1"
         onClick={() => {
-          startNew(messageId);
+          startNew(host, messageId);
         }}
       >
         Start new
@@ -49,7 +51,7 @@ export function RoutingChip({
           agents={agents}
           onMove={(agentId) => {
             setOpen(false);
-            moveTo(messageId, agentId);
+            moveTo(host, messageId, agentId);
           }}
         />
       ) : null}
@@ -67,17 +69,20 @@ export function AskChips({
   agents: readonly LaneRef[];
   choices: string;
 }) {
+  const host = useHostClient();
   const items = routeChoices(choices, agents);
   if (items.length === 0) {
     return null;
   }
   const choose = (choice: RouteChoice): void => {
-    void call(
-      "messages.reroute",
-      choice.agentId === null
-        ? { message_id: messageId, new: true }
-        : { message_id: messageId, agent_id: choice.agentId },
-    ).catch(() => undefined);
+    void host
+      .call(
+        "messages.reroute",
+        choice.agentId === null
+          ? { message_id: messageId, new: true }
+          : { message_id: messageId, agent_id: choice.agentId },
+      )
+      .catch(() => undefined);
   };
   return (
     <div className="flex flex-wrap gap-2">
@@ -146,15 +151,17 @@ function routingLabel(intent: string, title: string): string | null {
   return null;
 }
 
-function startNew(messageId: string): void {
-  void call("messages.reroute", { message_id: messageId, new: true }).catch(
-    () => undefined,
-  );
+function startNew(host: HostClient, messageId: string): void {
+  void host
+    .call("messages.reroute", { message_id: messageId, new: true })
+    .catch(() => undefined);
 }
 
-function moveTo(messageId: string, agentId: string): void {
-  void call("messages.reroute", {
-    message_id: messageId,
-    agent_id: agentId,
-  }).catch(() => undefined);
+function moveTo(host: HostClient, messageId: string, agentId: string): void {
+  void host
+    .call("messages.reroute", {
+      message_id: messageId,
+      agent_id: agentId,
+    })
+    .catch(() => undefined);
 }

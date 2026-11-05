@@ -183,8 +183,14 @@ docker compose -f deploy/compose.yaml up -d
 curl -fsS http://127.0.0.1:8787/health
 ```
 
-Set `SEVN_ALLOWED_HOSTS` (in the shell or `deploy/.env`) to every non-loopback `Host` that
-clients use.
+Compose defaults `SEVN_ALLOWED_HOSTS` to `127.0.0.1:8787,localhost:8787`, because the image
+binds all interfaces inside the container and requires explicit allowed hosts. Override it
+(in the shell or `deploy/.env`) with the host names and ports clients use.
+
+The browser reaches the container through its bridge, so the local token login link does not
+work. Run `docker exec sevn sevn pair --scope owner`, then open
+`http://127.0.0.1:8787/pairing` and enter `ws://127.0.0.1:8787/ws` with the short code.
+See [direct remote access](remote-direct.md) for pairing and proxy setup.
 
 ### On a tailnet
 

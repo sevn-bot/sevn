@@ -80,6 +80,7 @@ ci-fast: lint typecheck db-heads contracts-check
 contracts:
 	uv run sevn contracts export
 	uv run python scripts/gen_frame_vectors.py
+	uv run python scripts/gen_vectors.py
 	uv run python scripts/check_contracts.py --write-ts
 
 contracts-check:

@@ -26,6 +26,8 @@ type ErrorCode = Literal[
     "resync_required",
     "secrets_locked",
     "secrets_unavailable",
+    "rate_limited",
+    "last_owner",
     "internal",
 ]
 

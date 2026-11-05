@@ -89,7 +89,7 @@ async def test_token_session_is_owner(tmp_path: Path, monkeypatch: pytest.Monkey
         assert session.scope == "owner"
 
 
-async def test_owner_only_method_refuses_member() -> None:
+async def test_owner_only_method_refuses_read_only() -> None:
     from pydantic import BaseModel
     from sevn.contracts.errors import ProtocolError
     from sevn.contracts.frames import parse
@@ -104,13 +104,13 @@ async def test_owner_only_method_refuses_member() -> None:
 
     called: list[bool] = []
 
-    @method("test.owner_only", params=Params, result=Result, mutating=False, scope="owner")
+    @method("test.owner_only_ro", params=Params, result=Result, mutating=False, scope="owner")
     async def _owner_only(_ctx: object, _params: Params) -> Result:
         called.append(True)
         return Result(ok=True)
 
-    session = Session.for_test(scope="member")
-    req = parse('{"id":"1","m":"test.owner_only","p":{},"t":"req"}')
+    session = Session.for_test(scope="read_only")
+    req = parse('{"id":"1","m":"test.owner_only_ro","p":{},"t":"req"}')
     try:
         outcome: Any = await dispatch(session, req)
     except ProtocolError as exc:
@@ -120,3 +120,32 @@ async def test_owner_only_method_refuses_member() -> None:
         code = error.code if hasattr(error, "code") else error["code"]
         assert code == "forbidden"
     assert called == []
+
+
+async def test_owner_only_method_allows_member() -> None:
+    """D12: ``member`` = ``owner`` for now, in ``scope_allows`` only."""
+    from pydantic import BaseModel
+    from sevn.contracts.frames import parse
+    from sevn.protocol.registry import dispatch, method
+    from sevn.protocol.session import Session
+
+    class Params(BaseModel):
+        pass
+
+    class Result(BaseModel):
+        ok: bool
+
+    called: list[bool] = []
+
+    @method("test.owner_only_member", params=Params, result=Result, mutating=False, scope="owner")
+    async def _owner_only(_ctx: object, _params: Params) -> Result:
+        called.append(True)
+        return Result(ok=True)
+
+    session = Session.for_test(scope="member")
+    outcome: Any = await dispatch(
+        session, parse('{"id":"1","m":"test.owner_only_member","p":{},"t":"req"}')
+    )
+    assert outcome.e is None, outcome.e
+    assert called == [True]
+    assert session.scope == "member"

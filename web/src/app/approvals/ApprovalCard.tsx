@@ -1,4 +1,4 @@
-import { call } from "../../client/index.ts";
+import { useHostClient } from "../../client/hooks.ts";
 
 export function ApprovalCard({
   pendingId,
@@ -11,11 +11,14 @@ export function ApprovalCard({
   name: string;
   args: Record<string, unknown>;
 }) {
+  const host = useHostClient();
   function answer(decision: "approve" | "deny"): void {
-    void call("pending.answer", {
-      pending_id: pendingId,
-      answer: decision,
-    }).catch(() => undefined);
+    void host
+      .call("pending.answer", {
+        pending_id: pendingId,
+        answer: decision,
+      })
+      .catch(() => undefined);
   }
 
   return (
