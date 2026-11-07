@@ -10,6 +10,7 @@ directory with fake CLI credential folders that must stay untouched.
 from __future__ import annotations
 
 import asyncio
+import errno
 import os
 import secrets
 import sqlite3
@@ -21,7 +22,7 @@ import tomllib
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, ClassVar, NoReturn
 
 import pytest
 from support.archives import cursor_tree, script, sha256, tar_gz, zip_bytes
@@ -1156,3 +1157,63 @@ def test_cli_reports_a_read_only_root(
     assert str(env.root) in _out(result)
     assert "Traceback" not in _out(result)
     assert "PermissionError" not in _out(result)
+
+
+@pytest.mark.parametrize("via_cli", [False, True], ids=["api", "cli"])
+@pytest.mark.parametrize(
+    ("command", "failure_point", "error_number"),
+    [
+        ("install", "sevn.runtime.installs.tempfile.mkdtemp", errno.ENOSPC),
+        ("install", "sevn.runtime.installs._unpack", errno.ENOSPC),
+        ("install", "pathlib.Path.rename", errno.EACCES),
+        ("install", "sevn.runtime.installs.os.replace", errno.EACCES),
+        ("remove", "pathlib.Path.rename", errno.EACCES),
+        ("remove", "pathlib.Path.unlink", errno.EACCES),
+    ],
+    ids=["staging", "extraction", "publish", "switch", "remove-rename", "remove-link"],
+)
+def test_runtime_filesystem_failure_uses_typed_error(
+    env: Env,
+    server: FileServer,
+    use_manifest: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    command: str,
+    failure_point: str,
+    error_number: int,
+    via_cli: bool,
+) -> None:
+    from sevn.runtime.installs import InstallError, install, remove
+
+    use_manifest(_publish_all(server))
+    previous = install("opencode")
+    use_manifest(_publish_all(server, version="2.0.0"))
+    failed_path = env.root / ".tmp" / "failed-operation"
+    failure = OSError(error_number, os.strerror(error_number), str(failed_path))
+
+    def fail(*_args: object, **_kwargs: object) -> NoReturn:
+        raise failure
+
+    with monkeypatch.context() as patch:
+        patch.setattr(failure_point, fail)
+        if via_cli:
+            result = _invoke(["runtimes", command, "opencode"])
+            assert result.exit_code == 1, _out(result)
+            assert isinstance(result.exception, SystemExit), result.exception
+            assert f"cannot {command} opencode" in _out(result)
+            assert str(failed_path) in _out(result)
+            assert "Traceback" not in _out(result)
+        else:
+            with pytest.raises(InstallError) as caught:
+                if command == "install":
+                    install("opencode")
+                else:
+                    remove("opencode")
+            assert caught.value.code == f"{command}_failed"
+            assert caught.value.__cause__ is failure
+            assert str(failed_path) in caught.value.message
+
+    # A failed upgrade never replaces the working runtime or its current link.
+    # Failed removal may have unlinked current, but the version remains on disk.
+    assert (previous / "opencode").is_file()
+    if command == "install":
+        assert (env.root / "opencode" / "current").resolve() == previous

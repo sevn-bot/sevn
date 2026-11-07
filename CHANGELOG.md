@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Runtime install and remove commands report filesystem failures, including disk exhaustion and denied renames, as typed errors instead of uncaught exceptions.
+
 - Preserve service definitions when systemd or launchd cannot stop the host during uninstall, so the error is visible and removal can be retried. Secret migration reports corrupt age ciphertext or identity files without a traceback or changing either backend.
 
 - `deploy/install.sh` installs the host on Ubuntu, Debian, Omarchy and Arch Linux: the bubblewrap, git, curl and libsecret packages through `apt-get` or `pacman` (with `sudo` for that step only), uv, the release wheel checked against its `SHA256SUMS`, the user service and a closing `sevn doctor`. `make wheel` and the new `release` workflow (on `v*` tags) build the wheel with the web app inside and publish it with `SHA256SUMS`. CI adds an Arch Linux host test job, an install-script job in Ubuntu 24.04 and Arch containers, and an image job that builds both Dockerfiles and checks `/health` and the managed runtimes. `docs/linux.md` covers the service and lingering, the keyring and `sevn secret migrate`, bubblewrap on Ubuntu 24.04, the sandbox in containers and CLI logins in Docker, and the README gains Install and Runtimes sections.

@@ -303,6 +303,13 @@ def install(name: str, *, version: str | None = None, sha256: str | None = None)
     pinned URL with the version replaced. A version that is already installed is not
     downloaded again; ``current`` is switched to it.
     """
+    try:
+        return _install(name, version=version, sha256=sha256)
+    except OSError as exc:
+        raise InstallError("install_failed", f"cannot install {name}: {exc}") from exc
+
+
+def _install(name: str, *, version: str | None, sha256: str | None) -> Path:
     manifest = load_manifest()
     entry = manifest.runtimes.get(name)
     if entry is None:
@@ -575,6 +582,13 @@ def remove(name: str, *, version: str | None = None) -> None:
     Refuses with ``runtime_busy`` while a turn of ``name`` is running or waiting. A turn
     records no version and can outlive a switch of ``current``, so any version may be in use.
     """
+    try:
+        _remove(name, version=version)
+    except OSError as exc:
+        raise InstallError("remove_failed", f"cannot remove {name}: {exc}") from exc
+
+
+def _remove(name: str, *, version: str | None) -> None:
     known = set(RUNTIMES) | set(load_manifest().runtimes)
     if name not in known:
         raise InstallError("unknown_runtime", f"unknown runtime: {name}")
