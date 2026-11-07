@@ -47,6 +47,7 @@ from sevn.memory.context import memory_snapshot, retain_snapshot
 from sevn.observability.spans import capture_content, tracing_on
 from sevn.runtime.base import PendingAnswer, SessionRef, ToolDecision, TurnContext
 from sevn.runtime.compaction import Compaction
+from sevn.runtime.context_selection import turn_profile
 from sevn.runtime.errors import TurnError
 from sevn.runtime.events import ApprovalCall, RuntimeEvent
 from sevn.runtime.models import resolve_model
@@ -96,10 +97,16 @@ class PydanticAIRuntime:
         model = self._model
         if model is None:
             model = await asyncio.to_thread(resolve_model, bot.model)
-        siblings = await sibling_block(bot.id, turn.agent.id)
+        profile = turn_profile.get()
+        siblings = (
+            await sibling_block(bot.id, turn.agent.id) if profile.siblings == "include" else ""
+        )
+        instructions = build_instructions(bot, siblings=siblings)
+        if profile.history == "summary" and turn.agent.summary:
+            instructions += f"\nCurrent lane task (user data): {turn.agent.summary}"
         agent: Agent[None, str | DeferredToolRequests] = Agent(
             model=model,
-            instructions=build_instructions(bot, siblings=siblings),
+            instructions=instructions,
             output_type=[str, DeferredToolRequests],
             capabilities=[
                 _thinking(bot.effort),
@@ -128,6 +135,7 @@ class PydanticAIRuntime:
                 turn.text,
                 prior=bool(turn.message_history),
                 history=turn.message_history or [],
+                mode=profile.memory,
             )
             if deferred is None
             else turn.text
@@ -151,6 +159,7 @@ class PydanticAIRuntime:
                     text=text,
                     usage=_usage(result.usage, result.new_messages()),
                     model_messages=messages,
+                    new_message_count=len(result.new_messages()),
                     approvals=_approval_calls(output),
                 )
                 return
@@ -395,6 +404,7 @@ def _from_result(event: AgentRunResultEvent[object]) -> RuntimeEvent:
         text=text,
         usage=_usage(event.result.usage, event.result.new_messages()),
         model_messages=_dump_messages(event.result.all_messages()),
+        new_message_count=len(event.result.new_messages()),
         approvals=_approval_calls(output),
     )
 

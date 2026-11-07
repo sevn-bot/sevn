@@ -44,4 +44,5 @@ class RuntimeEvent:
     session_ref: str | None = None
     native_type: str | None = None
     model_messages: list[object] | None = None
+    new_message_count: int | None = None
     approvals: tuple[ApprovalCall, ...] | None = None

@@ -142,6 +142,9 @@ function routingLabel(intent: string, title: string): string | null {
   if (intent === "follow_up") {
     return `→ continues: ${title}`;
   }
+  if (intent === "queued_steer") {
+    return "→ queued for the next turn";
+  }
   if (intent === "steer") {
     return "→ steer";
   }

@@ -74,6 +74,20 @@ def test_evals_on_writes_report(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
     finally:
         use_client(None)
         _clear_report()
+    delivery = body["delivery"]
+    assert delivery["confusion_matrix"] == {
+        "queue": {"queue": 4, "steer": 0, "unresolved": 0},
+        "steer": {"queue": 4, "steer": 0, "unresolved": 0},
+    }
+    assert delivery["always_queue_accuracy"] == delivery["accuracy"] == 0.5
+    assert delivery["per_label"]["queue"] == {"precision": 0.5, "recall": 1.0}
+    assert body["context"]["cases"] >= 6
+    assert set(body["context"]["source_accuracy"]) == {
+        "history",
+        "siblings",
+        "memory",
+        "attachments",
+    }
     accuracy = body["accuracy"]
     assert isinstance(accuracy, dict)
     assert "message.intent" in accuracy

@@ -330,7 +330,7 @@ async def test_jev_request_has_all_router_questions_in_one_call(
         answers={
             "message.intent": ("follow_up", 0.95),
             "message.target_agent": ("agent_trip", 0.91),
-            "busy.policy": ("steer", 0.9),
+            "delivery.mode": ("steer", 0.9),
         }
     )
     use_client(fake)
@@ -346,7 +346,16 @@ async def test_jev_request_has_all_router_questions_in_one_call(
     assert len(fake.requests) == 1
     request = fake.requests[0]
     assert request.model == "jev-1.13.0"
-    assert set(request.questions) == {"message.intent", "message.target_agent", "busy.policy"}
+    assert set(request.questions) == {
+        "message.intent",
+        "message.target_agent",
+        "delivery.mode",
+        "context.history",
+        "context.memory",
+        "context.siblings",
+        "context.attachments",
+    }
+    assert decision.delivery_policy == "steer"
     intent = _criteria(request.questions["message.intent"])
     assert set(intent) == {
         "new_request",
@@ -359,8 +368,8 @@ async def test_jev_request_has_all_router_questions_in_one_call(
     target = _criteria(request.questions["message.target_agent"])
     assert set(target) == {"agent_trip", "none"}
     assert target["agent_trip"] == "Trip plan — lisbon dates"
-    busy = _criteria(request.questions["busy.policy"])
-    assert set(busy) == {"queue", "steer", "interrupt"}
+    busy = _criteria(request.questions["delivery.mode"])
+    assert set(busy) == {"queue", "steer"}
     state = request.text()
     assert "make it four days" in state
     assert "keep-one" in state
@@ -392,7 +401,128 @@ async def test_busy_policy_omitted_when_no_agent_is_running(
     finally:
         use_client(None)
     assert len(fake.requests) == 1
-    assert set(fake.requests[0].questions) == {"message.intent", "message.target_agent"}
+    assert "delivery.mode" not in fake.requests[0].questions
+
+
+@pytest.mark.parametrize(("score", "expected"), [(0.98, "steer"), (0.25, "queue")])
+async def test_rule_target_gets_one_gated_classification(tmp_path, monkeypatch, score, expected):
+    from sevn.decisions.jev import use_client
+    from sevn.decisions.registry import decide
+
+    arm_configured(monkeypatch, tmp_path)
+    await upgrade_home(tmp_path)
+    fake = FakeJev(
+        answers={
+            "message.target_agent": ("wrong", 1.0),
+            "delivery.mode": ("steer", score),
+            "context.history": ("recent", score),
+            "context.memory": ("skip", score),
+        }
+    )
+    use_client(fake)
+    try:
+        decision = await decide(
+            _message(agent_id="lane"), _context([_agent("lane", "Task", "moving", "running")])
+        )
+    finally:
+        use_client(None)
+    assert (decision.path, decision.intent, decision.target_agent_id) == (
+        "rule",
+        "follow_up",
+        "lane",
+    )
+    assert len(fake.requests) == 1
+    assert "message.target_agent" not in fake.requests[0].questions
+    (row,) = decision_rows(tmp_path)
+    answers = json.loads(row["answers"])
+    assert answers["delivery_policy"] == expected
+    assert answers["context_profile"]["history"] == ("recent" if score > 0.9 else "full")
+    assert json.loads(row["confidences"])["delivery_confidence"] == score
+
+
+@pytest.mark.parametrize("intent", ["answer", "cancel"])
+async def test_defined_effect_skips_delivery(tmp_path, monkeypatch, intent):
+    from sevn.decisions.base import RouteDecision
+    from sevn.decisions.jev import use_client
+    from sevn.decisions.registry import decide
+    from sevn.domain.routing import clear_source_rules, register_source_rule
+
+    arm_configured(monkeypatch, tmp_path)
+    register_source_rule("user", lambda *_: RouteDecision(intent, "lane", 1.0, "rule"), 0)
+    fake = FakeJev()
+    use_client(fake)
+    try:
+        decision = await decide(
+            _message(), _context([_agent("lane", "Task", "moving", "running")]), record=False
+        )
+    finally:
+        clear_source_rules()
+        use_client(None)
+    assert decision.delivery_policy is None
+    assert len(fake.requests) == 1
+    assert "delivery.mode" not in fake.requests[0].questions
+
+
+async def test_noninjectable_lane_never_asks_to_steer(tmp_path, monkeypatch):
+    from dataclasses import replace
+
+    from sevn.decisions.jev import use_client
+    from sevn.decisions.registry import decide
+
+    arm_configured(monkeypatch, tmp_path)
+    fake = FakeJev(answers={"delivery.mode": ("steer", 1.0)})
+    use_client(fake)
+    try:
+        lane = replace(_agent("lane", "Task", "", "running"), runtime="claude")
+        result = await decide(_message(agent_id="lane"), _context([lane]), record=False)
+    finally:
+        use_client(None)
+    assert result.delivery_policy == "queue"
+    assert "delivery.mode" not in fake.requests[0].questions
+
+
+async def test_timeout_preserves_rule_without_second_call(tmp_path, monkeypatch):
+    import asyncio
+
+    from sevn.decisions import jev
+    from sevn.decisions.registry import decide
+
+    arm_configured(monkeypatch, tmp_path)
+    monkeypatch.setattr(jev, "_ROUTE_TIMEOUT", 0.02)
+    calls = []
+
+    class Slow:
+        async def system_one(self, state, questions, *, model):
+            calls.append(questions)
+            await asyncio.Event().wait()
+
+    jev.use_client(Slow())
+    try:
+        result = await decide(
+            _message(agent_id="lane"),
+            _context([_agent("lane", "Task", "", "running")]),
+            record=False,
+        )
+    finally:
+        jev.use_client(None)
+    assert len(calls) == 1
+    assert (result.path, result.intent, result.delivery_policy) == ("rule", "follow_up", "queue")
+
+
+async def test_rule_without_key_keeps_existing_behavior(tmp_path, monkeypatch):
+    from sevn.decisions.base import ContextProfile
+    from sevn.decisions.registry import decide
+
+    arm_configured(monkeypatch, tmp_path, secrets_toml())
+    decision = await decide(
+        _message(agent_id="lane"), _context([_agent("lane", "Task", "", "running")]), record=False
+    )
+    assert (decision.path, decision.intent, decision.delivery_policy) == (
+        "rule",
+        "follow_up",
+        "queue",
+    )
+    assert decision.context_profile == ContextProfile()
 
 
 async def test_state_is_redacted_before_jev(

@@ -86,6 +86,8 @@ class DecisionThresholds(BaseModel):
     intent: float = 0.70
     target: float = 0.65
     busy: float = 0.60
+    delivery: float | None = None
+    context: float | None = None
 
 
 class MemorySettings(BaseModel):

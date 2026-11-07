@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Any, cast
 
@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sevn.config import Settings
 from sevn.decisions.base import RouteDecision
 from sevn.decisions.log import last_decision_id, mark_corrected
-from sevn.domain.agents import AgentRecord, AgentService, apply_lifecycle, lane_text, occupying
+from sevn.domain.agents import AgentRecord, AgentService, apply_lifecycle, lane_text
 from sevn.domain.bots import BotRecord, BotService
 from sevn.domain.errors import DomainError
 from sevn.domain.ids import new_id
@@ -28,14 +28,14 @@ from sevn.observability.spans import job_span
 from sevn.protocol.hub import Hub
 from sevn.store.db import utcnow
 from sevn.store.models import Agent as AgentRow
+from sevn.store.models import DecisionLog, Message, RouteDecisionRow
 from sevn.store.models import Job as JobRow
-from sevn.store.models import Message, RouteDecisionRow
 from sevn.store.models import PendingRequest as PendingRow
 from sevn.store.models import Turn as TurnRow
 
 _OPEN = ("running", "waiting", "idle")
 _ENDED_JOBS = frozenset({"done", "failed", "cancelled"})
-_QUEUED_ON_TARGET = frozenset({"follow_up", "steer"})
+_QUEUED_ON_TARGET = frozenset({"follow_up", "steer", "queued_steer"})
 _SLOT_HOLDERS = frozenset({"running", "waiting"})
 _FRESH = frozenset({"new_request", "chit_chat"})
 
@@ -63,6 +63,8 @@ class OpenAgent:
     title: str
     summary: str
     status: str
+    runtime: str = ""
+    starting: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -153,7 +155,13 @@ async def deliver(
     decision_id = after if after != before else None
     bot = await BotService().get(message.bot_id)
     agent, origin, consumed = await _act(message, decision, job_id)
-    held = await _over_cap(bot.id, decision.intent, agent)
+    if decision.intent == "steer" or decision.delivery_policy == "steer":
+        actual = (
+            "follow_up"
+            if decision.delivery_policy == "queue"
+            else ("steer" if consumed else "queued_steer")
+        )
+        decision = replace(decision, intent=actual)
     job_status = "waiting" if decision.ask_user else ("done" if consumed else "queued")
     async with job_lock(job_id):
         await JobService().enqueue(
@@ -166,7 +174,7 @@ async def deliver(
             status=job_status,
         )
         message_id, created = await _attach_user_message(
-            job_id, agent, bot, message.text, decision, consumed=consumed
+            job_id, agent, bot, message.text, decision, consumed=consumed, decision_id=decision_id
         )
         payload: dict[str, object] = {
             "job_id": job_id,
@@ -174,6 +182,7 @@ async def deliver(
             "bot_id": bot.id,
             "status": job_status,
         }
+        held = job_status == "queued" and await _over_cap(bot.id, decision.intent, agent)
         if held:
             ahead = await _ahead(bot.id, job_id)
             payload["ahead"] = ahead
@@ -273,9 +282,11 @@ async def _act(
         origin = "chit_chat" if decision.intent == "chit_chat" else "user"
         return agent, origin, False
     agent = await _agent_on_bot(message.bot_id, decision.target_agent_id)
-    if decision.intent == "follow_up":
-        return await AgentService().revive(agent.id), "user", False
-    if decision.intent == "steer":
+    if decision.intent in {"follow_up", "steer"}:
+        if decision.delivery_policy == "queue" or (
+            decision.delivery_policy is None and decision.intent == "follow_up"
+        ):
+            return await AgentService().revive(agent.id), "user", False
         steered = await _steer(agent.id, message.text)
         if not steered:
             logger.info("steer queued for {runtime}", runtime=agent.runtime)
@@ -295,14 +306,38 @@ async def _over_cap(bot_id: str, intent: str, agent: AgentRecord) -> bool:
     A new lane always needs a slot. A follow-up or a queued steer needs one
     only when its target is not already running or waiting.
     """
-    if intent in _FRESH:
-        pass
-    elif intent in _QUEUED_ON_TARGET:
-        if agent.status in _SLOT_HOLDERS:
-            return False
-    else:
+    if intent not in _FRESH and (intent not in _QUEUED_ON_TARGET or agent.status in _SLOT_HOLDERS):
         return False
-    return await occupying(bot_id) >= Settings.load().bots.max_parallel_agents
+    async with open_session() as session:
+        lanes = await _admitted_lanes(session, bot_id)
+    return agent.id not in lanes and len(lanes) >= Settings.load().bots.max_parallel_agents
+
+
+async def _admitted_lanes(session: AsyncSession, bot_id: str) -> set[str]:
+    """Count slot holders once, then fill remaining slots with oldest pending lanes."""
+    active = set(
+        await session.scalars(
+            select(AgentRow.id).where(AgentRow.bot_id == bot_id, AgentRow.status.in_(_SLOT_HOLDERS))
+        )
+    )
+    limit = Settings.load().bots.max_parallel_agents
+    if len(active) >= limit:
+        return active
+    pending = await session.scalars(
+        select(JobRow.agent_id)
+        .where(
+            JobRow.to_bot_id == bot_id,
+            JobRow.status.in_(("queued", "started")),
+            JobRow.agent_id.is_not(None),
+        )
+        .order_by((JobRow.status == "started").desc(), JobRow.created_at, JobRow.id)
+    )
+    for lane in pending:
+        if len(active) >= limit:
+            break
+        if lane is not None:
+            active.add(lane)
+    return active
 
 
 def _start(agent_id: str) -> None:
@@ -627,12 +662,20 @@ async def _load_context(bot_id: str) -> RouterContext:
             )
         )
         agent_ids = [agent.id for agent in agents]
+        admitted = await _admitted_lanes(session, bot_id)
         pending = await _questions(session, agent_ids)
         recent = await _recent(session, agent_ids)
     return RouterContext(
         bot_id=bot_id,
         open_agents=[
-            OpenAgent(id=agent.id, title=agent.title, summary=agent.summary, status=agent.status)
+            OpenAgent(
+                id=agent.id,
+                title=agent.title,
+                summary=agent.summary,
+                status=agent.status,
+                runtime=agent.runtime,
+                starting=agent.status == "idle" and agent.id in admitted,
+            )
             for agent in agents
         ],
         pending_questions=pending,
@@ -690,6 +733,7 @@ async def _attach_user_message(
     decision: RouteDecision,
     *,
     consumed: bool = False,
+    decision_id: str | None = None,
 ) -> tuple[str, dict[str, object]]:
     """Store the user message and its queued turn. Returns the id and its event payload."""
     now = utcnow()
@@ -724,6 +768,11 @@ async def _attach_user_message(
                 created_at=now,
             )
         )
+        if decision_id and decision.intent in {"steer", "queued_steer", "follow_up"}:
+            log = await session.get(DecisionLog, decision_id)
+            if log is not None:
+                log.outcome = decision.intent
+                log.answers = {**log.answers, "steer_injected": decision.intent == "steer"}
         session.add(RouteDecisionRow(id=new_id("rd_"), message_id=message_id, created_at=now))
         await session.commit()
     return message_id, {

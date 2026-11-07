@@ -79,6 +79,9 @@ test("chip shows new task", async () => {
           { type: "text", text: "shorter" },
           { type: "routing", intent: "steer", title: "" },
         ]),
+        message("msg_queued_steer", [
+          { type: "routing", intent: "queued_steer", title: "" },
+        ]),
         message("msg_answer", [
           { type: "text", text: "Tuesday" },
           { type: "routing", intent: "answer", title: "" },
@@ -96,6 +99,7 @@ test("chip shows new task", async () => {
     await testing.screen.findByText("→ new task: Lisbon");
     await testing.screen.findByText("→ continues: Invoice");
     await testing.screen.findByText("→ steer");
+    await testing.screen.findByText("→ queued for the next turn");
     await testing.screen.findByText("→ answer");
   } finally {
     testing.cleanup();

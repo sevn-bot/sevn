@@ -46,6 +46,7 @@ from sevn.observability.propagate import child_env
 from sevn.protocol.hub import Hub
 from sevn.runtime import installs
 from sevn.runtime.base import PendingAnswer, SessionRef, TurnContext
+from sevn.runtime.context_selection import turn_profile
 from sevn.runtime.errors import TurnError
 from sevn.runtime.events import RuntimeEvent
 from sevn.runtime.runtimes.pydantic_ai import build_instructions
@@ -233,7 +234,11 @@ class ClaudeRuntime:
         async def _can_use_tool(tool: str, args: object, request_id: object) -> str:
             return await self._ask(agent.id, tool, args, request_id)
 
-        siblings = await sibling_block(agent.bot_id, agent.id)
+        siblings = (
+            await sibling_block(agent.bot_id, agent.id)
+            if turn_profile.get().siblings == "include"
+            else ""
+        )
         await client.connect(
             cwd=bot.workspace_path,
             resume=agent.runtime_session_ref,

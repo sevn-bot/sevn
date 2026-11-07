@@ -7,10 +7,12 @@ import datetime as dt
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from sevn.config import Settings
+from sevn.decisions.base import ContextProfile
 from sevn.decisions.registry import decide
 from sevn.domain.routing import OpenAgent, PendingQuestion, RoutedMessage, RouterContext
 from sevn.evals.errors import EvalsError
@@ -40,6 +42,9 @@ class _Case(BaseModel):
     target: str = "none"
     text: str
     open_agents: list[_Agent] = Field(default_factory=_no_agents)
+    explicit_target: str | None = None
+    delivery: Literal["steer", "queue"] | None = None
+    profile: ContextProfile | None = None
     pending_agent_id: str | None = None
     pending_minutes_ago: int | None = None
 
@@ -57,8 +62,8 @@ def run_decisions() -> EvalOutcome:
     if not Settings.load().decisions.evals_on:
         return EvalOutcome(disabled=True, path=None)
     cases = _load_cases()
-    scores, judge = asyncio.run(_evaluate(cases))
-    path = _write_report(_accuracy(scores), judge)
+    report = asyncio.run(_evaluate(cases))
+    path = _write_report(report)
     logger.info("decision evals wrote a report")
     return EvalOutcome(disabled=False, path=path)
 
@@ -82,26 +87,61 @@ def _load_cases() -> list[_Case]:
     return cases
 
 
-async def _evaluate(cases: list[_Case]) -> tuple[list[RouteScore], dict[str, str]]:
-    scores = await _replay(cases)
-    return scores, await score_routes(scores)
-
-
-async def _replay(cases: list[_Case]) -> list[RouteScore]:
+async def _evaluate(cases: list[_Case]) -> dict[str, object]:
     scores: list[RouteScore] = []
+    matrix = {label: {"steer": 0, "queue": 0, "unresolved": 0} for label in ("steer", "queue")}
+    source_hits = dict.fromkeys(ContextProfile.model_fields, 0)
+    exact = profiles = 0
     for case in cases:
         now = _utcnow()
         decision = await decide(_message(case, now), _context(case, now), record=False)
-        scores.append(
-            RouteScore(
-                text=case.text,
-                intent=case.intent,
-                predicted_intent=decision.intent,
-                target=case.target,
-                predicted_target=_target(decision.target_agent_id),
+        if case.delivery:
+            matrix[case.delivery][decision.delivery_policy or "unresolved"] += 1
+        if case.profile:
+            profiles += 1
+            actual = decision.context_profile.model_dump()
+            exact += int(decision.context_profile == case.profile)
+            for source, label in case.profile.model_dump().items():
+                source_hits[source] += int(actual[source] == label)
+        if case.delivery is None and case.profile is None:
+            scores.append(
+                RouteScore(
+                    text=case.text,
+                    intent=case.intent,
+                    predicted_intent=decision.intent,
+                    target=case.target,
+                    predicted_target=_target(decision.target_agent_id),
+                )
             )
-        )
-    return scores
+    return {
+        "accuracy": _accuracy(scores),
+        "judge": await score_routes(scores),
+        "delivery": _delivery_metrics(matrix),
+        "context": {
+            "cases": profiles,
+            "exact_accuracy": exact / profiles if profiles else None,
+            "source_accuracy": {
+                key: hits / profiles for key, hits in source_hits.items() if profiles
+            },
+        },
+    }
+
+
+def _delivery_metrics(matrix: dict[str, dict[str, int]]) -> dict[str, object]:
+    labels: dict[str, dict[str, float]] = {}
+    for label, row in matrix.items():
+        predicted = sum(counts[label] for counts in matrix.values())
+        labels[label] = {
+            "precision": row[label] / predicted if predicted else 0.0,
+            "recall": row[label] / sum(row.values()) if sum(row.values()) else 0.0,
+        }
+    total = sum(sum(row.values()) for row in matrix.values())
+    return {
+        "confusion_matrix": matrix,
+        "per_label": labels,
+        "accuracy": sum(matrix[label][label] for label in matrix) / total if total else None,
+        "always_queue_accuracy": sum(matrix["queue"].values()) / total if total else None,
+    }
 
 
 def _accuracy(scores: list[RouteScore]) -> dict[str, float]:
@@ -116,10 +156,9 @@ def _accuracy(scores: list[RouteScore]) -> dict[str, float]:
     }
 
 
-def _write_report(accuracy: dict[str, float], judge: dict[str, str]) -> Path:
+def _write_report(body: dict[str, object]) -> Path:
     path = _repo_root() / ".ignorelocal" / "evals" / f"{_report_day()}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
-    body: dict[str, object] = {"accuracy": accuracy, "judge": judge}
     path.write_text(json.dumps(body, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return path
 
@@ -133,7 +172,7 @@ def _message(case: _Case, now: dt.datetime) -> RoutedMessage:
         new_agent=False,
         reply_to=None,
         reply_to_agent_id=None,
-        agent_id=None,
+        agent_id=case.explicit_target,
         bot_id="bot_eval",
     )
 

@@ -33,7 +33,13 @@ class _Block(str):
 
 
 async def with_memories(
-    bot_id: str, agent_id: str, text: str, *, prior: bool, history: list[object] | None = None
+    bot_id: str,
+    agent_id: str,
+    text: str,
+    *,
+    prior: bool,
+    history: list[object] | None = None,
+    mode: str = "auto",
 ) -> str:
     """``text`` with the memory block in front of it, for the turn's user prompt.
 
@@ -45,7 +51,7 @@ async def with_memories(
     if history is not None:
         retained = _retained_snapshot(history)
         _shown[(bot_id, agent_id)] = {} if retained is None else retained
-        if retained is None and prior:
+        if retained is None and prior and mode == "auto":
             # Legacy histories have no baseline. An authoritative snapshot also
             # removes memories deleted before restart, even if the list is empty.
             rows = await MemoryStore().list_for(bot_id)
@@ -53,6 +59,15 @@ async def with_memories(
                 row.id: (row.text, row.tier, row.revision) for row in rows
             }
             return f"{_full(rows)}\n\n{text}"
+    if mode == "skip":
+        return text
+    if mode == "full":
+        # Explicit full must clear previously visible memories even when all were deleted.
+        rows = await MemoryStore().list_for(bot_id)
+        _shown[(bot_id, agent_id)] = {row.id: (row.text, row.tier, row.revision) for row in rows}
+        return f"{_full(rows)}\n\n{text}"
+    if mode == "diff":
+        prior = True
     prefix = await _prefix(bot_id, agent_id, prior=prior)
     if prefix == "":
         return text

@@ -48,9 +48,13 @@ New agents start with isolation `shared`, so file tools and the shell use the bo
 
 Every incoming message is routed, and the choice is written to the decision log. Rules run first, and the first match wins: a reply to an agent's message, an explicit agent, a message that is `/new` or starts with `/new `, a `/continue` prefix that matches exactly one open title, or a user reply within ten minutes of the only pending question. Plugins can add earlier rules for a source.
 
-If no rule matches, the host asks jev (`decisions.jev_model`, default `jev-1.13.0`) one request covering the intent and the target agent. When an open agent is running, that request also asks whether to queue, steer, or interrupt. The text sent out is redacted. The jev key is the secret `provider/typesafe`, or the `TYPESAFE_API_KEY` environment variable. Intent must reach 0.70, the target 0.65, and the busy question 0.60 (`decisions.thresholds` in `$SEVN_HOME/config.toml`). A busy answer below its gate rejects the jev route. The accepted route follows the intent, and the busy label is stored on the decision log.
+With the default provider, jev runs on every routed message. One redacted request chooses intent and target when no rule matches. A rule match fixes both. The same request selects context and, for a running or starting Pydantic AI target, whether to steer the current turn or queue the message. Answers and cancellations keep their defined effects. Claude queues. The log and chat distinguish injected steers from steers that arrived after the runtime stopped accepting input.
 
-Below a gate, or when jev has no key or does not answer, the host walks a fallback chain. A step whose own confidence is under 0.6 moves on:
+The context profile selects full history, the last three user turns, or the task line and last turn. It also selects memory (full, diff or skip), sibling lane titles/statuses, and available attachments. Pydantic AI applies history selection to one request and retains the full lane archive. Claude owns its native session history and applies the sibling selection to its system prompt. Selecting a source never fetches new attachments or another lane's transcript.
+
+The jev model defaults to `jev-1.13.0`. Set the `provider/typesafe` secret or `TYPESAFE_API_KEY`. In `decisions.thresholds`, intent defaults to 0.70 and target to 0.65. Delivery inherits the busy gate (0.60), and context inherits the intent gate. A rejected delivery choice keeps the original intent's behavior. If all context choices are rejected, the existing prompt is used. The routing call has a three-second deadline and no retries.
+
+When no rule matches and jev cannot resolve the route, the host walks the fallback chain. A step whose confidence is under 0.6 moves on:
 
 1. A Pydantic AI model, when a provider key is configured (`decisions.llm_model`, otherwise the cheapest configured model).
 2. Local Ollama, when `SEVN_OLLAMA_URL` answers `/api/chat` (`decisions.ollama_model`, default `llama3.2:3b`).
@@ -93,7 +97,7 @@ The host exports OpenTelemetry traces, logs and metrics to Logfire, a Datadog Ag
 
 ## Evals
 
-`decisions.evals_on` defaults to false. `sevn evals run decisions` then prints `evals disabled`, replays nothing, and exports no decision state. When `evals_on` is true, the same command replays the synthetic routing cases in `host/evals/decisions/` and writes a local JSON report. A missing `judge-jev` binary skips the judge. The cases are synthetic messages.
+`decisions.evals_on` defaults to false. `sevn evals run decisions` then prints `evals disabled`, replays nothing, and exports no decision state. When `evals_on` is true, the same command replays the synthetic routing cases in `host/evals/decisions/` and writes a local JSON report. A missing `judge-jev` binary skips the judge. The report keeps the original intent and target scores separate from steer/queue precision, recall, confusion matrix and always-queue baseline. Context scores compare selected sources with labels. There is no evidence yet that trimming improves replies. The source-selection eval measures selection errors, not reply quality.
 
 ## Development
 
