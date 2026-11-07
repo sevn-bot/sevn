@@ -2,6 +2,21 @@
 
 sevn is a personal, local-first host for persistent AI bots. A bot runs one agent per request. Clients speak one protocol to the host over WebSocket. Secrets and conversation data stay on the host.
 
+## Install
+
+**Ubuntu 24.04, Debian, Omarchy and Arch Linux.** `deploy/install.sh` installs the system packages (bubblewrap, git, curl and libsecret, through `apt-get` or `pacman` and `sudo`), uv, the host wheel from the latest release (checked against its `SHA256SUMS`), a systemd `--user` service, and then runs `sevn doctor`. Omarchy takes the Arch path. Read the script, then run it as your normal user:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/sevn-bot/sevn/HEAD/deploy/install.sh
+sh install.sh            # --no-service, --no-system-deps, --home PATH, --wheel PATH|URL
+```
+
+**macOS.** The same script installs uv, the host and a launchd agent; macOS needs no system packages. `sevn service install|status|logs|restart|uninstall` manages the service on both systems.
+
+**Docker.** `docker compose -f deploy/compose.yaml up -d` runs the host on `127.0.0.1:8787` with the CLI runtimes inside the image, and its `tailscale` profile serves it on a tailnet. `deploy/Dockerfile.ubuntu` builds the same image on Ubuntu 24.04.
+
+[docs/linux.md](docs/linux.md) covers lingering, the keyring and `sevn secret migrate`, bubblewrap on Ubuntu 24.04, the sandbox in containers, and logging in to the CLIs inside the container. To build the wheel yourself, run `make wheel` and pass `--wheel dist/sevn-<version>-py3-none-any.whl`.
+
 ## Quick start
 
 Set a provider key, start the host, and open the chat. `sevn secret set` reads the value with no echo and stores it in the secret backend. The value is never printed.
@@ -24,6 +39,10 @@ Each agent owns one thread. Statuses are `running`, `waiting`, `idle`, `done`, a
 Every agent gets its own `tasks/<agent_id>/` folder inside the bot workspace. The folder stays when the agent is archived. A write outside that folder takes an advisory lock for ten minutes, refreshed on each write. A second agent that writes the same path gets `path_locked`, with the holder's id and title. Locks are released when the turn finishes and when the agent is done. Writes inside the agent's own scratch folder are not locked.
 
 New agents start with isolation `shared`, so file tools and the shell use the bot workspace. When an agent's isolation is `worktree` and that workspace is a git repository, those tools use a git worktree at `<sevn-home>/worktrees/<agent_id>` on branch `sevn/<agent_id>`. Its parent is host-managed, outside bot-writable workspaces, so a sibling cannot replace the checkout root. A workspace that is not a git repository stays on the scratch folder.
+
+## Runtimes
+
+`sevn runtimes install <name>|--all` downloads pinned, SHA-256-verified copies of the Claude, OpenCode, Codex and Cursor CLIs into `$SEVN_HOME/runtimes/<name>/<version>/`; `sevn runtimes list` shows which copy the host uses and `sevn runtimes remove` deletes one. The host runs the managed copy first, then the one on `PATH` unless `[runtimes.<name>] use_system = false`, then, for Claude, the CLI bundled with the SDK. Logins stay with each CLI; sevn never reads them.
 
 ## Routing
 
@@ -58,7 +77,7 @@ The bot access level defaults to `workspace`. Bot settings can switch the level 
 
 Claude Code's native tools currently run without sevn's OS confinement. Claude bots therefore require explicitly selected `access=full` and `network=on`; other combinations fail before the CLI session opens. Tool approvals remain required. Use Pydantic AI for workspace confinement, isolated execution, or network-off tools.
 
-`workspace` file tools resolve paths and refuse anything outside the bot workspace and the `Shared` directory next to the workspaces folder (`path_outside_workspace`). The shell runs under Seatbelt on macOS, using `host/src/sevn/sandbox/profiles/sevn-workspace.sb`, or under bubblewrap on Linux. The workspace and `Shared` are writable. The rest of the system is read-only, and your home directory is not readable at all except for git's config (`~/.gitconfig`, `~/.config/git`) and the usual toolchain installs (`~/.local/bin`, `~/.local/share/uv`, `~/.cargo/bin`, `~/.rustup/toolchains`, `~/.nvm/versions`, `~/.pyenv`, `~/.bun/bin`, `~/.deno/bin`, `~/go/bin`, pnpm). Reads and writes are also denied for `.ssh`, `.aws`, `Library/Keychains`, the CLI credential directories, and the sevn database, secrets, keys, run token and logs wherever `SEVN_HOME` puts them. On macOS the command can reach only the Mach services it needs for name lookup, logging, preferences, DNS and TLS trust, so the keychain, the pasteboard, `open` and Apple Events are out of reach. On Linux it runs in new namespaces (`--unshare-all`, `--new-session`), so it cannot see or signal host processes. Network follows the bot flag, which defaults to off. Other platforms do not run that confined command. Running the host itself inside Docker needs `--security-opt seccomp=unconfined --security-opt apparmor=unconfined --security-opt systempaths=unconfined` for bubblewrap to start.
+`workspace` file tools resolve paths and refuse anything outside the bot workspace and the `Shared` directory next to the workspaces folder (`path_outside_workspace`). The shell runs under Seatbelt on macOS, using `host/src/sevn/sandbox/profiles/sevn-workspace.sb`, or under bubblewrap on Linux. The workspace and `Shared` are writable. The rest of the system is read-only, and your home directory is not readable at all except for git's config (`~/.gitconfig`, `~/.config/git`) and the usual toolchain installs (`~/.local/bin`, `~/.local/share/uv`, `~/.cargo/bin`, `~/.rustup/toolchains`, `~/.nvm/versions`, `~/.pyenv`, `~/.bun/bin`, `~/.deno/bin`, `~/go/bin`, pnpm). Reads and writes are also denied for `.ssh`, `.aws`, `Library/Keychains`, the CLI credential directories, and the sevn database, secrets, keys, run token and logs wherever `SEVN_HOME` puts them. On macOS the command can reach only the Mach services it needs for name lookup, logging, preferences, DNS and TLS trust, so the keychain, the pasteboard, `open` and Apple Events are out of reach. On Linux it runs in new namespaces (`--unshare-all`, `--new-session`), so it cannot see or signal host processes. Network follows the bot flag, which defaults to off. Other platforms do not run that confined command. Running the host itself inside Docker needs `--security-opt seccomp=unconfined --security-opt apparmor=unconfined --security-opt systempaths=unconfined` for bubblewrap to start; [docs/linux.md](docs/linux.md) explains what that exposes and why the `full` level is the recommended container setup.
 
 Every shell command, at every level, gets only `PATH` (without the host's own virtualenv), `HOME`, `USER`, `LOGNAME`, `SHELL`, `TMPDIR`, `TERM`, `TZ` and the locale variables from the host environment, so provider keys, `TYPESAFE_API_KEY` and `SEVN_SECRET_*` values never reach it. A command runs for at most 300 seconds; on a timeout or a cancelled turn its whole process group is stopped. The model reads the exit code, stdout and stderr, each capped at 64 KB.
 

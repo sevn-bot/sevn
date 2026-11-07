@@ -44,6 +44,7 @@ from sevn.domain.session import open_session
 from sevn.log import logger
 from sevn.observability.propagate import child_env
 from sevn.protocol.hub import Hub
+from sevn.runtime import installs
 from sevn.runtime.base import PendingAnswer, SessionRef, TurnContext
 from sevn.runtime.errors import TurnError
 from sevn.runtime.events import RuntimeEvent
@@ -103,7 +104,10 @@ class SdkClaudeClient:
         system_prompt = options.get("system_prompt")
         model = options.get("model")
         env = options.get("env")
+        # Managed copy, then the system one, then the SDK's bundled CLI (plan 0025 D6).
+        resolved = await asyncio.to_thread(installs.resolve, "claude")
         sdk_options = ClaudeAgentOptions(
+            cli_path=None if resolved is None else resolved.path,
             cwd=cwd,
             resume=resume if isinstance(resume, str) and resume != "" else None,
             permission_mode="default",

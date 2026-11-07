@@ -35,7 +35,7 @@ jobs:
   mergecraft:
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 50
     permissions:
       contents: read
       pull-requests: write
@@ -68,7 +68,7 @@ jobs:
           push: disabled
           shell: disabled
           status_checks: enabled
-          timeout: 25m
+          timeout: 40m
         env:
           # Keep equal to the uses: commit above. The container cannot read it.
           MERGECRAFT_ACTION_SHA: 9e4318a81c47ad20313966105e9d0038e415198f

@@ -24,6 +24,8 @@ type ErrorCode = Literal[
     "path_outside_workspace",
     "path_locked",
     "resync_required",
+    "secrets_locked",
+    "secrets_unavailable",
     "rate_limited",
     "last_owner",
     "internal",

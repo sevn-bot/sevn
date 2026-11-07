@@ -1,0 +1,88 @@
+name: release
+
+# Plan 0025 D3: on a v* tag, build the SPA into host/src/sevn/_web, build
+# sevn-<version>-py3-none-any.whl, write SHA256SUMS, and attach both to the
+# GitHub release for that tag. deploy/install.sh downloads them from
+# releases/latest/download. `make wheel` does the same build locally.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  wheel:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+        with:
+          python-version: "3.13"
+          # A release build never restores a cache another workflow could have written.
+          enable-cache: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11.8.0
+          run_install: false
+
+      - name: Install Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          # Same rule as uv above: this input needs setup-node v5 or later.
+          package-manager-cache: false
+
+      - name: Tag matches the host version
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' host/pyproject.toml | head -n 1)
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "tag $GITHUB_REF_NAME does not match host/pyproject.toml version $version" >&2
+            exit 1
+          fi
+
+      - name: Build the SPA into host/src/sevn/_web
+        run: |
+          pnpm --dir web install --frozen-lockfile
+          make build-web
+          test -f host/src/sevn/_web/index.html
+
+      - name: Build the wheel
+        run: uv build --package sevn --wheel --out-dir dist
+
+      - name: Check the wheel carries the SPA
+        run: |
+          python3 - <<'EOF'
+          import glob, zipfile
+          wheels = glob.glob("dist/sevn-*-py3-none-any.whl")
+          assert len(wheels) == 1, wheels
+          assert "sevn/_web/index.html" in zipfile.ZipFile(wheels[0]).namelist()
+          EOF
+
+      - name: Write SHA256SUMS
+        working-directory: dist
+        run: |
+          sha256sum sevn-*-py3-none-any.whl > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Attach the .whl and SHA256SUMS to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/sevn-*-py3-none-any.whl dist/SHA256SUMS --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/sevn-*-py3-none-any.whl dist/SHA256SUMS \
+              --verify-tag --title "$GITHUB_REF_NAME" --generate-notes
+          fi

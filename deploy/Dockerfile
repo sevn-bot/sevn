@@ -1,11 +1,19 @@
-# Multi-stage image: node:22 builds the SPA, then uv installs the host on
-# python:3.13-slim. The server runs as the non-root user sevn (uid 10001).
+# Multi-stage image: node:22 builds the SPA, a runtimes stage downloads the
+# pinned CLI runtimes, then uv installs the host on python:3.13-slim. The
+# server runs as the non-root user sevn (uid 10001).
 #
 # SEVN_ALLOWED_HOSTS (D8): comma-separated Host values the Origin/Host guard
 # accepts in addition to 127.0.0.1:<port>, localhost:<port>, and [::1]:<port>.
 # /health is not guarded. Set this before clients use /ws or /auth through a
 # published port, for example:
 #   docker run --rm -p 8787:8787 -e SEVN_ALLOWED_HOSTS=127.0.0.1:8787 sevn:dev
+#
+# CLI runtimes (plan 0025 D8): `sevn runtimes install --all` puts the pinned,
+# SHA-256-verified claude, opencode, codex and cursor-agent binaries under
+# /opt/sevn/runtimes, owned by root and read-only to sevn, outside the /data
+# volume so a volume never hides them. Log in inside the container, for
+# example `docker exec -it sevn claude login`; the login lands in /home/sevn
+# (mount a volume there to keep it).
 
 FROM node:22 AS web
 
@@ -20,17 +28,46 @@ COPY web/tsconfig.json web/tsconfig.app.json web/tsconfig.node.json web/vite.con
 COPY web/src ./src
 RUN pnpm run build
 
+# The runtimes stage only produces files, so deploy/Dockerfile.ubuntu uses the
+# same stage and the two builds share its cache.
+FROM python:3.13-slim AS runtimes
+
+COPY --from=ghcr.io/astral-sh/uv:0.13.1 /uv /uvx /bin/
+
+WORKDIR /src
+
+ENV UV_COMPILE_BYTECODE=0 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=0
+
+COPY pyproject.toml uv.lock ./
+COPY host/pyproject.toml host/pyproject.toml
+RUN uv sync --frozen --no-dev --no-install-project --package sevn
+
+COPY host/src host/src
+RUN uv sync --frozen --no-dev --package sevn \
+    && SEVN_HOME=/tmp/sevn-home SEVN_RUNTIMES_DIR=/opt/sevn/runtimes \
+       /src/.venv/bin/sevn runtimes install --all \
+    && rm -rf /opt/sevn/runtimes/.tmp /tmp/sevn-home \
+    && chmod -R a+rX,go-w /opt/sevn
+
 FROM python:3.13-slim
 
 COPY --from=ghcr.io/astral-sh/uv:0.13.1 /uv /uvx /bin/
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl \
+    && apt-get install -y --no-install-recommends bubblewrap ca-certificates curl git \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 10001 sevn \
     && useradd --uid 10001 --gid 10001 --create-home --home-dir /home/sevn sevn \
     && mkdir -p /data \
     && chown sevn:sevn /data
+
+COPY --from=runtimes /opt/sevn/runtimes /opt/sevn/runtimes
+ENV SEVN_RUNTIMES_DIR=/opt/sevn/runtimes
+RUN for name in claude opencode codex cursor-agent; do \
+        ln -s "/opt/sevn/runtimes/$name/current/$name" "/usr/local/bin/$name"; \
+    done
 
 WORKDIR /app
 

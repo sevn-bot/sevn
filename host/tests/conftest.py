@@ -16,6 +16,26 @@ import pytest  # noqa: E402
 from support.http_app import running_app  # noqa: E402
 
 
+def pytest_configure(config: pytest.Config) -> None:
+    config.addinivalue_line(
+        "markers",
+        "session_bus: keep DBUS_SESSION_BUS_ADDRESS so the test can reach the real session bus",
+    )
+
+
+@pytest.fixture(autouse=True)
+def _no_session_bus(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep tests off the real Secret Service (plan 0025 D4).
+
+    With ``secrets.backend`` unset, Linux selection probes the session bus, so a
+    test on a Linux desktop could otherwise read or write the user's keyring.
+    Tests that need a bus set the variable themselves (to a fake address) or opt
+    in with ``@pytest.mark.session_bus``.
+    """
+    if request.node.get_closest_marker("session_bus") is None:
+        monkeypatch.delenv("DBUS_SESSION_BUS_ADDRESS", raising=False)
+
+
 @pytest.fixture
 def host_app(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch

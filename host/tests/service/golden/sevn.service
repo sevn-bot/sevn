@@ -1,0 +1,11 @@
+[Unit]
+Description=sevn host
+
+[Service]
+ExecStart=/opt/sevn/bin/sevn serve
+Environment=SEVN_HOME=/srv/sevn
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

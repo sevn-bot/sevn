@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 
 class ModelError(Exception):
     """A model name cannot be resolved or is not enabled."""
@@ -20,4 +22,33 @@ class TurnError(Exception):
     def __init__(self, message: str, *, usage: dict[str, object] | None = None) -> None:
         self.message = message
         self.usage = usage
+        super().__init__(message)
+
+
+type InstallErrorCode = Literal[
+    "unknown_runtime",
+    "unsupported_platform",
+    "invalid_version",
+    "invalid_manifest",
+    "sha256_required",
+    "download_failed",
+    "checksum_mismatch",
+    "unsafe_archive",
+    "runtime_busy",
+    "not_installed",
+    "read_only_root",
+    "install_failed",
+    "remove_failed",
+]
+
+
+class InstallError(Exception):
+    """A managed CLI runtime cannot be installed, resolved or removed (plan 0025 D6).
+
+    ``code`` is stable; ``str(exc)`` is the human message.
+    """
+
+    def __init__(self, code: InstallErrorCode, message: str) -> None:
+        self.code: InstallErrorCode = code
+        self.message = message
         super().__init__(message)

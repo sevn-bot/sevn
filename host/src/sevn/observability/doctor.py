@@ -18,6 +18,7 @@ from sevn.observability.presets import resolve
 from sevn.observability.setup import SHUTDOWN_CAP_S, choose_exporter, setup
 from sevn.paths import Paths
 from sevn.secrets.backends import open_backend
+from sevn.secrets.errors import SecretsBackendError
 from sevn.secrets.registry import register
 
 TEST_SPAN = "sevn.test"
@@ -57,15 +58,21 @@ def exporter_label(settings: Settings) -> str:
 def doctor_fields(settings: Settings, *, check: bool) -> dict[str, str]:
     """The observability keys ``sevn doctor`` adds; ``check`` sends a test span."""
     fields = {
-        "observability_exporter": exporter_label(settings),
         "observability_content": "on" if settings.observability.capture_content else "off",
     }
-    if check:
-        if choose_exporter(settings) == "none":
-            fields["observability_check"] = "off"
-        else:
-            sent = send_test_span(settings)
-            fields["observability_check"] = "ok" if sent.ok else sent.problem
+    try:
+        fields["observability_exporter"] = exporter_label(settings)
+        if check:
+            if choose_exporter(settings) == "none":
+                fields["observability_check"] = "off"
+            else:
+                sent = send_test_span(settings)
+                fields["observability_check"] = "ok" if sent.ok else sent.problem
+    except SecretsBackendError as exc:
+        # A diagnostic must still report host health when exporter credentials are locked.
+        fields.setdefault("observability_exporter", exc.code)
+        if check:
+            fields["observability_check"] = exc.code
     return fields
 
 

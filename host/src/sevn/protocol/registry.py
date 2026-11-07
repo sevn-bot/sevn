@@ -15,6 +15,7 @@ from sevn.contracts.methods import MethodSpec
 from sevn.log import logger
 from sevn.protocol.errors import Scope, scope_allows
 from sevn.protocol.hub import Hub
+from sevn.secrets.errors import SecretsBackendError
 
 type Handler = Callable[["Ctx", BaseModel], Awaitable[BaseModel]]
 
@@ -117,6 +118,10 @@ async def dispatch(ctx: Ctx, req: Req) -> Res:
         return Res(t="res", id=req.id, r=await _invoke(bound, ctx, params))
     except ProtocolError as exc:
         return error_res(req.id, exc)
+    except SecretsBackendError as exc:
+        # The secret store went locked or away after startup: a typed answer, never `internal`.
+        logger.warning("method {} failed: {}", bound.spec.name, exc.code)
+        return error_res(req.id, ProtocolError(exc.code, exc.message))
     except Exception:  # noqa: BLE001 — unknown failures become `internal` on the wire
         logger.exception("method dispatch failed: {}", bound.spec.name)
         return error_res(req.id, ProtocolError("internal", "internal error"))

@@ -16,7 +16,7 @@ from sevn.domain.routing import OpenAgent, RouterContext
 from sevn.log import logger
 from sevn.paths import Paths
 from sevn.secrets.backends import open_backend
-from sevn.secrets.errors import SecretNotFound
+from sevn.secrets.errors import SecretNotFound, SecretsBackendError
 
 _DASH = "\u2014"
 _INTENTS: dict[str, str] = {
@@ -201,4 +201,8 @@ def _typesafe_key() -> str | None:
     try:
         return open_backend(Settings.load(), Paths.from_env()).get("provider/typesafe")
     except SecretNotFound:
+        return None
+    except SecretsBackendError as exc:
+        # A locked or unreachable store means no jev for now; routing falls through.
+        logger.warning("jev unavailable: the secret store failed ({})", exc.code)
         return None
