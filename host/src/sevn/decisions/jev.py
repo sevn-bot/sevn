@@ -58,6 +58,7 @@ _CONTEXT = {
 }
 _ROUTE_TIMEOUT = 3.0
 _client: _Jev | None = None
+_closing_clients: set[asyncio.Task[None]] = set()
 
 
 class _Jev(Protocol):
@@ -93,6 +94,13 @@ def use_client(client: _Jev | None) -> None:
     _client = client
 
 
+async def _close_client(client: AsyncTypeSafeClient) -> None:
+    try:
+        await client.aclose()
+    except Exception:  # noqa: BLE001 — a cleanup failure cannot change the routing answer
+        logger.warning("jev client close failed")
+
+
 class JevDecider:
     """Ask jev every router question in one request. Secrets are already redacted."""
 
@@ -108,22 +116,25 @@ class JevDecider:
     ) -> Attempt | None:
         questions = _questions(context, ruled)
         self.calls = 0
+        owned: AsyncTypeSafeClient | None = None
         try:
             async with asyncio.timeout(_ROUTE_TIMEOUT):
                 client = await _resolve_client(routing=True)
                 if client is None:
                     return None
+                if isinstance(client, AsyncTypeSafeClient) and client is not _client:
+                    owned = client
                 self.calls = 1
-                try:
-                    response = await client.system_one(
-                        state, questions, model=self.settings.jev_model
-                    )
-                finally:
-                    if isinstance(client, AsyncTypeSafeClient) and client is not _client:
-                        await client.aclose()
+                response = await client.system_one(state, questions, model=self.settings.jev_model)
         except Exception:  # noqa: BLE001 — key lookup, timeout and service errors fall through
             logger.warning("jev decider failed")
             return None
+        finally:
+            if owned is not None:
+                # Release the transport even after timeout or cancellation, off the message path.
+                close = asyncio.create_task(_close_client(owned))
+                _closing_clients.add(close)
+                close.add_done_callback(_closing_clients.discard)
         route = (
             attempt_for(ruled)
             if ruled

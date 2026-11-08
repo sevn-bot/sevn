@@ -540,6 +540,51 @@ def test_install_rejects_a_platform_missing_from_the_manifest(
     assert server.requests == []
 
 
+@pytest.mark.parametrize(
+    ("replies", "error"),
+    [
+        (("timeout", "ok"), None),
+        (("timeout", "timeout"), "download_failed"),
+        (("bad_hash",), "checksum_mismatch"),
+        (("missing",), "download_failed"),
+    ],
+)
+def test_runtime_download_retries_only_stalled_reads(tmp_path, monkeypatch, replies, error):
+    import httpx
+    from sevn.runtime import installs
+
+    attempts = []
+    archive = b"verified archive"
+    monkeypatch.setattr(installs, "_CHUNK", 4)
+
+    class Interrupted(httpx.SyncByteStream):
+        def __iter__(self):
+            yield b"partial archive"
+            raise httpx.ReadTimeout("stalled response body")
+
+    def serve(_transport, request):
+        reply = replies[len(attempts)]
+        attempts.append(request.url)
+        if reply == "timeout":
+            return httpx.Response(200, stream=Interrupted())
+        if reply == "missing":
+            return httpx.Response(404)
+        return httpx.Response(200, content=archive if reply == "ok" else b"other bytes")
+
+    monkeypatch.setattr(httpx.HTTPTransport, "handle_request", serve)
+    args = ("https://runtime.example/archive", tmp_path, "codex", "1", sha256(archive))
+    if error is None:
+        downloaded = installs._download(*args)
+        assert downloaded.read_bytes() == archive
+        downloaded.unlink()
+    else:
+        with pytest.raises(installs.InstallError) as failure:
+            installs._download(*args)
+        assert failure.value.code == error
+    assert len(attempts) == len(replies)
+    assert list(tmp_path.iterdir()) == []
+
+
 def test_install_download_failure_leaves_no_files(
     env: Env, server: FileServer, use_manifest: Any
 ) -> None:

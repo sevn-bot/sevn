@@ -509,6 +509,54 @@ async def test_timeout_preserves_rule_without_second_call(tmp_path, monkeypatch)
     assert (result.path, result.intent, result.delivery_policy) == ("rule", "follow_up", "queue")
 
 
+@pytest.mark.parametrize("request_times_out", [False, True])
+async def test_owned_jev_client_closes_outside_routing_deadline(
+    tmp_path, monkeypatch, request_times_out
+):
+    import asyncio
+
+    from sevn.decisions import jev
+    from sevn.decisions.registry import decide
+
+    arm_configured(monkeypatch, tmp_path)
+    monkeypatch.setattr(jev, "_ROUTE_TIMEOUT", 0.05)
+    closing = asyncio.Event()
+    release = asyncio.Event()
+    closed = asyncio.Event()
+
+    class Owned(FakeJev):
+        async def system_one(self, *args, **kwargs):
+            if request_times_out:
+                await asyncio.Event().wait()
+            return await super().system_one(*args, **kwargs)
+
+        async def aclose(self):
+            closing.set()
+            await release.wait()
+            closed.set()
+
+    client = Owned(answers={"delivery.mode": ("steer", 1.0)})
+
+    async def resolve(*, routing):
+        assert routing
+        return client
+
+    monkeypatch.setattr(jev, "AsyncTypeSafeClient", Owned)
+    monkeypatch.setattr(jev, "_resolve_client", resolve)
+    try:
+        async with asyncio.timeout(2):
+            decision = await decide(
+                _message(agent_id="lane"),
+                _context([_agent("lane", "Task", "", "running")]),
+                record=False,
+            )
+            await closing.wait()
+        assert decision.delivery_policy == ("queue" if request_times_out else "steer")
+    finally:
+        release.set()
+    await asyncio.wait_for(closed.wait(), timeout=2)
+
+
 async def test_rule_without_key_keeps_existing_behavior(tmp_path, monkeypatch):
     from sevn.decisions.base import ContextProfile
     from sevn.decisions.registry import decide
