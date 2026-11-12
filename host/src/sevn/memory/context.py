@@ -33,7 +33,13 @@ class _Block(str):
 
 
 async def with_memories(
-    bot_id: str, agent_id: str, text: str, *, prior: bool, history: list[object] | None = None
+    bot_id: str,
+    agent_id: str,
+    text: str,
+    *,
+    prior: bool,
+    history: list[object] | None = None,
+    mode: str = "auto",
 ) -> str:
     """``text`` with the memory block in front of it, for the turn's user prompt.
 
@@ -42,30 +48,41 @@ async def with_memories(
     model still has. Rewriting a request in ``before_model_request`` would show it
     to one request only, while the diff baseline moved on.
     """
+    key = (bot_id, agent_id)
     if history is not None:
         retained = _retained_snapshot(history)
-        _shown[(bot_id, agent_id)] = {} if retained is None else retained
-        if retained is None and prior:
-            # Legacy histories have no baseline. An authoritative snapshot also
-            # removes memories deleted before restart, even if the list is empty.
-            rows = await MemoryStore().list_for(bot_id)
-            _shown[(bot_id, agent_id)] = {
-                row.id: (row.text, row.tier, row.revision) for row in rows
-            }
-            return f"{_full(rows)}\n\n{text}"
+        if retained is None:
+            _shown.pop(key, None)
+        else:
+            _shown[key] = retained
+    if mode == "skip":
+        return text
+    if mode == "full" or (key not in _shown and (prior or mode == "diff")):
+        # Without a known baseline, replace any legacy memories, including
+        # deleted ones. An empty known snapshot is distinct from no snapshot.
+        rows = await MemoryStore().list_for(bot_id)
+        _shown[key] = {row.id: (row.text, row.tier, row.revision) for row in rows}
+        return f"{_full(rows)}\n\n{text}"
+    if mode == "diff":
+        prior = True
     prefix = await _prefix(bot_id, agent_id, prior=prior)
     if prefix == "":
         return text
     return f"{prefix}\n\n{text}"
 
 
-def memory_snapshot(bot_id: str, agent_id: str) -> dict[str, tuple[str, str, int]]:
+def memory_snapshot(bot_id: str, agent_id: str) -> dict[str, tuple[str, str, int]] | None:
     """Snapshot used to build this run's prompt; save it only with retained history."""
-    return dict(_shown.get((bot_id, agent_id), {}))
+    snapshot = _shown.get((bot_id, agent_id))
+    return None if snapshot is None else dict(snapshot)
 
 
-def retain_snapshot(messages: list[object], snapshot: dict[str, tuple[str, str, int]]) -> None:
+def retain_snapshot(
+    messages: list[object], snapshot: dict[str, tuple[str, str, int]] | None
+) -> None:
     """Attach application-only metadata to the latest retained user request."""
+    if snapshot is None:
+        return
     for raw in reversed(messages):
         if not isinstance(raw, dict):
             continue

@@ -5,12 +5,20 @@ from __future__ import annotations
 import asyncio
 import os
 from collections.abc import Mapping
+from dataclasses import replace
 from typing import Protocol, cast
 
-from typesafe_sdk import AsyncTypeSafeClient, Choice, Noul
+from typesafe_sdk import AsyncTypeSafeClient, Choice, Noul, RetryPolicy
 
-from sevn.config import Settings
-from sevn.decisions.base import Attempt, RouteDecision, object_dict, redact_text
+from sevn.config import DecisionsSettings, DecisionThresholds, Settings
+from sevn.decisions.base import (
+    Attempt,
+    ContextProfile,
+    RouteDecision,
+    attempt_for,
+    object_dict,
+    redact_text,
+)
 from sevn.decisions.thresholds import jev_accepts
 from sevn.domain.routing import OpenAgent, RouterContext
 from sevn.log import logger
@@ -30,9 +38,27 @@ _INTENTS: dict[str, str] = {
 _BUSY: dict[str, str] = {
     "queue": "wait until the running turn finishes",
     "steer": "inject this message into the running turn",
-    "interrupt": "stop the running turn and handle this message",
 }
+_CONTEXT = {
+    "history": {
+        "full": "all prior turns",
+        "recent": "last three user turns and responses",
+        "summary": "task description and last turn",
+    },
+    "memory": {
+        "full": "all available memories",
+        "diff": "only changes to memories",
+        "skip": "no memory block needed",
+    },
+    "siblings": {
+        "include": "needs other open lanes' titles and status",
+        "exclude": "independent of other lanes",
+    },
+    "attachments": {"include": "keep available attachments", "skip": "text alone suffices"},
+}
+_ROUTE_TIMEOUT = 3.0
 _client: _Jev | None = None
+_closing_clients: set[asyncio.Task[None]] = set()
 
 
 class _Jev(Protocol):
@@ -68,33 +94,120 @@ def use_client(client: _Jev | None) -> None:
     _client = client
 
 
+async def _close_client(client: AsyncTypeSafeClient) -> None:
+    try:
+        await client.aclose()
+    except Exception:  # noqa: BLE001 — a cleanup failure cannot change the routing answer
+        logger.warning("jev client close failed")
+
+
 class JevDecider:
     """Ask jev every router question in one request. Secrets are already redacted."""
 
-    async def attempt(self, context: RouterContext, state: str) -> Attempt | None:
-        client = await _resolve_client()
-        if client is None:
-            return None
-        questions = _questions(context)
-        model = Settings.load().decisions.jev_model
+    def __init__(self, settings: DecisionsSettings | None = None) -> None:
+        self.settings = settings or Settings.load().decisions
+        self.calls = 0
+
+    async def attempt(
+        self,
+        context: RouterContext,
+        state: str,
+        ruled: RouteDecision | None = None,
+    ) -> Attempt | None:
+        questions = _questions(context, ruled)
+        self.calls = 0
+        owned: AsyncTypeSafeClient | None = None
         try:
-            response = await client.system_one(state, questions, model=model)
-        except Exception:  # noqa: BLE001 — jev offline falls through
+            async with asyncio.timeout(_ROUTE_TIMEOUT):
+                client = await _resolve_client(routing=True)
+                if client is None:
+                    return None
+                if isinstance(client, AsyncTypeSafeClient) and client is not _client:
+                    owned = client
+                self.calls = 1
+                response = await client.system_one(state, questions, model=self.settings.jev_model)
+        except Exception:  # noqa: BLE001 — key lookup, timeout and service errors fall through
             logger.warning("jev decider failed")
             return None
-        return _attempt(
-            response,
-            asked_target="message.target_agent" in questions,
-            asked_busy="busy.policy" in questions,
+        finally:
+            if owned is not None:
+                # Release the transport even after timeout or cancellation, off the message path.
+                close = asyncio.create_task(_close_client(owned))
+                _closing_clients.add(close)
+                close.add_done_callback(_closing_clients.discard)
+        route = (
+            attempt_for(ruled)
+            if ruled
+            else _attempt(
+                response, self.settings.thresholds, asked_target="message.target_agent" in questions
+            )
         )
+        if route is None:
+            return None
+        gates = self.settings.thresholds
+        context_gate = gates.intent if gates.context is None else gates.context
+        delivery_gate = gates.busy if gates.delivery is None else gates.delivery
+        labels: dict[str, str] = {}
+        scores: dict[str, float] = {}
+        for name, menu in _CONTEXT.items():
+            answer = _choice(response, f"context.{name}")
+            if answer and answer[0] in menu:
+                scores[name] = answer[1]
+                if answer[1] >= context_gate:
+                    labels[name] = answer[0]
+        if labels:
+            labels.setdefault("siblings", "exclude")
+        decision = with_default_delivery(route.decision, context)
+        delivery = _choice(response, "delivery.mode") if "delivery.mode" in questions else None
+        target = _busy_target(decision, context)
+        if target and delivery and delivery[0] in _BUSY:
+            mode, confidence = delivery
+            if confidence >= delivery_gate and (target.runtime or context.runtime) == "pydantic_ai":
+                decision = replace(decision, delivery_policy=mode, delivery_confidence=confidence)
+        decision = replace(
+            decision,
+            context_profile=ContextProfile.model_validate(labels),
+            context_confidence=scores,
+        )
+        return replace(route, decision=decision)
 
 
-def _questions(context: RouterContext) -> dict[str, Choice]:
-    questions: dict[str, Choice] = {"message.intent": Choice(criteria=_INTENTS)}
-    if context.open_agents:
-        questions["message.target_agent"] = Choice(criteria=_target_criteria(context.open_agents))
-    if any(agent.status == "running" for agent in context.open_agents):
-        questions["busy.policy"] = Choice(criteria=_BUSY)
+def _busy_target(decision: RouteDecision, context: RouterContext) -> OpenAgent | None:
+    if decision.intent not in {"follow_up", "steer"} or decision.ask_user:
+        return None
+    return next(
+        (
+            lane
+            for lane in context.open_agents
+            if lane.id == decision.target_agent_id and (lane.status == "running" or lane.starting)
+        ),
+        None,
+    )
+
+
+def with_default_delivery(decision: RouteDecision, context: RouterContext) -> RouteDecision:
+    if _busy_target(decision, context) is None or decision.delivery_policy is not None:
+        return decision
+    mode = "steer" if decision.intent == "steer" else "queue"
+    return replace(decision, delivery_policy=mode)
+
+
+def _questions(context: RouterContext, ruled: RouteDecision | None) -> dict[str, Choice]:
+    questions = {f"context.{name}": Choice(criteria=menu) for name, menu in _CONTEXT.items()}
+    if ruled is None:
+        questions["message.intent"] = Choice(criteria=_INTENTS)
+        if context.open_agents:
+            questions["message.target_agent"] = Choice(
+                criteria=_target_criteria(context.open_agents)
+            )
+        candidates = [
+            lane for lane in context.open_agents if lane.status == "running" or lane.starting
+        ]
+    else:
+        target = _busy_target(ruled, context)
+        candidates = [target] if target else []
+    if any((lane.runtime or context.runtime) == "pydantic_ai" for lane in candidates):
+        questions["delivery.mode"] = Choice(criteria=_BUSY)
     return questions
 
 
@@ -104,7 +217,7 @@ def _target_criteria(agents: list[OpenAgent]) -> dict[str, str]:
     return criteria
 
 
-def _attempt(response: object, *, asked_target: bool, asked_busy: bool) -> Attempt | None:
+def _attempt(response: object, gates: DecisionThresholds, *, asked_target: bool) -> Attempt | None:
     intent = _choice(response, "message.intent")
     if intent is None:
         return None
@@ -117,39 +230,28 @@ def _attempt(response: object, *, asked_target: bool, asked_busy: bool) -> Attem
             target_label, target_confidence = "none", 0.0
         else:
             target_label, target_confidence = target
-    busy_label: str | None = None
-    busy_confidence: float | None = None
-    if asked_busy:
-        busy = _choice(response, "busy.policy")
-        # An unscripted question comes back at 0. It must not veto a confident intent.
-        if busy is None or busy[1] == 0.0:
-            busy_label, busy_confidence = None, None
-        else:
-            busy_label, busy_confidence = busy
     target_id = None if target_label in (None, "none") else target_label
     decision = RouteDecision(
         intent=intent_label,
         target_agent_id=target_id,
         confidence=intent_confidence,
         path="jev",
-        busy_policy=busy_label,
     )
     confidences: dict[str, object] = {"intent": intent_confidence}
     if target_confidence is not None:
         confidences["target"] = target_confidence
-    if busy_confidence is not None:
-        confidences["busy"] = busy_confidence
     return Attempt(
         decision=decision,
         accepted=jev_accepts(
             intent=intent_confidence,
             target=target_confidence,
-            busy=busy_confidence,
+            busy=None,
+            gates=gates,
         ),
         answers={
             "intent": intent_label,
             "target_agent_id": target_id,
-            "busy_policy": busy_label,
+            "busy_policy": None,
         },
         confidences=confidences,
     )
@@ -181,16 +283,22 @@ def _choice(response: object, name: str) -> tuple[str, float] | None:
         return None
     if not isinstance(confidence, int | float):
         return None
+    if not 0 <= confidence <= 1:
+        return None
     return label, float(confidence)
 
 
-async def _resolve_client() -> _Jev | None:
+async def _resolve_client(*, routing: bool = False) -> _Jev | None:
     if _client is not None:
         return _client
     key = await asyncio.to_thread(_typesafe_key)
     if key is None:
         return None
-    client = AsyncTypeSafeClient(api_key=key, model=Settings.load().decisions.jev_model)
+    model = Settings.load().decisions.jev_model
+    if routing:
+        client = AsyncTypeSafeClient(api_key=key, model=model, retry=RetryPolicy(max_retries=0))
+    else:
+        client = AsyncTypeSafeClient(api_key=key, model=model)
     return cast("_Jev", client)
 
 

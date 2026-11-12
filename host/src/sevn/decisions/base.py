@@ -2,14 +2,27 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import cast
+from dataclasses import dataclass, field
+from typing import Literal, cast
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from sevn.log import redact_string
 
 _STATE_LIMIT = 4000
+
+
+class ContextProfile(BaseModel):
+    """Prompt sources already available to the runtime. Defaults replay legacy jobs."""
+
+    model_config = ConfigDict(frozen=True)
+    history: Literal["full", "recent", "summary"] = "full"
+    memory: Literal["auto", "full", "diff", "skip"] = "auto"
+    siblings: Literal["include", "exclude"] = "include"
+    attachments: Literal["include", "skip"] = "include"
+
+
+DEFAULT_PROFILE = ContextProfile()
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,6 +37,10 @@ class RouteDecision:
     choices: tuple[str, ...] = ()
     choice_targets: tuple[str | None, ...] = ()
     busy_policy: str | None = None
+    context_profile: ContextProfile = DEFAULT_PROFILE
+    context_confidence: dict[str, float] = field(default_factory=dict[str, float])
+    delivery_policy: str | None = None
+    delivery_confidence: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)

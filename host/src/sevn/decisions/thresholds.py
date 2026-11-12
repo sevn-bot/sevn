@@ -12,9 +12,15 @@ def jev_thresholds() -> DecisionThresholds:
     return Settings.load().decisions.thresholds
 
 
-def jev_accepts(*, intent: float, target: float | None, busy: float | None) -> bool:
+def jev_accepts(
+    *,
+    intent: float,
+    target: float | None,
+    busy: float | None,
+    gates: DecisionThresholds | None = None,
+) -> bool:
     """True when every asked jev question meets its own threshold."""
-    gates = jev_thresholds()
+    gates = gates or jev_thresholds()
     if intent < gates.intent:
         return False
     if target is not None and target < gates.target:

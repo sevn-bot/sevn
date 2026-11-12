@@ -74,6 +74,20 @@ def test_evals_on_writes_report(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
     finally:
         use_client(None)
         _clear_report()
+    delivery = body["delivery"]
+    assert delivery["confusion_matrix"] == {
+        "queue": {"queue": 4, "steer": 0, "unresolved": 0},
+        "steer": {"queue": 4, "steer": 0, "unresolved": 0},
+    }
+    assert delivery["always_queue_accuracy"] == delivery["accuracy"] == 0.5
+    assert delivery["per_label"]["queue"] == {"precision": 0.5, "recall": 1.0}
+    assert body["context"]["cases"] >= 6
+    assert set(body["context"]["source_accuracy"]) == {
+        "history",
+        "siblings",
+        "memory",
+        "attachments",
+    }
     accuracy = body["accuracy"]
     assert isinstance(accuracy, dict)
     assert "message.intent" in accuracy
@@ -101,3 +115,52 @@ def test_datasets_are_synthetic() -> None:
             counts[intent] += 1
     for intent in _INTENTS:
         assert counts[intent] >= 20
+
+
+@pytest.mark.parametrize("labels", [{"delivery": "queue"}, {"profile": {"memory": "skip"}}])
+def test_specialized_dataset_writes_report_without_routing_judge(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, labels: dict[str, object]
+) -> None:
+    from sevn.decisions.base import ContextProfile, RouteDecision
+    from sevn.evals import decisions
+
+    arm_configured(monkeypatch, tmp_path, secrets_toml("[decisions]\nevals_on = true\n"))
+    folder = tmp_path / "host" / "evals" / "decisions"
+    folder.mkdir(parents=True)
+    (folder / "specialized.jsonl").write_text(
+        json.dumps({"text": "hello", "intent": "new_request", **labels}) + "\n"
+    )
+    monkeypatch.setattr(decisions, "_repo_root", lambda: tmp_path)
+
+    async def decide(*args, **kwargs):
+        return RouteDecision(
+            intent="new_request",
+            target_agent_id=None,
+            confidence=1,
+            path="rule",
+            delivery_policy="queue",
+            context_profile=ContextProfile(memory="skip"),
+        )
+
+    async def judge(*args, **kwargs):
+        pytest.fail("specialized datasets must not call the routing judge")
+
+    monkeypatch.setattr(decisions, "decide", decide)
+    monkeypatch.setattr(decisions, "score_routes", judge)
+    result = decisions.run_decisions()
+    assert result.path is not None
+    report = json.loads(result.path.read_text())
+    assert report["accuracy"] == {}
+    assert report["judge"]["status"] == "skipped"
+    if "delivery" in labels:
+        assert report["delivery"]["accuracy"] == 1
+    else:
+        assert report["context"]["exact_accuracy"] == 1
+
+
+async def test_empty_dataset_is_still_rejected() -> None:
+    from sevn.evals.decisions import _evaluate
+    from sevn.evals.errors import EvalsError
+
+    with pytest.raises(EvalsError, match="datasets are empty"):
+        await _evaluate([])

@@ -42,7 +42,9 @@ async def mark_corrected(decision_id: str | None, agent_id: str) -> None:
         await session.commit()
 
 
-async def record_attempt(state: str, attempt: Attempt) -> None:
+async def record_attempt(
+    state: str, attempt: Attempt, *, calls: int = 0, elapsed: float = 0.0, p95: float = 0.0
+) -> None:
     """Insert one row for a step that actually ran."""
     decision = attempt.decision
     outcome = "ask_user" if decision.ask_user else decision.intent
@@ -53,8 +55,17 @@ async def record_attempt(state: str, attempt: Attempt) -> None:
         point=_POINT,
         input_hash=hashlib.sha256(state.encode("utf-8")).hexdigest(),
         state_redacted=stored_state(state),
-        answers=attempt.answers,
-        confidences=attempt.confidences,
+        answers={
+            **attempt.answers,
+            "context_profile": decision.context_profile.model_dump(),
+            "delivery_policy": decision.delivery_policy,
+            "steer_injected": False,
+        },
+        confidences={
+            **attempt.confidences,
+            "delivery_confidence": decision.delivery_confidence,
+            "context_confidence": decision.context_confidence,
+        },
         path=decision.path,
         outcome=outcome,
         corrected_to=None,
@@ -66,7 +77,11 @@ async def record_attempt(state: str, attempt: Attempt) -> None:
         confidence=decision.confidence,
         accepted=attempt.accepted,
         decision_id=row_id,
-    ):
+    ) as span:
+        if attempt.accepted:
+            span.set_attribute("sevn.routing.jev_calls", calls)
+            span.set_attribute("sevn.routing.latency_ms", elapsed)
+            span.set_attribute("sevn.routing.latency_p95_ms", p95)
         async with open_session() as session:
             session.add(row)
             await session.commit()
