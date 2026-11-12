@@ -23,6 +23,7 @@ from sevn.decisions.thresholds import jev_accepts
 from sevn.domain.routing import OpenAgent, RouterContext
 from sevn.log import logger
 from sevn.paths import Paths
+from sevn.runtime.usage import usage_record
 from sevn.secrets.backends import open_backend
 from sevn.secrets.errors import SecretNotFound, SecretsBackendError
 
@@ -169,7 +170,7 @@ class JevDecider:
             context_profile=ContextProfile.model_validate(labels),
             context_confidence=scores,
         )
-        return replace(route, decision=decision)
+        return replace(route, decision=decision, usage=_jev_usage(response))
 
 
 def _busy_target(decision: RouteDecision, context: RouterContext) -> OpenAgent | None:
@@ -254,6 +255,20 @@ def _attempt(response: object, gates: DecisionThresholds, *, asked_target: bool)
             "busy_policy": None,
         },
         confidences=confidences,
+    )
+
+
+def _jev_usage(response: object) -> dict[str, object]:
+    """jev reports tokens but no price, so the cost of a routing call is unknown."""
+    usage = getattr(response, "usage", None)
+    return usage_record(
+        {
+            "requests": 1,
+            "input_tokens": getattr(usage, "input_tokens", None),
+            "output_tokens": getattr(usage, "output_tokens", None),
+        },
+        cost_usd=None,
+        cost_source="unknown",
     )
 
 

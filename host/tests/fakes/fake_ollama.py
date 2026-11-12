@@ -7,6 +7,8 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
+FAKE_OLLAMA_TOKENS = (90, 12)
+
 
 class FakeOllama:
     """Loopback server. ``GET /`` answers; ``POST /api/chat`` returns ``content``."""
@@ -42,6 +44,8 @@ class FakeOllama:
                     {
                         "model": "llama3.2:3b",
                         "done": True,
+                        "prompt_eval_count": FAKE_OLLAMA_TOKENS[0],
+                        "eval_count": FAKE_OLLAMA_TOKENS[1],
                         "message": {"role": "assistant", "content": owner.content},
                     }
                 ).encode()

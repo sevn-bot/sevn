@@ -4,11 +4,15 @@ from __future__ import annotations
 
 import asyncio
 
+from pydantic_ai.messages import ModelMessage, ModelResponse
+from pydantic_ai.usage import RunUsage
+
 from sevn.config import Settings
 from sevn.decisions.base import Attempt, ModelRoute, attempt_from_model, model_prompt
 from sevn.decisions.thresholds import step_accepts
 from sevn.log import logger
 from sevn.runtime.models import cheapest_configured_model, resolve_model
+from sevn.runtime.usage import price_responses, usage_record
 
 _INSTRUCTIONS = "Choose a route. Reply with the structured route and a confidence from 0 to 1."
 
@@ -33,7 +37,31 @@ class LLMDecider:
             logger.warning("llm decider failed")
             return None
         parsed = result.output
-        return attempt_from_model(parsed, "llm", accepted=step_accepts(parsed.confidence))
+        return attempt_from_model(
+            parsed,
+            "llm",
+            accepted=step_accepts(parsed.confidence),
+            usage=_usage(result.usage, result.new_messages()),
+        )
+
+
+def _usage(usage: RunUsage, messages: list[ModelMessage]) -> dict[str, object]:
+    """The call's counts, priced per response like a turn."""
+    cost, source = price_responses(
+        message for message in messages if isinstance(message, ModelResponse)
+    )
+    return usage_record(
+        {
+            "requests": usage.requests,
+            "tool_calls": usage.tool_calls,
+            "input_tokens": usage.input_tokens,
+            "output_tokens": usage.output_tokens,
+            "cache_read_tokens": usage.cache_read_tokens,
+            "cache_write_tokens": usage.cache_write_tokens,
+        },
+        cost_usd=cost,
+        cost_source=source,
+    )
 
 
 def _model_name() -> str:

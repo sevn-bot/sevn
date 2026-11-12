@@ -43,9 +43,15 @@ async def mark_corrected(decision_id: str | None, agent_id: str) -> None:
 
 
 async def record_attempt(
-    state: str, attempt: Attempt, *, calls: int = 0, elapsed: float = 0.0, p95: float = 0.0
+    state: str,
+    attempt: Attempt,
+    *,
+    bot_id: str | None = None,
+    calls: int = 0,
+    elapsed: float = 0.0,
+    p95: float = 0.0,
 ) -> None:
-    """Insert one row for a step that actually ran."""
+    """Insert one row for a step that actually ran, with what its model call used."""
     decision = attempt.decision
     outcome = "ask_user" if decision.ask_user else decision.intent
     row_id = new_id("dec_")
@@ -70,6 +76,8 @@ async def record_attempt(
         outcome=outcome,
         corrected_to=None,
         created_at=_created_at(),
+        bot_id=bot_id,
+        usage=attempt.usage,
     )
     with route_span(
         point=_POINT,

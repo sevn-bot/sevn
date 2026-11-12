@@ -112,7 +112,12 @@ async def decide(
         _latencies.append(elapsed)
         p95 = sorted(_latencies)[ceil(len(_latencies) * 0.95) - 1]
         await record_attempt(
-            state, replace(chosen, decision=decision), calls=calls, elapsed=elapsed, p95=p95
+            state,
+            replace(chosen, decision=decision),
+            bot_id=context.bot_id,
+            calls=calls,
+            elapsed=elapsed,
+            p95=p95,
         )
     return decision
 
@@ -178,5 +183,5 @@ async def _keep(
     if attempt.accepted:
         return attempt
     if record:
-        await record_attempt(state, attempt)
+        await record_attempt(state, attempt, bot_id=context.bot_id)
     return None

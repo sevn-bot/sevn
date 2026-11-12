@@ -21,6 +21,7 @@ from sevn.domain.host_status import FleetHost, host_status, ollama_status
 from sevn.domain.metrics import FleetMetric
 from sevn.domain.metrics import tiles as metric_tiles
 from sevn.domain.session import open_session
+from sevn.domain.spend import routing_usage
 from sevn.runtime.usage import cost_of, cost_source_of, tokens_of
 from sevn.store.db import utcnow
 from sevn.store.models import Agent as AgentRow
@@ -408,6 +409,16 @@ async def _activity(session: AsyncSession, first: date) -> list[FleetDay]:
             unpriced[key] += 1
         elif isinstance(spent, float):
             costs[key] = costs.get(key, 0.0) + spent
+    # Routing a message is spend for its bot, but not a finished turn.
+    for bot_id, when, usage in await routing_usage(session, start):
+        if bot_id is None:
+            continue
+        key = (bot_id, when.date().isoformat())
+        spent = _spend(usage)
+        if spent is _UNPRICED:
+            unpriced[key] += 1
+        elif isinstance(spent, float):
+            costs[key] = costs.get(key, 0.0) + spent
     keys = sorted(set(counts) | set(costs) | set(unpriced))
     return [
         FleetDay(
@@ -447,6 +458,18 @@ class _Today:
     tokens: int = 0
     unpriced: int = 0
     subscription: int = 0
+    routing_calls: int = 0
+
+    def add(self, usage: dict[str, object]) -> None:
+        """Count one turn's or one routing call's usage."""
+        self.tokens += tokens_of(usage)
+        if usage and cost_source_of(usage) == "subscription":
+            self.subscription += 1
+        spent = _spend(usage)
+        if spent is _UNPRICED:
+            self.unpriced += 1
+        elif isinstance(spent, float):
+            self.spend += spent
 
 
 async def _today(session: AsyncSession, today: date) -> _Today:
@@ -462,14 +485,10 @@ async def _today(session: AsyncSession, today: date) -> _Today:
         if finished_at is None or _utc(finished_at) < start:
             continue
         body = _object_dict(usage) or {}
-        found.tokens += tokens_of(body)
-        if body and cost_source_of(body) == "subscription":
-            found.subscription += 1
-        spent = _spend(body)
-        if spent is _UNPRICED:
-            found.unpriced += 1
-        elif isinstance(spent, float):
-            found.spend += spent
+        found.add(body)
+    for _bot, _when, usage in await routing_usage(session, start):
+        found.routing_calls += 1
+        found.add(usage)
     return found
 
 
@@ -481,7 +500,8 @@ async def _running_turns(session: AsyncSession) -> int:
 
 
 def _kpis(today: _Today, *, waiting: int, running: int) -> list[FleetKpi]:
-    notes = ["turns finished since 00:00 UTC", "routing calls not included"]
+    calls = "routing call" if today.routing_calls == 1 else "routing calls"
+    notes = [f"turns finished and {today.routing_calls} {calls} since 00:00 UTC"]
     if today.unpriced:
         notes.append(f"{today.unpriced} unpriced")
     if today.subscription:
@@ -498,7 +518,7 @@ def _kpis(today: _Today, *, waiting: int, running: int) -> list[FleetKpi]:
             label="Spend today",
             value=round(today.spend, 6),
             unit="USD",
-            source="turn usage priced with genai-prices",
+            source="turn and routing usage priced with genai-prices",
             note="; ".join(notes),
             unpriced=today.unpriced,
             subscription=today.subscription,
@@ -510,8 +530,8 @@ def _kpis(today: _Today, *, waiting: int, running: int) -> list[FleetKpi]:
             label="Tokens today",
             value=float(today.tokens),
             unit="tokens",
-            source="turn usage (input + output)",
-            note="turns finished since 00:00 UTC",
+            source="turn and routing usage (input + output)",
+            note="turns finished and routing calls since 00:00 UTC",
         ),
         FleetKpi(
             key="waiting",
