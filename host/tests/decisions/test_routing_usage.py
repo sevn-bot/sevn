@@ -209,10 +209,11 @@ async def test_rule_and_default_steps_record_no_usage(
         _reset()
     assert ruled.path == "rule"
     assert fallback.path == "default"
-    assert [(row["path"], row["usage"]) for row in _rows(tmp_path)] == [
-        ("rule", None),
-        ("default", None),
-    ]
+    # SQL NULL, not the JSON text "null", so the spend query can skip them in SQL.
+    rows = fetch_all(
+        tmp_path, "SELECT path, usage IS NULL AS missing FROM decision_log ORDER BY created_at"
+    )
+    assert [(row["path"], row["missing"]) for row in rows] == [("rule", 1), ("default", 1)]
 
 
 async def _routing_row(bot_id: str, when: datetime, usage: dict[str, object]) -> None:
