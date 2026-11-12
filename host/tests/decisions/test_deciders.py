@@ -112,8 +112,9 @@ def _criteria(question: object) -> dict[str, object]:
 class RecordingRuntime:
     """Throwaway CLI runtime. Records open/close and any tools it was given."""
 
-    def __init__(self, text: str) -> None:
+    def __init__(self, text: str, usage: dict[str, object] | None = None) -> None:
         self.text = text
+        self.usage = usage
         self.opened: list[str] = []
         self.closed: list[str] = []
         self.session_refs: list[str] = []
@@ -139,10 +140,11 @@ class RecordingRuntime:
             self.tools.append(tools)
         self.prompts.append(str(getattr(turn, "text", "")))
         text = self.text
+        usage = self.usage
 
         async def generate() -> Any:
             yield RuntimeEvent(kind="text_delta", text=text)
-            yield RuntimeEvent(kind="turn_finished", text=text, model_messages=[])
+            yield RuntimeEvent(kind="turn_finished", text=text, model_messages=[], usage=usage)
 
         return generate()
 

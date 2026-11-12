@@ -146,7 +146,7 @@ const full = overview({
       value: 0.8,
       unit: "USD",
       source: "turn usage priced with genai-prices",
-      note: "turns finished since 00:00 UTC; routing calls not included",
+      note: "turns finished and 3 routing calls since 00:00 UTC",
       unpriced: 1,
       subscription: 2,
     },
@@ -349,7 +349,7 @@ test("KPI strip shows spend, tokens, waiting and running with sources", async ()
     expect(spend.textContent).toContain("1 unpriced");
     expect(spend.textContent).toContain("2 on subscription");
     expect(spend.getAttribute("title")).toContain("genai-prices");
-    expect(spend.getAttribute("title")).toContain("routing calls not included");
+    expect(spend.getAttribute("title")).toContain("3 routing calls");
     const tokens = await testing.screen.findByTestId("kpi-tokens_today");
     expect(tokens.textContent).toContain("15.4k");
     const running = await testing.screen.findByTestId("kpi-running");

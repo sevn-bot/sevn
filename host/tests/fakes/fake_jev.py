@@ -48,6 +48,17 @@ class _ScoreAnswer:
         self.confidence = confidence
 
 
+class FakeJevUsage:
+    """Token counts shaped like the typesafe ``Usage``. jev reports no price."""
+
+    def __init__(self, input_tokens: int | None, output_tokens: int | None) -> None:
+        self.input_tokens = input_tokens
+        self.output_tokens = output_tokens
+
+
+FAKE_JEV_USAGE = (120, 8)
+
+
 class FakeJevResponse:
     """Answer bags shaped like the typesafe ``SystemOneResponse``."""
 
@@ -63,6 +74,7 @@ class FakeJevResponse:
         self.nouls = nouls
         self.scores = scores
         self.model = model
+        self.usage = FakeJevUsage(*FAKE_JEV_USAGE)
 
 
 class FakeJev:

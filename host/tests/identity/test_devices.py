@@ -264,7 +264,8 @@ def test_migrations_single_head() -> None:
     )
     assert completed.returncode == 0, completed.stderr
     head = script_head()
-    assert head == revision_ending(DEVICES_SUFFIX)
+    # This plan's revision is in the single chain; a later plan's revision may follow it.
+    assert revision_ending(DEVICES_SUFFIX)
     assert head in completed.stdout, completed.stdout
 
 
@@ -292,8 +293,8 @@ def test_upgrade_from_previous_head(tmp_path: Path) -> None:
     db = tmp_path / "sevn.db"
     cfg = _alembic_config()
     cfg.set_main_option("sqlalchemy.url", f"sqlite:///{db}")
-    this_head = revision_ending(DEVICES_SUFFIX)
-    command.upgrade(cfg, down_revision_of(this_head))
+    devices = revision_ending(DEVICES_SUFFIX)
+    command.upgrade(cfg, down_revision_of(devices))
     stamp = "2026-11-01 09:00:00.000000+00:00"
     with sqlite3.connect(db) as connection:
         connection.execute(
@@ -316,7 +317,7 @@ def test_upgrade_from_previous_head(tmp_path: Path) -> None:
         }
         columns = {row[1] for row in connection.execute("PRAGMA table_info(devices)")}
         nullable = {row[1]: not row[3] for row in connection.execute("PRAGMA table_info(devices)")}
-    assert version == [(this_head,)]
+    assert version == [(script_head(),)]
     assert events == [(1, "system.ping", '{"note": "before 0011"}')]
     assert shares == [("shr_fixture", "Fixture link")]
     assert {"devices", "pairing_tickets", "pairing_attempts"} <= tables
