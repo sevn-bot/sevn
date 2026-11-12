@@ -354,7 +354,8 @@ class DecisionLog(Base):
     # The bot whose message was routed, and what the step's model call used
     # (the shared usage shape). Null usage: rules and the default step.
     bot_id: Mapped[str | None] = mapped_column(String, nullable=True)
-    usage: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
+    # none_as_null: a step with no model call stores SQL NULL, not JSON "null".
+    usage: Mapped[dict[str, object] | None] = mapped_column(JSON(none_as_null=True), nullable=True)
 
 
 class RouteDecisionRow(Base):
