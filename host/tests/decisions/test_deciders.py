@@ -437,7 +437,7 @@ async def test_rule_target_gets_one_gated_classification(tmp_path, monkeypatch, 
     answers = json.loads(row["answers"])
     assert answers["delivery_policy"] == expected
     assert answers["context_profile"]["history"] == ("recent" if score > 0.9 else "full")
-    assert json.loads(row["confidences"])["delivery_confidence"] == score
+    assert json.loads(row["confidences"])["delivery_confidence"] == (score if score > 0.9 else 0.0)
 
 
 @pytest.mark.parametrize("intent", ["answer", "cancel"])
@@ -479,6 +479,37 @@ async def test_noninjectable_lane_never_asks_to_steer(tmp_path, monkeypatch):
         use_client(None)
     assert result.delivery_policy == "queue"
     assert "delivery.mode" not in fake.requests[0].questions
+
+
+@pytest.mark.parametrize("runtime", ["pydantic_ai", "claude"])
+@pytest.mark.parametrize("mode", ["queue", "steer"])
+async def test_delivery_confidence_belongs_to_applied_answer(tmp_path, monkeypatch, runtime, mode):
+    from dataclasses import replace
+
+    from sevn.decisions.jev import use_client
+    from sevn.decisions.registry import decide
+
+    arm_configured(monkeypatch, tmp_path)
+    await upgrade_home(tmp_path)
+    target = replace(_agent("target", "Task", "", "running"), runtime=runtime)
+    sibling = replace(_agent("sibling", "Other task", "", "running"), runtime="pydantic_ai")
+    fake = FakeJev(
+        answers={
+            "message.intent": ("follow_up", 0.99),
+            "message.target_agent": ("target", 0.99),
+            "delivery.mode": (mode, 0.95),
+        }
+    )
+    use_client(fake)
+    try:
+        decision = await decide(_message(), _context([target, sibling]))
+    finally:
+        use_client(None)
+    assert "delivery.mode" in fake.requests[0].questions
+    applied = runtime == "pydantic_ai"
+    assert decision.delivery_policy == (mode if applied else "queue")
+    (row,) = decision_rows(tmp_path)
+    assert json.loads(row["confidences"])["delivery_confidence"] == (0.95 if applied else 0.0)
 
 
 async def test_timeout_preserves_rule_without_second_call(tmp_path, monkeypatch):

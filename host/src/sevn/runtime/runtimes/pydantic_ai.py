@@ -127,6 +127,11 @@ class PydanticAIRuntime:
             agent.instrument = instrumentation
         history = _history(turn.message_history)
         deferred = _deferred(turn.approvals)
+        memory_mode = profile.memory
+        if profile.history != "full" and memory_mode in {"auto", "diff"}:
+            # A retained snapshot can outlive the prompt containing its full memory block.
+            # Rebase each shortened turn so subsequent diffs have a visible baseline.
+            memory_mode = "full"
         # A resumed approval sends no new prompt: its block is already in history.
         prompt = (
             await with_memories(
@@ -135,7 +140,7 @@ class PydanticAIRuntime:
                 turn.text,
                 prior=bool(turn.message_history),
                 history=turn.message_history or [],
-                mode=profile.memory,
+                mode=memory_mode,
             )
             if deferred is None
             else turn.text

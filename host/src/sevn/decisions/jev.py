@@ -163,8 +163,7 @@ class JevDecider:
         if target and delivery and delivery[0] in _BUSY:
             mode, confidence = delivery
             if confidence >= delivery_gate and (target.runtime or context.runtime) == "pydantic_ai":
-                decision = replace(decision, delivery_policy=mode)
-            decision = replace(decision, delivery_confidence=confidence)
+                decision = replace(decision, delivery_policy=mode, delivery_confidence=confidence)
         decision = replace(
             decision,
             context_profile=ContextProfile.model_validate(labels),
