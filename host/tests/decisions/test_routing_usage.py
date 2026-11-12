@@ -250,22 +250,25 @@ def _priced(cost: float, tokens: int = 1000) -> dict[str, object]:
     )
 
 
+@pytest.mark.parametrize("minute", [0, 2, 720])
 async def test_routing_spend_joins_the_spend_tokens_and_cost_grid(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, minute: int
 ) -> None:
+    from sevn.domain import fleet
     from sevn.runtime.usage import usage_record
 
+    now = datetime(2026, 11, 12, tzinfo=UTC) + timedelta(minutes=minute)
+    monkeypatch.setattr(fleet, "utcnow", lambda: now)
     load_modules("sevn.api.bots", "sevn.api.fleet")
     async with connected(tmp_path, monkeypatch) as (_host, client):
         frame, _earlier = await request(
             client, "bots.create", {"name": "Router", "op_id": mint_id("op_")}
         )
         bot_id = ok(frame)["id"]
-        now = datetime.now(UTC)
-        await _routing_row(bot_id, now - timedelta(minutes=5), _priced(0.25, tokens=1000))
+        await _routing_row(bot_id, now, _priced(0.25, tokens=1000))
         await _routing_row(
             bot_id,
-            now - timedelta(minutes=4),
+            now,
             usage_record(
                 {"requests": 1, "input_tokens": 120, "output_tokens": 8},
                 cost_usd=None,
@@ -273,7 +276,7 @@ async def test_routing_spend_joins_the_spend_tokens_and_cost_grid(
             ),
         )
         # Yesterday's routing does not count today.
-        await _routing_row(bot_id, now - timedelta(days=1, hours=1), _priced(9.0))
+        await _routing_row(bot_id, now - timedelta(days=1), _priced(9.0))
         frame, _earlier = await request(client, "fleet.overview", {})
         body = ok(frame)
     kpis = {tile["key"]: tile for tile in body["kpis"]}
@@ -290,8 +293,9 @@ async def test_routing_spend_joins_the_spend_tokens_and_cost_grid(
     assert cell["turns"] == 0
 
 
+@pytest.mark.parametrize("minute", [0, 2, 720])
 async def test_routing_spend_counts_toward_a_bot_budget(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, minute: int
 ) -> None:
     from sevn.domain.session import open_session
     from sevn.domain.spend import day_start, spend_by_bot
@@ -302,8 +306,8 @@ async def test_routing_spend_counts_toward_a_bot_budget(
             client, "bots.create", {"name": "Router", "op_id": mint_id("op_")}
         )
         bot_id = ok(frame)["id"]
-        now = datetime.now(UTC)
-        await _routing_row(bot_id, now - timedelta(minutes=5), _priced(0.4))
+        now = datetime(2026, 11, 12, tzinfo=UTC) + timedelta(minutes=minute)
+        await _routing_row(bot_id, now, _priced(0.4))
         async with open_session() as session:
             spent = await spend_by_bot(session, day_start(now))
     assert spent == {bot_id: pytest.approx(0.4)}
