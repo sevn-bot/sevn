@@ -1,6 +1,6 @@
 # Plan: fleet dashboards
 
-Status: phases 1–4 merged into `wave/fleet-dashboards` (PRs #11, #12, #14, #15); phase 6 in review (PR #16). Phase 5 waits on bot-to-bot delegation and A2UI. Phase 4's routine model still has to move onto plan 0050's tables when 0050 lands (see below). Integration branch: `wave/fleet-dashboards`, which includes the merged bot core (PR #9). Every PR for this plan targets `wave/fleet-dashboards`, not `test` or `main`.
+Status: phases 1–4 and 6 are on `test` (PRs #11, #12, #14, #15, #16, then #17). Router spend follows on its own PR into `test`. Phase 5 waits on bot-to-bot delegation and A2UI. Phase 4's routine model still has to move onto plan 0050's tables when 0050 lands (see below).
 
 Source: the "Agent Fleet Dashboards" playbook, which restates ideas from Alex Finn's video on running a fleet of about 20 agents. This plan maps those ideas onto sevn.
 
@@ -70,7 +70,14 @@ Done when:
 - A resumed or auto-approved turn adds up the usage of each of its runs.
 - KPI strip: spend today (priced turns only, with unpriced and subscription counts beside it), tokens today, waiting requests, running turns against `runtime.max_running_turns`. Each tile names its source. A missing value reads unavailable.
 - The heat map can switch to cost.
-- Not done yet: router spend. `decision_log` has no usage or bot id, so jev, the LLM step and the Claude CLI step are not counted. The spend tile says so. This needs a column on `decision_log` and usage from each decider.
+- Router spend (migration `0012_routing_usage`): each routing step that calls a model stores its usage and the routed bot on its `decision_log` row.
+  - The LLM step is priced per response, like a turn.
+  - Ollama is `local` at 0.
+  - The CLI one-shot is `subscription`, with the SDK's estimate.
+  - jev reports tokens but no price, so its calls are `unknown`.
+  - Rules and the default step call no model and record none.
+  - The spend and tokens tiles, the cost heat map and the daily budgets add routing to turns. A routing call is spend, not a finished turn.
+  - Not counted: a step that fails before it answers (it has no row), and the jev scores outside routing (memory capture, inbound injection).
 - No migration: the usage shape lives in the existing `turns.usage` JSON column.
 
 ## Phase 3: questions with options
