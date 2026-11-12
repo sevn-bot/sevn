@@ -269,9 +269,24 @@ class TurnRunner:
                         turn_id, started, job, agent, bot, stored=stored, usage=outcome.usage
                     )
                 elif outcome.approvals or await PendingService().has_waiting(turn_id):
-                    await self._persist_waiting(
-                        turn_id, started, job, agent, bot, outcome, stored=stored
+                    # A question marks the turn waiting before this final write.
+                    # If cancelled now, finish the transaction before the worker
+                    # persists cancellation; interrupting a SQLite statement can
+                    # leave its writer lock held until the cursor is collected.
+                    saving = asyncio.create_task(
+                        self._persist_waiting(
+                            turn_id, started, job, agent, bot, outcome, stored=stored
+                        )
                     )
+                    cancelled = False
+                    while not saving.done():
+                        try:
+                            await asyncio.shield(saving)
+                        except asyncio.CancelledError:
+                            cancelled = True
+                    saving.result()
+                    if cancelled:
+                        raise asyncio.CancelledError
                 else:
                     await self._persist_done(
                         turn_id,

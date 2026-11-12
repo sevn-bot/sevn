@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -275,26 +276,59 @@ async def test_an_approval_still_takes_approve_or_deny(
         assert frame.get("e", {}).get("code") in {"not_found", "invalid_params"}
 
 
+@pytest.mark.parametrize("during_persist", [False, True])
 async def test_cancelling_the_turn_expires_its_question(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, during_persist: bool
 ) -> None:
+    from sevn.runtime import turn as turn_module
     from sevn.runtime.worker import bind
+
+    writing, release_write, interrupt_called = (asyncio.Event() for _ in range(3))
+    interrupted_write = False
+    question_message = turn_module.question_message
+
+    async def pause_write(*args, **kwargs):
+        nonlocal interrupted_write
+        writing.set()
+        try:
+            await release_write.wait()
+        except asyncio.CancelledError:
+            interrupted_write = True
+            raise
+        return await question_message(*args, **kwargs)
+
+    if during_persist:
+        monkeypatch.setattr(turn_module, "question_message", pause_write)
 
     reset_model_requests()
     load_modules("sevn.api.bots", "sevn.api.messages", "sevn.api.pending")
     _install({"question": "Which day?"})
     try:
         async with connected(tmp_path, monkeypatch) as (host, client):
-            bind(host.hub)
+            worker = bind(host.hub)
+            interrupt = worker._pydantic.interrupt
+
+            async def signal_interrupt(agent_id):
+                await interrupt(agent_id)
+                interrupt_called.set()
+
+            monkeypatch.setattr(worker._pydantic, "interrupt", signal_interrupt)
             sent, pending_id = await _asked(client, tmp_path)
             turn = fetch_all(
                 tmp_path,
                 "SELECT id FROM turns WHERE agent_id = ? AND status = 'waiting'",
                 (sent["agent_id"],),
             )
-            frame, _earlier = await request(
-                client, "turns.cancel", {"turn_id": turn[0]["id"], "op_id": mint_id("op_")}
+            if during_persist:
+                await asyncio.wait_for(writing.wait(), 5)
+            cancellation = asyncio.create_task(
+                request(client, "turns.cancel", {"turn_id": turn[0]["id"], "op_id": mint_id("op_")})
             )
+            if during_persist:
+                await asyncio.wait_for(interrupt_called.wait(), 5)
+                release_write.set()
+            frame, _earlier = await cancellation
+            assert not interrupted_write
             ok(frame)
             rows = fetch_all(
                 tmp_path, "SELECT status, answer FROM pending_requests WHERE id = ?", (pending_id,)
@@ -302,6 +336,7 @@ async def test_cancelling_the_turn_expires_its_question(
             assert rows[0]["status"] == "resolved"
             assert json.loads(rows[0]["answer"]) == {"expired": True}
     finally:
+        release_write.set()
         _clear()
 
 
