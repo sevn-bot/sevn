@@ -1,7 +1,8 @@
 """Router spend: what each routing step's model call used (plan fleet-dashboards).
 
 ``decision_log.usage`` holds the shared usage shape (``runtime/usage.py``) for a
-step that called a model, and is null for rules and the default step.
+step that called a model, and is null when no model was called. Rule-matched
+routes include any Jev context/delivery classification usage.
 ``decision_log.bot_id`` is the bot whose message was routed, so the spend can
 be counted per bot.
 """

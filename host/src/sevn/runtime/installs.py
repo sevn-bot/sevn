@@ -381,30 +381,37 @@ def _target(
 
 
 def _download(url: str, tmp: Path, name: str, version: str, expected: str) -> Path:
-    """One GET into a file under ``tmp``; the file is removed unless the hash matches."""
+    """Retry one stalled read, starting with a fresh file and checksum."""
+    try:
+        try:
+            return _download_once(url, tmp, name, version, expected)
+        except httpx.ReadTimeout:
+            return _download_once(url, tmp, name, version, expected)
+    except (httpx.HTTPError, OSError) as exc:
+        raise InstallError(
+            "download_failed", f"download of {name} {version} failed: {exc}"
+        ) from exc
+
+
+def _download_once(url: str, tmp: Path, name: str, version: str, expected: str) -> Path:
     handle, raw_path = tempfile.mkstemp(prefix=f"{name}-{version}-", suffix=".download", dir=tmp)
     path = Path(raw_path)
     digest = hashlib.sha256()
     try:
         with os.fdopen(handle, "wb") as out:
-            try:
-                with (
-                    httpx.Client(follow_redirects=True, timeout=_TIMEOUT) as client,
-                    client.stream("GET", url) as response,
-                ):
-                    if response.status_code != 200:
-                        raise InstallError(
-                            "download_failed",
-                            f"download of {name} {version} failed: HTTP {response.status_code} "
-                            f"from {url}",
-                        )
-                    for chunk in response.iter_bytes(_CHUNK):
-                        digest.update(chunk)
-                        out.write(chunk)
-            except (httpx.HTTPError, OSError) as exc:
-                raise InstallError(
-                    "download_failed", f"download of {name} {version} failed: {exc}"
-                ) from exc
+            with (
+                httpx.Client(follow_redirects=True, timeout=_TIMEOUT) as client,
+                client.stream("GET", url) as response,
+            ):
+                if response.status_code != 200:
+                    raise InstallError(
+                        "download_failed",
+                        f"download of {name} {version} failed: HTTP {response.status_code} "
+                        f"from {url}",
+                    )
+                for chunk in response.iter_bytes(_CHUNK):
+                    digest.update(chunk)
+                    out.write(chunk)
         actual = digest.hexdigest()
         if actual != expected:
             raise InstallError(

@@ -112,8 +112,9 @@ def _reset() -> None:
     use_model(None)
 
 
+@pytest.mark.parametrize("text,path", [("plan a trip", "jev"), ("/new plan a trip", "rule")])
 async def test_jev_step_records_its_tokens_and_an_unknown_cost(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, text: str, path: str
 ) -> None:
     from sevn.decisions.jev import use_client
     from sevn.decisions.registry import decide
@@ -129,10 +130,10 @@ async def test_jev_step_records_its_tokens_and_an_unknown_cost(
         )
     )
     try:
-        decision = await decide(_message("plan a trip"), _context())
+        decision = await decide(_message(text), _context())
     finally:
         _reset()
-    assert decision.path == "jev"
+    assert decision.path == path
     [row] = _rows(tmp_path)
     assert row["bot_id"] == _BOT
     usage = row["usage"]

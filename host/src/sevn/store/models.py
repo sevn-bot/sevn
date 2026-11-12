@@ -352,7 +352,7 @@ class DecisionLog(Base):
     corrected_to: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     # The bot whose message was routed, and what the step's model call used
-    # (the shared usage shape). Null usage: rules and the default step.
+    # (the shared usage shape). Null usage: no model call for this step.
     bot_id: Mapped[str | None] = mapped_column(String, nullable=True)
     # none_as_null: a step with no model call stores SQL NULL, not JSON "null".
     usage: Mapped[dict[str, object] | None] = mapped_column(JSON(none_as_null=True), nullable=True)

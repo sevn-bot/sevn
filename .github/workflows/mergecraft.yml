@@ -2,10 +2,7 @@
 #
 # Reviewer: OpenCode Go subscription, model opencode-go/deepseek-v4.1-flash.
 # That is the primary rung in alexhawat/mergeCraft's own review workflow.
-# The action pin below is manifest commit 9e4318a on mergeCraft main, the same
-# commit mergeCraft's own review runs. It is newer than v0.1.0a4 and carries the
-# fix that keeps inline review comments from being rejected with a 422. Its
-# action.yml pins the container image by digest.
+# The manifest pins the reviewer image by digest and supports ignore_paths.
 #
 # Trigger is pull_request, not pull_request_target. This job is not a required
 # ruleset, and pull_request keeps repository secrets out of fork runs. The
@@ -17,6 +14,9 @@ name: mergeCraft
 on:
   pull_request:
     types: [opened, ready_for_review, synchronize]
+    paths-ignore:
+      - 'host/evals/**/*.jsonl'
+      - 'CHANGELOG.md'
   workflow_dispatch:
     inputs:
       prompt:
@@ -57,13 +57,16 @@ jobs:
 
       - name: Run mergeCraft
         if: env.HAS_OPENCODE_GO == 'true'
-        uses: alexhawat/mergeCraft@9e4318a81c47ad20313966105e9d0038e415198f # main manifest 9e4318a (image built from d103e90c)
+        uses: alexhawat/mergeCraft@ee0420055aa652f6ae40df911d56b0c6f93260db
         with:
           prompt: >
             ${{ github.event_name == 'pull_request'
                 && 'Review this pull request.'
                 || github.event.inputs.prompt }}
           model: opencode-go/deepseek-v4.1-flash
+          ignore_paths: |
+            host/evals/**/*.jsonl
+            CHANGELOG.md
           model_pin: enabled
           push: disabled
           shell: disabled
@@ -71,7 +74,7 @@ jobs:
           timeout: 40m
         env:
           # Keep equal to the uses: commit above. The container cannot read it.
-          MERGECRAFT_ACTION_SHA: 9e4318a81c47ad20313966105e9d0038e415198f
+          MERGECRAFT_ACTION_SHA: ee0420055aa652f6ae40df911d56b0c6f93260db
           LLM_PROVIDER_9: opencode-go
           OPENCODE_GO_API_KEY: ${{ secrets.LLM_PROVIDER_9_API_KEY }}
 

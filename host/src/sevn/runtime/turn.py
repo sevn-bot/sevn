@@ -11,6 +11,7 @@ from typing import Protocol
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sevn.decisions.base import DEFAULT_PROFILE, ContextProfile
 from sevn.decisions.registry import begin_inbound, end_inbound, inbound_hits
 from sevn.domain.agents import AgentRecord, AgentService
 from sevn.domain.bots import BotRecord, BotService
@@ -30,6 +31,7 @@ from sevn.runtime.approvals import (
     question_message,
 )
 from sevn.runtime.base import Runtime, ToolDecision, TurnContext
+from sevn.runtime.context_selection import select_history, turn_profile
 from sevn.runtime.errors import TurnError
 from sevn.runtime.events import ApprovalCall, RuntimeEvent
 from sevn.runtime.turn_end import (
@@ -51,7 +53,7 @@ from sevn.runtime.turn_store import (
 from sevn.runtime.usage import combine as combine_usage
 from sevn.runtime.usage import interrupted_usage
 from sevn.store.db import utcnow
-from sevn.store.models import Event, Message
+from sevn.store.models import DecisionLog, Event, Message
 from sevn.store.models import Job as JobRow
 from sevn.store.models import Turn as TurnRow
 from sevn.tools.routine import is_silent_reply, mark_jobs_silent
@@ -77,6 +79,7 @@ class _Job:
     text: str
     origin: str = "user"
     trace_parent: str | None = None
+    profile: ContextProfile = DEFAULT_PROFILE
 
 
 @dataclass(frozen=True, slots=True)
@@ -213,6 +216,7 @@ class TurnRunner:
         stored: bool,
     ) -> None:
         token = begin_inbound()
+        profile_token = turn_profile.set(job.profile)
         try:
             await self._runtime.open(agent)
             try:
@@ -265,9 +269,29 @@ class TurnRunner:
                         turn_id, started, job, agent, bot, stored=stored, usage=outcome.usage
                     )
                 elif outcome.approvals or await PendingService().has_waiting(turn_id):
-                    await self._persist_waiting(
-                        turn_id, started, job, agent, bot, outcome, stored=stored
+                    # A question marks the turn waiting before this final write.
+                    # If cancelled now, finish the transaction before the worker
+                    # persists cancellation; interrupting a SQLite statement can
+                    # leave its writer lock held until the cursor is collected.
+                    saving = asyncio.create_task(
+                        self._persist_waiting(
+                            turn_id, started, job, agent, bot, outcome, stored=stored
+                        )
                     )
+                    cancelled = False
+                    try:
+                        while not saving.done():
+                            try:
+                                await asyncio.shield(saving)
+                            except asyncio.CancelledError:
+                                cancelled = True
+                        saving.result()
+                    except Exception:
+                        if not cancelled:
+                            raise
+                        logger.exception("waiting turn persistence failed during cancellation")
+                    if cancelled:
+                        raise asyncio.CancelledError
                 else:
                     await self._persist_done(
                         turn_id,
@@ -287,6 +311,7 @@ class TurnRunner:
                 if self._watch is not None:
                     self._watch.forget(turn_id)
         finally:
+            turn_profile.reset(profile_token)
             end_inbound(token)
 
     async def _drive(
@@ -298,13 +323,14 @@ class TurnRunner:
         history: list[object] | None,
         decisions: tuple[ToolDecision, ...] | None,
     ) -> _Outcome:
+        selected = select_history(history, job.profile, resuming=decisions is not None)
         context = TurnContext(
             agent=agent,
             bot=bot,
             job_id=job.id,
             text=job.text,
             turn_id=turn_id,
-            message_history=history,
+            message_history=selected,
             approvals=decisions,
             ephemeral=job.origin == "chit_chat",
         )
@@ -341,10 +367,19 @@ class TurnRunner:
             text = finished.text
         usage = finished.usage if finished.usage is not None else {}
         approvals = finished.approvals if finished.approvals is not None else ()
+        messages = finished.model_messages
+        if (
+            history is not None
+            and selected is not history
+            and finished.new_message_count is not None
+        ):
+            # Keep the full archive, including attachments, for later full turns and resumes.
+            new = messages[-finished.new_message_count :] if finished.new_message_count else []
+            messages = [*history, *new]
         return _Outcome(
             text=text,
             usage=usage,
-            model_messages=finished.model_messages,
+            model_messages=messages,
             approvals=approvals,
         )
 
@@ -567,7 +602,16 @@ async def _mark_started(job_id: str, *, agent_id: str | None = None) -> _Job | N
             text=row.text,
             origin=row.origin,
             trace_parent=row.trace_parent,
+            profile=await _job_profile(session, row),
         )
+
+
+async def _job_profile(session: AsyncSession, job: JobRow) -> ContextProfile:
+    if job.route_decision_id:
+        row = await session.get(DecisionLog, job.route_decision_id)
+        if row is not None:
+            return ContextProfile.model_validate(row.answers.get("context_profile") or {})
+    return DEFAULT_PROFILE
 
 
 async def _previous_messages(agent_id: str) -> list[object] | None:
@@ -638,6 +682,7 @@ async def _load_resume(turn_id: str) -> _Loaded:
             text=job_row.text,
             origin=job_row.origin,
             trace_parent=job_row.trace_parent,
+            profile=await _job_profile(session, job_row),
         )
         agent_id = turn.agent_id
         bot_id = job_row.to_bot_id

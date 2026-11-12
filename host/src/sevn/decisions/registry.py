@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+from collections import deque
 from contextvars import ContextVar, Token
 from dataclasses import replace
+from math import ceil
+from time import perf_counter
 
 from sevn.config import Settings
 from sevn.decisions.base import Attempt, RouteDecision, attempt_for, redact_text
 from sevn.decisions.cli_oneshot import CliOneShotDecider
 from sevn.decisions.default import DefaultDecider
-from sevn.decisions.jev import JevDecider, noul_score
+from sevn.decisions.jev import JevDecider, noul_score, with_default_delivery
 from sevn.decisions.llm import LLMDecider
 from sevn.decisions.log import record_attempt
 from sevn.decisions.ollama import OllamaDecider
@@ -20,6 +23,11 @@ DECISION_POINTS: tuple[str, ...] = (
     "message.intent",
     "message.target_agent",
     "busy.policy",
+    "delivery.mode",
+    "context.history",
+    "context.memory",
+    "context.siblings",
+    "context.attachments",
     "route.owner",
     "delegate.needed",
     "routine.silent",
@@ -29,6 +37,7 @@ DECISION_POINTS: tuple[str, ...] = (
     "notify.priority",
 )
 _PER_AGENT = 2000
+_latencies: deque[float] = deque(maxlen=256)
 
 
 def decision_points() -> tuple[str, ...]:
@@ -41,8 +50,9 @@ def router_state(message: RoutedMessage, context: RouterContext) -> str:
     parts = [redact_text(message.text)]
     for agent in context.open_agents:
         recent = context.recent_user_messages.get(agent.id, [])
+        status = "starting" if agent.starting else agent.status
         lines = [
-            redact_text(agent.id),
+            redact_text(f"{agent.id} ({agent.runtime or context.runtime}, {status})"),
             redact_text(f"{agent.title} \u2014 {agent.summary}"),
         ]
         lines.extend(redact_text(item) for item in recent[-3:])
@@ -63,45 +73,53 @@ async def decide(
     ``provider=rules`` stops after rules. ``record`` appends the decision log.
     Eval replay passes ``record=False`` so a suite does not export decision state.
     """
+    started = perf_counter()
     settings = Settings.load().decisions
     state = router_state(message, context)
-    # An empty lane list is a rule when asked directly. The chain still asks jev
-    # and the fallbacks, and the default step starts a task if they do not.
     ruled = await RuleDecider().decide(message, context, empty_is_new=False)
     if ruled is not None:
-        if record:
-            await record_attempt(state, attempt_for(ruled), bot_id=context.bot_id)
-        return ruled
-    if settings.provider == "rules":
-        return RouteDecision(
-            intent="new_request",
-            target_agent_id=None,
-            confidence=0.0,
-            path="rule",
+        state += redact_text(
+            f"\nRule: {ruled.intent}, target: {ruled.target_agent_id or 'new lane'}"
         )
-    if settings.provider != "llm":
+    calls = 0
+    chosen: Attempt | None = None
+    if settings.provider == "jev":
+        jev = JevDecider(settings)
+        attempt = await jev.attempt(context, state, ruled)
+        calls = jev.calls
+        chosen = await _keep(state, attempt, record=record, context=context)
+    if chosen is None and ruled is not None:
+        chosen = attempt_for(ruled)
+    if chosen is None and settings.provider == "rules":
+        chosen = attempt_for(RouteDecision("new_request", None, 0.0, "rule"))
+    if chosen is None:
         chosen = await _keep(
-            state, await JevDecider().attempt(context, state), record=record, context=context
+            state, await LLMDecider().attempt(state), record=record, context=context
         )
-        if chosen is not None:
-            return chosen
-    chosen = await _keep(state, await LLMDecider().attempt(state), record=record, context=context)
-    if chosen is not None:
-        return chosen
-    chosen = await _keep(
-        state, await OllamaDecider().attempt(state), record=record, context=context
-    )
-    if chosen is not None:
-        return chosen
-    chosen = await _keep(
-        state, await CliOneShotDecider().attempt(context, state), record=record, context=context
-    )
-    if chosen is not None:
-        return chosen
-    fallback = DefaultDecider().decide(context)
+    if chosen is None:
+        chosen = await _keep(
+            state, await OllamaDecider().attempt(state), record=record, context=context
+        )
+    if chosen is None:
+        chosen = await _keep(
+            state, await CliOneShotDecider().attempt(context, state), record=record, context=context
+        )
+    if chosen is None:
+        chosen = attempt_for(DefaultDecider().decide(context))
+    decision = with_default_delivery(chosen.decision, context)
     if record:
-        await record_attempt(state, attempt_for(fallback), bot_id=context.bot_id)
-    return fallback
+        elapsed = (perf_counter() - started) * 1000
+        _latencies.append(elapsed)
+        p95 = sorted(_latencies)[ceil(len(_latencies) * 0.95) - 1]
+        await record_attempt(
+            state,
+            replace(chosen, decision=decision),
+            bot_id=context.bot_id,
+            calls=calls,
+            elapsed=elapsed,
+            p95=p95,
+        )
+    return decision
 
 
 _INJECTION_SCORE = 0.7
@@ -154,16 +172,16 @@ async def _keep(
     *,
     record: bool,
     context: RouterContext,
-) -> RouteDecision | None:
+) -> Attempt | None:
     if attempt is None:
         return None
     decision = attempt.decision
     targets = {agent.id for agent in context.open_agents}
     targeted = decision.intent in {"follow_up", "steer", "answer", "cancel"}
-    if targeted and decision.target_agent_id not in targets:
+    if decision.path != "rule" and targeted and decision.target_agent_id not in targets:
         attempt = replace(attempt, accepted=False)
+    if attempt.accepted:
+        return attempt
     if record:
         await record_attempt(state, attempt, bot_id=context.bot_id)
-    if attempt.accepted:
-        return attempt.decision
     return None

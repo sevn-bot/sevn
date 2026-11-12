@@ -75,7 +75,7 @@ Done when:
   - Ollama is `local` at 0.
   - The CLI one-shot is `subscription`, with the SDK's estimate.
   - jev reports tokens but no price, so its calls are `unknown`.
-  - Rules and the default step call no model and record none.
+  - Steps without a model call record no usage. A rule-matched route that receives Jev context/delivery classification records that call on its rule row.
   - The spend and tokens tiles, the cost heat map and the daily budgets add routing to turns. A routing call is spend, not a finished turn.
   - Not counted: a step that fails before it answers (it has no row), and the jev scores outside routing (memory capture, inbound injection).
 - No migration: the usage shape lives in the existing `turns.usage` JSON column.

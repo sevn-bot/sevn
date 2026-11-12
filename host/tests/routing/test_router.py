@@ -211,11 +211,13 @@ async def test_steer_enqueues_into_running_pydantic_turn(
                     {
                         "message.intent": ("steer", 0.95),
                         "message.target_agent": (str(first["agent_id"]), 0.94),
-                        "busy.policy": ("steer", 0.92),
+                        "delivery.mode": ("steer", 0.92),
                     }
                 ]
             )
-            consumed = await _send(client, bot["id"], "steer-marker add a date")
+            consumed = await _send(
+                client, bot["id"], "steer-marker add a date", agent_id=first["agent_id"]
+            )
             await _assert_consumed_turn_done(tmp_path, client, consumed["job_id"])
             pause.set()
             await poll_rows(
@@ -612,6 +614,85 @@ async def test_bot_cap_queues_new_agent_job(
     finally:
         gate.release_all.set()
         _clear()
+
+
+async def test_context_selection_applies_to_one_turn_and_preserves_archive(tmp_path, monkeypatch):
+    from sevn.decisions.jev import use_client
+    from sevn.domain.agents import AgentService
+    from sevn.runtime.worker import bind
+    from support.canary import model_request_payloads
+
+    reset_model_requests()
+    load_modules("sevn.api.bots", "sevn.api.messages")
+    _install([{}])
+    try:
+        async with connected(tmp_path, monkeypatch) as (host, client):
+            bind(host.hub)
+            bot = await _create_bot(client)
+            lane = await AgentService().spawn(
+                str(bot["id"]), title="Write a checklist", summary="Release checklist"
+            )
+            await AgentService().spawn(str(bot["id"]), title="Sibling marker")
+            for text, history in [
+                ("old-marker", "full"),
+                ("latest-marker", "full"),
+                ("short-marker", "summary"),
+                ("restore-marker", "full"),
+            ]:
+                use_client(
+                    FakeJev(
+                        answers={
+                            "context.history": (history, 0.99),
+                            "context.memory": ("skip", 0.99),
+                            "context.siblings": ("exclude", 0.99),
+                        }
+                    )
+                )
+                sent = await _send(client, bot["id"], text, agent_id=lane.id)
+                await poll_rows(
+                    tmp_path,
+                    "SELECT status FROM jobs WHERE id = ?",
+                    (sent["job_id"],),
+                    lambda rows: bool(rows) and rows[0]["status"] == "done",
+                )
+            third, fourth = model_request_payloads()[-2:]
+            assert "Release checklist" in str(third["instructions"])
+            assert "Sibling marker" not in str(third["instructions"])
+            assert "old-marker" not in str(third["messages"])
+            assert "latest-marker" in str(third["messages"])
+            assert "old-marker" in str(fourth["messages"])
+            assert "short-marker" in str(fourth["messages"])
+    finally:
+        _clear()
+
+
+async def test_burst_before_pump_starts_keeps_queue_notice(tmp_path, monkeypatch):
+    from sevn.decisions.jev import use_client
+    from sevn.domain import routing
+
+    monkeypatch.setattr(routing, "_start", lambda _: None)
+    monkeypatch.setenv("SEVN_BOTS__MAX_PARALLEL_AGENTS", "1")
+    load_modules("sevn.api.bots", "sevn.api.messages")
+    fake = FakeJev(answers={"delivery.mode": ("steer", 0.99)})
+    use_client(fake)
+    try:
+        async with connected(tmp_path, monkeypatch) as (_, client):
+            bot = await _create_bot(client)
+            first = await _send(client, bot["id"], "/new first")
+            await _send(client, bot["id"], "/new second")
+            assert any(_ahead(row) == 1 for row in _events(tmp_path, "job.queued"))
+            follow = await _send(client, bot["id"], "change the date", agent_id=first["agent_id"])
+            assert "delivery.mode" in fake.requests[-1].questions
+            (row,) = fetch_all(
+                tmp_path,
+                "SELECT d.outcome, d.answers, j.status FROM decision_log d "
+                "JOIN jobs j ON j.route_decision_id = d.id WHERE j.id = ?",
+                (follow["job_id"],),
+            )
+            assert (row["outcome"], row["status"]) == ("queued_steer", "queued")
+            assert json.loads(row["answers"])["steer_injected"] is False
+    finally:
+        use_client(None)
 
 
 def _ahead(row: dict[str, object]) -> object:

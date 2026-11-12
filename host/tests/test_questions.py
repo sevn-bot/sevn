@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -275,33 +276,69 @@ async def test_an_approval_still_takes_approve_or_deny(
         assert frame.get("e", {}).get("code") in {"not_found", "invalid_params"}
 
 
+@pytest.mark.parametrize("during_persist,fail_write", [(False, False), (True, False), (True, True)])
 async def test_cancelling_the_turn_expires_its_question(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, during_persist: bool, fail_write: bool
 ) -> None:
+    from sevn.runtime import turn as turn_module
     from sevn.runtime.worker import bind
+
+    writing, release_write, interrupt_called = (asyncio.Event() for _ in range(3))
+    interrupted_write = False
+    question_message = turn_module.question_message
+
+    async def pause_write(*args, **kwargs):
+        nonlocal interrupted_write
+        writing.set()
+        try:
+            await release_write.wait()
+        except asyncio.CancelledError:
+            interrupted_write = True
+            raise
+        if fail_write:
+            raise RuntimeError("question write failed")
+        return await question_message(*args, **kwargs)
+
+    if during_persist:
+        monkeypatch.setattr(turn_module, "question_message", pause_write)
 
     reset_model_requests()
     load_modules("sevn.api.bots", "sevn.api.messages", "sevn.api.pending")
     _install({"question": "Which day?"})
     try:
         async with connected(tmp_path, monkeypatch) as (host, client):
-            bind(host.hub)
+            worker = bind(host.hub)
+            interrupt = worker._pydantic.interrupt
+
+            async def signal_interrupt(agent_id):
+                await interrupt(agent_id)
+                interrupt_called.set()
+
+            monkeypatch.setattr(worker._pydantic, "interrupt", signal_interrupt)
             sent, pending_id = await _asked(client, tmp_path)
             turn = fetch_all(
                 tmp_path,
                 "SELECT id FROM turns WHERE agent_id = ? AND status = 'waiting'",
                 (sent["agent_id"],),
             )
-            frame, _earlier = await request(
-                client, "turns.cancel", {"turn_id": turn[0]["id"], "op_id": mint_id("op_")}
+            if during_persist:
+                await asyncio.wait_for(writing.wait(), 5)
+            cancellation = asyncio.create_task(
+                request(client, "turns.cancel", {"turn_id": turn[0]["id"], "op_id": mint_id("op_")})
             )
-            ok(frame)
+            if during_persist:
+                await asyncio.wait_for(interrupt_called.wait(), 5)
+                release_write.set()
+            frame, _earlier = await cancellation
+            assert not interrupted_write
+            assert ok(frame)["status"] == "cancelled"
             rows = fetch_all(
                 tmp_path, "SELECT status, answer FROM pending_requests WHERE id = ?", (pending_id,)
             )
             assert rows[0]["status"] == "resolved"
             assert json.loads(rows[0]["answer"]) == {"expired": True}
     finally:
+        release_write.set()
         _clear()
 
 
@@ -622,3 +659,87 @@ async def test_a_card_answer_resumes_a_turn_that_also_asked_for_approval(
             )
     finally:
         use_model(None)
+
+
+@pytest.mark.parametrize("cancel", [False, True])
+async def test_cancel_wins_when_approval_persistence_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cancel: bool
+) -> None:
+    from sevn.runtime import turn as turn_module
+    from sevn.runtime.models import use_model
+    from sevn.runtime.worker import bind
+
+    writing, release_write, interrupted = (asyncio.Event() for _ in range(3))
+
+    async def fail_write(*args, **kwargs):
+        writing.set()
+        await release_write.wait()
+        raise RuntimeError("approval write failed")
+
+    monkeypatch.setattr(turn_module, "question_message", fail_write)
+    load_modules("sevn.api.bots", "sevn.api.messages")
+    _install({"question": "unused"})
+    use_model(function_model([[{"kind": "tool", "name": "shell", "args": {"command": "echo hi"}}]]))
+    try:
+        async with connected(tmp_path, monkeypatch) as (host, client):
+            worker = bind(host.hub)
+            interrupt = worker._pydantic.interrupt
+
+            async def signal_interrupt(agent_id):
+                await interrupt(agent_id)
+                interrupted.set()
+
+            monkeypatch.setattr(worker._pydantic, "interrupt", signal_interrupt)
+            frame, _ = await request(
+                client,
+                "bots.create",
+                {"name": "Approval", "access": "full", "op_id": mint_id("op_")},
+            )
+            bot_id = ok(frame)["id"]
+            frame, _ = await request(
+                client,
+                "messages.send",
+                {"bot_id": bot_id, "text": "run it", "op_id": mint_id("op_")},
+            )
+            sent = ok(frame)
+            await asyncio.wait_for(writing.wait(), 5)
+            turn_id = fetch_all(
+                tmp_path, "SELECT id FROM turns WHERE agent_id = ?", (sent["agent_id"],)
+            )[0]["id"]
+            if not cancel:
+                release_write.set()
+                await poll_rows(
+                    tmp_path,
+                    "SELECT status FROM jobs WHERE id = ?",
+                    (sent["job_id"],),
+                    lambda rows: bool(rows) and rows[0]["status"] == "failed",
+                )
+                assert (
+                    fetch_all(tmp_path, "SELECT status FROM turns WHERE id = ?", (turn_id,))[0][
+                        "status"
+                    ]
+                    == "failed"
+                )
+                return
+            cancellation = asyncio.create_task(
+                request(client, "turns.cancel", {"turn_id": turn_id, "op_id": mint_id("op_")})
+            )
+            await asyncio.wait_for(interrupted.wait(), 5)
+            release_write.set()
+            frame, _ = await cancellation
+            assert ok(frame)["status"] == "cancelled"
+            assert (
+                fetch_all(tmp_path, "SELECT status FROM turns WHERE id = ?", (turn_id,))[0][
+                    "status"
+                ]
+                == "cancelled"
+            )
+            assert (
+                fetch_all(tmp_path, "SELECT status FROM jobs WHERE id = ?", (sent["job_id"],))[0][
+                    "status"
+                ]
+                == "cancelled"
+            )
+    finally:
+        release_write.set()
+        _clear()
