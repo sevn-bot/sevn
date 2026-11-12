@@ -70,7 +70,7 @@ async def decide(
     ruled = await RuleDecider().decide(message, context, empty_is_new=False)
     if ruled is not None:
         if record:
-            await record_attempt(state, attempt_for(ruled))
+            await record_attempt(state, attempt_for(ruled), bot_id=context.bot_id)
         return ruled
     if settings.provider == "rules":
         return RouteDecision(
@@ -100,7 +100,7 @@ async def decide(
         return chosen
     fallback = DefaultDecider().decide(context)
     if record:
-        await record_attempt(state, attempt_for(fallback))
+        await record_attempt(state, attempt_for(fallback), bot_id=context.bot_id)
     return fallback
 
 
@@ -163,7 +163,7 @@ async def _keep(
     if targeted and decision.target_agent_id not in targets:
         attempt = replace(attempt, accepted=False)
     if record:
-        await record_attempt(state, attempt)
+        await record_attempt(state, attempt, bot_id=context.bot_id)
     if attempt.accepted:
         return attempt.decision
     return None

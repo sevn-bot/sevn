@@ -34,6 +34,8 @@ class Attempt:
     accepted: bool
     answers: dict[str, object]
     confidences: dict[str, object]
+    # What the step's model call used, in the shared usage shape. None: no model.
+    usage: dict[str, object] | None = None
 
 
 class ModelRoute(BaseModel):
@@ -98,7 +100,13 @@ def attempt_for(decision: RouteDecision, *, accepted: bool = True) -> Attempt:
     )
 
 
-def attempt_from_model(parsed: ModelRoute, path: str, *, accepted: bool) -> Attempt:
+def attempt_from_model(
+    parsed: ModelRoute,
+    path: str,
+    *,
+    accepted: bool,
+    usage: dict[str, object] | None = None,
+) -> Attempt:
     """Build an attempt from a parsed fallback reply."""
     target = parsed.target_agent_id
     if target == "" or target == "none":
@@ -119,4 +127,5 @@ def attempt_from_model(parsed: ModelRoute, path: str, *, accepted: bool) -> Atte
             "busy_policy": parsed.busy_policy,
         },
         confidences={"confidence": parsed.confidence},
+        usage=usage,
     )

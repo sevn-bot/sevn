@@ -42,8 +42,8 @@ async def mark_corrected(decision_id: str | None, agent_id: str) -> None:
         await session.commit()
 
 
-async def record_attempt(state: str, attempt: Attempt) -> None:
-    """Insert one row for a step that actually ran."""
+async def record_attempt(state: str, attempt: Attempt, *, bot_id: str | None = None) -> None:
+    """Insert one row for a step that actually ran, with what its model call used."""
     decision = attempt.decision
     outcome = "ask_user" if decision.ask_user else decision.intent
     row_id = new_id("dec_")
@@ -59,6 +59,8 @@ async def record_attempt(state: str, attempt: Attempt) -> None:
         outcome=outcome,
         corrected_to=None,
         created_at=_created_at(),
+        bot_id=bot_id,
+        usage=attempt.usage,
     )
     with route_span(
         point=_POINT,

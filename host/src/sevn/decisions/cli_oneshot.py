@@ -13,6 +13,7 @@ from sevn.domain.routing import RouterContext
 from sevn.log import logger
 from sevn.runtime.base import SessionRef, TurnContext
 from sevn.runtime.events import RuntimeEvent
+from sevn.runtime.usage import interrupted_usage
 from sevn.store.db import utcnow
 
 _CLI = frozenset({"claude", "codex", "opencode", "cursor"})
@@ -41,7 +42,9 @@ class CliOneShotDecider:
         if runtime is None:
             return None
         try:
-            text = await _complete(cast("_Shot", runtime), _throwaway(context), model_prompt(state))
+            text, usage = await _complete(
+                cast("_Shot", runtime), _throwaway(context), model_prompt(state)
+            )
         except Exception:  # noqa: BLE001 — a failed CLI one-shot falls through
             logger.warning("cli decider failed")
             return None
@@ -50,7 +53,9 @@ class CliOneShotDecider:
         parsed = parse_model_route(text)
         if parsed is None:
             return None
-        return attempt_from_model(parsed, "cli", accepted=step_accepts(parsed.confidence))
+        return attempt_from_model(
+            parsed, "cli", accepted=step_accepts(parsed.confidence), usage=usage
+        )
 
 
 def _runtime_for(name: str) -> object | None:
@@ -89,19 +94,26 @@ def _throwaway(context: RouterContext) -> AgentRecord:
     )
 
 
-async def _complete(runtime: _Shot, agent: AgentRecord, prompt: str) -> str | None:
+async def _complete(
+    runtime: _Shot, agent: AgentRecord, prompt: str
+) -> tuple[str | None, dict[str, object]]:
+    """The reply text and what the one-shot used. Unreported usage is unknown."""
     ref = await runtime.open(agent)
     try:
         turn = TurnContext(agent=agent, text=prompt, job_id="decision")
         deltas: list[str] = []
         finished = ""
+        usage: dict[str, object] | None = None
         async for event in runtime.run_turn(turn):
             if event.kind == "text_delta" and event.text:
                 deltas.append(event.text)
-            elif event.kind == "turn_finished" and event.text:
-                finished = event.text
+            elif event.kind == "turn_finished":
+                if event.text:
+                    finished = event.text
+                usage = event.usage
+        spent = usage if usage else interrupted_usage()
         if deltas:
-            return "".join(deltas)
-        return finished
+            return "".join(deltas), spent
+        return finished, spent
     finally:
         await runtime.close(ref.agent_id)

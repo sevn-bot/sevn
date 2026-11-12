@@ -16,6 +16,7 @@ from sevn.decisions.base import (
 )
 from sevn.decisions.thresholds import step_accepts
 from sevn.log import logger
+from sevn.runtime.usage import usage_record
 
 
 class OllamaDecider:
@@ -27,16 +28,19 @@ class OllamaDecider:
             return None
         model = Settings.load().decisions.ollama_model
         try:
-            text = await _chat(url, model, model_prompt(state))
+            reply = await _chat(url, model, model_prompt(state))
         except (httpx.HTTPError, OSError, ValueError):
             logger.warning("ollama decider failed")
             return None
-        if text is None:
+        if reply is None:
             return None
+        text, usage = reply
         parsed = parse_model_route(text)
         if parsed is None:
             return None
-        return attempt_from_model(parsed, "ollama", accepted=step_accepts(parsed.confidence))
+        return attempt_from_model(
+            parsed, "ollama", accepted=step_accepts(parsed.confidence), usage=usage
+        )
 
 
 def _url() -> str | None:
@@ -46,7 +50,7 @@ def _url() -> str | None:
     return raw.rstrip("/")
 
 
-async def _chat(url: str, model: str, prompt: str) -> str | None:
+async def _chat(url: str, model: str, prompt: str) -> tuple[str, dict[str, object]] | None:
     body = {
         "model": model,
         "stream": False,
@@ -65,4 +69,14 @@ async def _chat(url: str, model: str, prompt: str) -> str | None:
     content = message.get("content")
     if not isinstance(content, str):
         return None
-    return content
+    # A local model: no API spend, so the cost is 0.
+    usage = usage_record(
+        {
+            "requests": 1,
+            "input_tokens": payload.get("prompt_eval_count"),
+            "output_tokens": payload.get("eval_count"),
+        },
+        cost_usd=0.0,
+        cost_source="local",
+    )
+    return content, usage
