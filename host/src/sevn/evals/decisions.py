@@ -88,6 +88,8 @@ def _load_cases() -> list[_Case]:
 
 
 async def _evaluate(cases: list[_Case]) -> dict[str, object]:
+    if not cases:
+        raise EvalsError("decision eval datasets are empty")
     scores: list[RouteScore] = []
     matrix = {label: {"steer": 0, "queue": 0, "unresolved": 0} for label in ("steer", "queue")}
     source_hits = dict.fromkeys(ContextProfile.model_fields, 0)
@@ -114,8 +116,12 @@ async def _evaluate(cases: list[_Case]) -> dict[str, object]:
                 )
             )
     return {
-        "accuracy": _accuracy(scores),
-        "judge": await score_routes(scores),
+        "accuracy": _accuracy(scores) if scores else {},
+        "judge": (
+            await score_routes(scores)
+            if scores
+            else {"status": "skipped", "reason": "no routing cases"}
+        ),
         "delivery": _delivery_metrics(matrix),
         "context": {
             "cases": profiles,

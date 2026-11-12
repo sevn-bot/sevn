@@ -510,3 +510,95 @@ async def test_capture_below_threshold_has_no_hint(
     assert len(payloads) >= 2
     assert _hint_lines(payloads[0]) == []
     assert _hint_lines(payloads[1]) == []
+
+
+@pytest.mark.parametrize("mode", ["auto", "diff"])
+@pytest.mark.parametrize("skips", [0, 2])
+@pytest.mark.parametrize("keep_memory", [False, True])
+async def test_legacy_memory_history_rebases_after_skips(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str, skips: int, keep_memory: bool
+) -> None:
+    from sevn.memory.context import memory_snapshot, retain_snapshot, with_memories
+    from sevn.memory.store import MemoryStore
+
+    bot_id = await _bot(tmp_path, monkeypatch)
+    agent_id = mint_id("agent_")
+    store = MemoryStore()
+    turn_id = mint_id("turn_")
+    removed = await store.save(bot_id, "old preference", turn_id=turn_id)
+    if keep_memory:
+        await store.save(bot_id, "current preference", turn_id=turn_id)
+    await store.commit(turn_id)
+    old_prompt = await with_memories(bot_id, agent_id, "first", prior=False, history=[])
+    history: list[object] = [
+        {"kind": "request", "parts": [{"part_kind": "user-prompt", "content": old_prompt}]}
+    ]
+    await store.delete(removed.id)
+    for _ in range(skips):
+        prompt = await with_memories(
+            bot_id, agent_id, "skip", prior=True, history=history, mode="skip"
+        )
+        assert prompt == "skip"
+        history.append(
+            {"kind": "request", "parts": [{"part_kind": "user-prompt", "content": prompt}]}
+        )
+        retain_snapshot(history, memory_snapshot(bot_id, agent_id))
+        assert memory_snapshot(bot_id, agent_id) is None
+    prompt = await with_memories(bot_id, agent_id, "next", prior=True, history=history, mode=mode)
+    assert "<sevn_memories>" in prompt
+    assert "<sevn_memories_diff>" not in prompt
+    assert "replaces all earlier memory blocks" in prompt
+    assert "old preference" not in prompt
+    assert ("current preference" in prompt) == keep_memory
+
+
+async def test_first_diff_turn_establishes_a_full_baseline(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sevn.memory.context import with_memories
+
+    bot_id = await _bot(tmp_path, monkeypatch)
+    prompt = await with_memories(
+        bot_id, mint_id("agent_"), "hello", prior=False, history=[], mode="diff"
+    )
+    assert "<sevn_memories>" in prompt
+
+
+@pytest.mark.parametrize("initial_memory", [False, True])
+async def test_skip_preserves_a_known_memory_baseline(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, initial_memory: bool
+) -> None:
+    from sevn.memory.context import memory_snapshot, retain_snapshot, with_memories
+    from sevn.memory.store import MemoryStore
+
+    bot_id = await _bot(tmp_path, monkeypatch)
+    agent_id = mint_id("agent_")
+    store = MemoryStore()
+    turn_id = mint_id("turn_")
+    removed = (
+        await store.save(bot_id, "old preference", turn_id=turn_id) if initial_memory else None
+    )
+    await store.commit(turn_id)
+    first = await with_memories(bot_id, agent_id, "first", prior=False, history=[])
+    history: list[object] = [
+        {"kind": "request", "parts": [{"part_kind": "user-prompt", "content": first}]}
+    ]
+    baseline = memory_snapshot(bot_id, agent_id)
+    assert baseline is not None
+    retain_snapshot(history, baseline)
+    if removed is not None:
+        await store.delete(removed.id)
+    turn_id = mint_id("turn_")
+    await store.save(bot_id, "new preference", turn_id=turn_id)
+    await store.commit(turn_id)
+    assert (
+        await with_memories(bot_id, agent_id, "skip", prior=True, history=history, mode="skip")
+        == "skip"
+    )
+    assert memory_snapshot(bot_id, agent_id) == baseline
+    history.append({"kind": "request", "parts": [{"part_kind": "user-prompt", "content": "skip"}]})
+    retain_snapshot(history, memory_snapshot(bot_id, agent_id))
+    prompt = await with_memories(bot_id, agent_id, "next", prior=True, history=history)
+    assert "<sevn_memories_diff>" in prompt
+    assert "new preference" in prompt
+    assert ("removed, no longer holds: old preference" in prompt) == initial_memory

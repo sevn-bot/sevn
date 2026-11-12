@@ -279,12 +279,17 @@ class TurnRunner:
                         )
                     )
                     cancelled = False
-                    while not saving.done():
-                        try:
-                            await asyncio.shield(saving)
-                        except asyncio.CancelledError:
-                            cancelled = True
-                    saving.result()
+                    try:
+                        while not saving.done():
+                            try:
+                                await asyncio.shield(saving)
+                            except asyncio.CancelledError:
+                                cancelled = True
+                        saving.result()
+                    except Exception:
+                        if not cancelled:
+                            raise
+                        logger.exception("waiting turn persistence failed during cancellation")
                     if cancelled:
                         raise asyncio.CancelledError
                 else:
