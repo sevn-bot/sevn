@@ -2,7 +2,8 @@
 #
 # Reviewer: OpenCode Go subscription, model opencode-go/deepseek-v4.1-flash.
 # That is the primary rung in alexhawat/mergeCraft's own review workflow.
-# The manifest pins the reviewer image by digest and supports ignore_paths.
+# The pin is the v0.1.0a7 release commit; its action.yml pins the signed reviewer
+# image by digest. Bump it with docs/upgrade.md in alexhawat/mergeCraft.
 #
 # Trigger is pull_request, not pull_request_target. This job is not a required
 # ruleset, and pull_request keeps repository secrets out of fork runs. The
@@ -57,7 +58,7 @@ jobs:
 
       - name: Run mergeCraft
         if: env.HAS_OPENCODE_GO == 'true'
-        uses: alexhawat/mergeCraft@ee0420055aa652f6ae40df911d56b0c6f93260db
+        uses: alexhawat/mergeCraft@ca65b4c95c7afbbefa58033cea1b31b1197d0372 # v0.1.0a7
         with:
           prompt: >
             ${{ github.event_name == 'pull_request'
@@ -74,7 +75,7 @@ jobs:
           timeout: 40m
         env:
           # Keep equal to the uses: commit above. The container cannot read it.
-          MERGECRAFT_ACTION_SHA: ee0420055aa652f6ae40df911d56b0c6f93260db
+          MERGECRAFT_ACTION_SHA: ca65b4c95c7afbbefa58033cea1b31b1197d0372
           LLM_PROVIDER_9: opencode-go
           OPENCODE_GO_API_KEY: ${{ secrets.LLM_PROVIDER_9_API_KEY }}
 

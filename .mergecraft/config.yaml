@@ -2,9 +2,7 @@ models:
 - opencode-go/deepseek-v4.1-flash
 push: disabled
 shell: disabled
-signedCommits: false
 prApproveEnabled: false
-autoMergeEnabled: false
 trust:
   agentSandbox: dispatch
   selfReview: "off"

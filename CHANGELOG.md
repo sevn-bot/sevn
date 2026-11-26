@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- mergeCraft reviews run v0.1.0a7, which skips draft pull requests and does not review the same commit twice.
+
 - Runtime install and remove commands report filesystem failures, including disk exhaustion and denied renames, as typed errors instead of uncaught exceptions.
 
 - Preserve service definitions when systemd or launchd cannot stop the host during uninstall, so the error is visible and removal can be retried. Secret migration reports corrupt age ciphertext or identity files without a traceback or changing either backend.
