@@ -2,7 +2,7 @@
 
 The mergeCraft workflow runs this only when the OpenCode Go review failed
 without posting a verdict. It runs on the GitHub runner, not in mergeCraft's
-container, and talks to OpenAI's regular Chat Completions API with
+container, and talks to OpenAI's regular Responses API with
 OPENAI_API_KEY. It never goes through the Codex CLI.
 
 Two subcommands keep the credentials apart:
@@ -135,9 +135,12 @@ def _head_file_lines(root: Path, head: str, path: str) -> list[str] | str:
 
 
 def _build_agent(root: Path, base: str, head: str, changed: list[str]) -> Any:
-    from agents import Agent, function_tool
+    from agents import Agent, ModelSettings, OpenAIResponsesModel, function_tool
     from mergecraft.agents_sdk import ReviewFindingsReport, resolve_model_config
-    from mergecraft.agents_sdk.model import agents_sdk_model_from_config
+    from mergecraft.agents_sdk.model import (
+        agents_sdk_model_from_config,
+        build_async_openai_client,
+    )
 
     changed_set = frozenset(changed)
 
@@ -175,11 +178,26 @@ def _build_agent(root: Path, base: str, head: str, changed: list[str]) -> Any:
         return body + note
 
     config = resolve_model_config()
+    settings = ModelSettings()
+    if config.base_url is None:
+        # OpenAI itself: GPT reasoning models refuse function tools on
+        # /v1/chat/completions, which mergeCraft's helper uses, so talk to
+        # /v1/responses. store=False keeps the review off OpenAI's stored
+        # responses; the encrypted reasoning items carry state between turns.
+        model: Any = OpenAIResponsesModel(
+            model=config.openai_model_name(),
+            openai_client=build_async_openai_client(config),
+        )
+        settings = ModelSettings(store=False, response_include=["reasoning.encrypted_content"])
+    else:
+        # An OpenAI-compatible gateway speaks chat completions.
+        model = agents_sdk_model_from_config(config)
     agent = Agent(
         name="mergecraft_backup_reviewer",
         instructions=INSTRUCTIONS,
         tools=[list_changed_files, get_file_diff, read_file],
-        model=agents_sdk_model_from_config(config),
+        model=model,
+        model_settings=settings,
         output_type=ReviewFindingsReport,
     )
     return agent, config.openai_model_name()
