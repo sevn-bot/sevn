@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 - mergeCraft reviews run v0.1.0a7, which skips draft pull requests and does not review the same commit twice.
+- When the OpenCode Go review fails without a verdict, mergeCraft reviews the pull request again with OpenAI's GPT Terra, if the repository has an `OPENAI_API_KEY` secret.
 
 - Runtime install and remove commands report filesystem failures, including disk exhaustion and denied renames, as typed errors instead of uncaught exceptions.
 

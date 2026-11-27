@@ -2,6 +2,10 @@
 #
 # Reviewer: OpenCode Go subscription, model opencode-go/deepseek-v4.1-flash.
 # That is the primary rung in alexhawat/mergeCraft's own review workflow.
+# Backup: when that run fails without posting a verdict (for example, the Go
+# plan's usage limit is reached), a second run reviews with openai/gpt-terra
+# through Codex, using the OPENAI_API_KEY secret. This mirrors the Codex rung
+# in mergeCraft's own workflow. Without that secret the backup is skipped.
 # The pin is the v0.1.0a7 release commit; its action.yml pins the signed reviewer
 # image by digest. Bump it with docs/upgrade.md in alexhawat/mergeCraft.
 #
@@ -36,7 +40,9 @@ jobs:
   mergecraft:
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    # Room for both runs: each action timeout must end before the job's, or the
+    # action never posts its completion check.
+    timeout-minutes: 90
     permissions:
       contents: read
       pull-requests: write
@@ -49,6 +55,7 @@ jobs:
       # Fork pull_request runs receive an empty secret. The same-repo clause
       # stays even if the trigger later changes.
       HAS_OPENCODE_GO: ${{ secrets.LLM_PROVIDER_9_API_KEY != '' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository) }}
+      HAS_OPENAI: ${{ secrets.OPENAI_API_KEY != '' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -57,7 +64,11 @@ jobs:
           persist-credentials: false
 
       - name: Run mergeCraft
+        id: review_opencode_go
         if: env.HAS_OPENCODE_GO == 'true'
+        # A failure here hands the review to the backup below; the last step
+        # fails the job when no run produced a review.
+        continue-on-error: true
         uses: alexhawat/mergeCraft@ca65b4c95c7afbbefa58033cea1b31b1197d0372 # v0.1.0a7
         with:
           prompt: >
@@ -79,6 +90,62 @@ jobs:
           LLM_PROVIDER_9: opencode-go
           OPENCODE_GO_API_KEY: ${{ secrets.LLM_PROVIDER_9_API_KEY }}
 
-      - name: Skip review without an OpenCode Go credential
-        if: env.HAS_OPENCODE_GO != 'true'
-        run: echo "::notice title=mergeCraft::No same-repo OpenCode Go credential for this run, so review was skipped."
+      # Fall back only when the first run posted no verdict. A success or
+      # failure verdict is a real review, and a second model must not override it.
+      - name: Decide whether the OpenAI backup reviews
+        id: decide
+        if: env.HAS_OPENAI == 'true'
+        env:
+          OUTCOME: ${{ steps.review_opencode_go.outcome }}
+          PACKET: ${{ steps.review_opencode_go.outputs.evidence_packet }}
+        run: |
+          set -euo pipefail
+          verdict="$(printf '%s' "${PACKET}" | jq -r '.decision.verdict // empty' 2>/dev/null || true)"
+          need=false
+          if [ "${OUTCOME}" = "skipped" ]; then
+            need=true
+            echo "::notice title=mergeCraft backup::No OpenCode Go credential for this run; reviewing with OpenAI."
+          elif [ "${OUTCOME}" = "failure" ]; then
+            case "${verdict}" in
+              success|failure)
+                echo "OpenCode Go posted a ${verdict} verdict before failing; not falling back." ;;
+              *)
+                need=true
+                echo "::notice title=mergeCraft backup::OpenCode Go review failed with no verdict (${verdict:-none}); reviewing with OpenAI." ;;
+            esac
+          fi
+          echo "need=${need}" >> "${GITHUB_OUTPUT}"
+
+      - name: Run mergeCraft (OpenAI backup)
+        id: review_openai
+        if: steps.decide.outputs.need == 'true'
+        uses: alexhawat/mergeCraft@ca65b4c95c7afbbefa58033cea1b31b1197d0372 # v0.1.0a7
+        with:
+          prompt: >
+            ${{ github.event_name == 'pull_request'
+                && 'Review this pull request.'
+                || github.event.inputs.prompt }}
+          model: openai/gpt-terra
+          ignore_paths: |
+            host/evals/**/*.jsonl
+            CHANGELOG.md
+          # Run exactly this model: this run carries only the OpenAI credential.
+          model_pin: enabled
+          push: disabled
+          shell: disabled
+          status_checks: enabled
+          timeout: 40m
+        env:
+          # Keep equal to the uses: commit above. The container cannot read it.
+          MERGECRAFT_ACTION_SHA: ca65b4c95c7afbbefa58033cea1b31b1197d0372
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Fail when no run produced a review
+        if: steps.review_opencode_go.outcome == 'failure' && steps.decide.outputs.need != 'true'
+        run: |
+          echo "::error title=mergeCraft::The OpenCode Go review failed and the OpenAI backup did not run (no OPENAI_API_KEY secret, or the failed run had already posted a verdict)."
+          exit 1
+
+      - name: Skip review without a reviewer credential
+        if: env.HAS_OPENCODE_GO != 'true' && env.HAS_OPENAI != 'true'
+        run: echo "::notice title=mergeCraft::No same-repo OpenCode Go or OpenAI credential for this run, so review was skipped."
