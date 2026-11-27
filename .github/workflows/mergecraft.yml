@@ -2,10 +2,13 @@
 #
 # Reviewer: OpenCode Go subscription, model opencode-go/deepseek-v4.1-flash.
 # That is the primary rung in alexhawat/mergeCraft's own review workflow.
-# Backup: when that run fails without posting a verdict (for example, the Go
-# plan's usage limit is reached), a second run reviews with openai/gpt-terra
-# through Codex, using the OPENAI_API_KEY secret. This mirrors the Codex rung
-# in mergeCraft's own workflow. Without that secret the backup is skipped.
+# Backup: when that run fails without posting a verdict on a pull request (for
+# example, the Go plan's usage limit is reached), .github/scripts/
+# mergecraft_sdk_review.py reviews it through mergeCraft's OpenAI Agents SDK
+# integration on the runner, using the OPENAI_API_KEY secret with OpenAI's
+# regular API, not the Codex CLI. The model defaults to openai/gpt-5.6-terra;
+# set the MERGECRAFT_AGENTS_SDK_MODEL repository variable to change it. Without
+# the secret the backup is skipped.
 # The pin is the v0.1.0a7 release commit; its action.yml pins the signed reviewer
 # image by digest. Bump it with docs/upgrade.md in alexhawat/mergeCraft.
 #
@@ -40,9 +43,9 @@ jobs:
   mergecraft:
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    # Room for both runs: each action timeout must end before the job's, or the
-    # action never posts its completion check.
-    timeout-minutes: 90
+    # Room for the 40-minute review plus the 30-minute backup: the action's
+    # timeout must end before the job's, or it never posts its completion check.
+    timeout-minutes: 80
     permissions:
       contents: read
       pull-requests: write
@@ -62,6 +65,8 @@ jobs:
           # Do not persist the checkout token into .git/config: mergeCraft adds
           # its own Authorization header, and git sends both on one request.
           persist-credentials: false
+          # The backup review diffs the pull request against its base commit.
+          fetch-depth: 0
 
       - name: Run mergeCraft
         id: review_opencode_go
@@ -94,7 +99,7 @@ jobs:
       # failure verdict is a real review, and a second model must not override it.
       - name: Decide whether the OpenAI backup reviews
         id: decide
-        if: env.HAS_OPENAI == 'true'
+        if: github.event_name == 'pull_request' && env.HAS_OPENAI == 'true'
         env:
           OUTCOME: ${{ steps.review_opencode_go.outcome }}
           PACKET: ${{ steps.review_opencode_go.outputs.evidence_packet }}
@@ -116,34 +121,47 @@ jobs:
           fi
           echo "need=${need}" >> "${GITHUB_OUTPUT}"
 
-      - name: Run mergeCraft (OpenAI backup)
-        id: review_openai
+      - name: Install mergeCraft's Agents SDK integration
         if: steps.decide.outputs.need == 'true'
-        uses: alexhawat/mergeCraft@ca65b4c95c7afbbefa58033cea1b31b1197d0372 # v0.1.0a7
-        with:
-          prompt: >
-            ${{ github.event_name == 'pull_request'
-                && 'Review this pull request.'
-                || github.event.inputs.prompt }}
-          model: openai/gpt-terra
-          ignore_paths: |
-            host/evals/**/*.jsonl
-            CHANGELOG.md
-          # Run exactly this model: this run carries only the OpenAI credential.
-          model_pin: enabled
-          push: disabled
-          shell: disabled
-          status_checks: enabled
-          timeout: 40m
+        run: |
+          python3 -m venv "${RUNNER_TEMP}/mergecraft-sdk"
+          "${RUNNER_TEMP}/mergecraft-sdk/bin/pip" install --quiet 'mergecraft-action[agents]==0.1.0a7'
+
+      # Sees OPENAI_API_KEY but no GitHub token; the post step below is the reverse.
+      - name: Review with the OpenAI Agents SDK (backup)
+        id: sdk_review
+        if: steps.decide.outputs.need == 'true'
+        timeout-minutes: 30
         env:
-          # Keep equal to the uses: commit above. The container cannot read it.
-          MERGECRAFT_ACTION_SHA: ca65b4c95c7afbbefa58033cea1b31b1197d0372
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          MERGECRAFT_AGENTS_SDK_MODEL: ${{ vars.MERGECRAFT_AGENTS_SDK_MODEL || 'openai/gpt-5.6-terra' }}
+          # Keep pull-request content out of OpenAI's trace dashboard.
+          OPENAI_AGENTS_DISABLE_TRACING: '1'
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          # The first review may leave the workspace on another commit or dirty.
+          git -c advice.detachedHead=false checkout --force --detach "${HEAD_SHA}"
+          "${RUNNER_TEMP}/mergecraft-sdk/bin/python" .github/scripts/mergecraft_sdk_review.py review \
+            --base "${BASE_SHA}" --head "${HEAD_SHA}" --pr "${PR_NUMBER}" --title "${PR_TITLE}" \
+            --out "${RUNNER_TEMP}/mergecraft-sdk-report.json"
+
+      - name: Post the backup review
+        if: always() && steps.decide.outputs.need == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          python3 .github/scripts/mergecraft_sdk_review.py post \
+            --report "${RUNNER_TEMP}/mergecraft-sdk-report.json" --pr "${PR_NUMBER}" --head-sha "${HEAD_SHA}"
 
       - name: Fail when no run produced a review
         if: steps.review_opencode_go.outcome == 'failure' && steps.decide.outputs.need != 'true'
         run: |
-          echo "::error title=mergeCraft::The OpenCode Go review failed and the OpenAI backup did not run (no OPENAI_API_KEY secret, or the failed run had already posted a verdict)."
+          echo "::error title=mergeCraft::The OpenCode Go review failed and the OpenAI backup did not run (no OPENAI_API_KEY secret, not a pull request, or the failed run had already posted a verdict)."
           exit 1
 
       - name: Skip review without a reviewer credential
