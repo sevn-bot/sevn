@@ -142,8 +142,8 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          # The first review may leave the workspace on another commit or dirty.
-          git -c advice.detachedHead=false checkout --force --detach "${HEAD_SHA}"
+          # The script reads the base and head commits from git objects, not the
+          # working tree, which the first review leaves root-owned and changed.
           "${RUNNER_TEMP}/mergecraft-sdk/bin/python" .github/scripts/mergecraft_sdk_review.py review \
             --base "${BASE_SHA}" --head "${HEAD_SHA}" --pr "${PR_NUMBER}" --title "${PR_TITLE}" \
             --out "${RUNNER_TEMP}/mergecraft-sdk-report.json"
